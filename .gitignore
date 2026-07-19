@@ -1,6 +1,9 @@
 # Hermes desktop / local agent noise
 .hermes/
 
+# Git worktrees (isolated feature checkouts)
+.worktrees/
+
 # Build
 **/target/
 **/build/
