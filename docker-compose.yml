@@ -35,8 +35,8 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
-    environment:
-      VITE_API_BASE: /api/v1
+      args:
+        VITE_API_BASE: /api/v1
     ports:
       - "5174:80"
     depends_on:

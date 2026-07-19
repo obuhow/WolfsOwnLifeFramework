@@ -71,7 +71,11 @@ cd api
 ./gradlew test
 ```
 
-Образец: `api/src/test/java/ru/wolf/api/HealthApiIT.java` — полный Spring context + Postgres container + HTTP assertion на `/api/v1/health`.
+Образец:
+- base: `api/src/test/java/ru/wolf/api/support/ApiIntegrationTest.java` (Testcontainers Postgres + `WebTestClient`, hook `authedClient()` под JWT в тикете 02)
+- пример: `api/src/test/java/ru/wolf/api/HealthApiIT.java` — HTTP `/api/v1/health` + smoke `select 1` на Postgres
+
+`/api/v1/health` проверяет живой `DataSource` (не «всегда UP»).
 
 Позже: JWT в header, изоляция по Пользователю, сценарии по глоссарию `CONTEXT.md`.
 
