@@ -4,10 +4,10 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** in-review
 
-- [ ] Gradle Spring Boot 3 (Java 21) модуль API стартует и отдаёт health
-- [ ] Vue 3 SPA scaffold открывается и ходит на API base URL
-- [ ] Docker Compose поднимает PostgreSQL (+ согласованный способ гонять API/UI)
-- [ ] Один пример API-теста на Testcontainers Postgres зелёный и задокументирован как образец
-- [ ] README с командами запуска для человека/агента
+- [x] Gradle Spring Boot 3 (Java 21) модуль API стартует и отдаёт health
+- [x] Vue 3 SPA scaffold открывается и ходит на API base URL
+- [x] Docker Compose поднимает PostgreSQL (+ согласованный способ гонять API/UI)
+- [x] Один пример API-теста на Testcontainers Postgres зелёный и задокументирован как образец
+- [x] README с командами запуска для человека/агента
