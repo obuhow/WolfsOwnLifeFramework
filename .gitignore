@@ -1,0 +1,19 @@
+# Hermes desktop / local agent noise
+.hermes/
+
+# Build
+**/target/
+**/build/
+**/.gradle/
+**/node_modules/
+**/dist/
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Env
+.env
+.env.*
