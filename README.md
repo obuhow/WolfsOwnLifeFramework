@@ -1,23 +1,98 @@
-# WOLF - Wolf's Own Life Framework
-Самостоятельная оцифровка жизни для предпринимателей, фрилансеров, художников, разработчиков. Ведение личных дел с помощью команды AI-agents. Система без самопринуждения и чувства вины за отложенные дела. Отказ от принуждения -> честный прогноз, замена навязанно важных дел на то, что выбираешь реально
+# WOLF
 
+Самостоятельная оцифровка жизни: одно тёплое место для работы, здоровья, семьи, денег и отдыха.
+Слоган: «Уютно. Тихо. Под вашим контролем».
 
-## Мой опыт
-QA-инженер с продуктовым мышлением. С 2013 по 2020 - предприниматель в сфере услуг BTL. В IT с 2020 года (SEO-специалист, PM). С 2023 года QA в банке (manual + auto, высоконагруженный сервис). Сейчас учусь на backend (Java, Spring Boot). Параллельно веду собственные проекты и open-source.
+Стек 0.1: **Java 21 + Spring Boot 3 + Gradle**, **Vue 3 (Vite)**, **PostgreSQL**, **JWT** (с тикета 02), **Docker Compose**.
 
-## Как устроено
-Всё на базе AI-agents. Я не пишу код руками каждый день. Агенты сами собирают, анализируют и предлагают варианты. Я только корректирую.
+## Структура
 
-## Что уже есть
-- Доменная модель (Дела, Проекты, Записи времени)
-- Архитектура на Java + Spring + Vue + Postgres + JWT
-- Первые рабочие прототипы
+```
+api/                 Spring Boot API (Gradle)
+web/                 Vue 3 SPA (Vite)
+docker-compose.yml   Postgres + API + web (nginx)
+```
 
-Сейчас
-Работаю в волнообразном режиме. План декабрь 2025 — июнь-июль 2026. Реально выхожу 7 часов в неделю вместо 20–30. Тревога и вина за отложенное — главная причина торможения. Прогноз — октябрь 2026.
+## Порты по умолчанию (host)
 
-Две дорожки:
+| Сервис | Host port | Внутри compose |
+|--------|-----------|----------------|
+| Postgres | **5434** | 5432 |
+| API | **8082** | 8080 |
+| Web | **5174** | 80 |
 
-Основная работа
-Подработка (1 день в неделю)
-Раз в месяц пересматриваю ресурсы и зависимости. Честный прогноз, без самообмана.
+Порты выбраны так, чтобы не пересекаться с типичным system Postgres `:5432` и другими локальными стеками.
+
+## Быстрый старт (человек / агент)
+
+### Вариант A — Docker Compose (всё сразу)
+
+```bash
+docker compose up --build
+```
+
+- UI: http://localhost:5174  
+- API: http://localhost:8082  
+- Health: http://localhost:8082/api/v1/health  
+- Postgres: `localhost:5434`, db/user/pass `wolf` / `wolf` / `wolf`
+
+### Вариант B — локальная разработка
+
+1. Поднять только БД:
+
+```bash
+docker compose up -d db
+```
+
+2. API (default `localhost:5434` + port `8082`):
+
+```bash
+cd api
+./gradlew bootRun
+```
+
+3. SPA (прокси `/api` → API; по умолчанию `http://localhost:8082`):
+
+```bash
+cd web
+npm install
+VITE_DEV_API_PROXY=http://localhost:8082 npm run dev -- --port 5174
+```
+
+- UI: http://localhost:5174  
+- API base в SPA: `/api/v1` (см. `web/src/api.js`, env `VITE_API_BASE`)
+
+## Тесты (шаблон для следующих тикетов)
+
+Primary seam: **HTTP API** на реальном PostgreSQL через **Testcontainers**.
+
+```bash
+cd api
+./gradlew test
+```
+
+Образец:
+- base: `api/src/test/java/ru/wolf/api/support/ApiIntegrationTest.java` (Testcontainers Postgres + `WebTestClient`, hook `authedClient()` под JWT в тикете 02)
+- пример: `api/src/test/java/ru/wolf/api/HealthApiIT.java` — HTTP `/api/v1/health` + smoke `select 1` на Postgres
+
+`/api/v1/health` проверяет живой `DataSource` (не «всегда UP»).
+
+Позже: JWT в header, изоляция по Пользователю, сценарии по глоссарию `CONTEXT.md`.
+
+Требование: Docker daemon с API ≥ 1.44 (Docker Engine 25+). В `api/build.gradle` Testcontainers поднят до **1.21.4** из‑за совместимости с современным Docker API.
+
+## Полезные команды
+
+| Действие | Команда |
+|----------|---------|
+| API tests | `cd api && ./gradlew test` |
+| API jar | `cd api && ./gradlew bootJar` |
+| FE build | `cd web && npm run build` |
+| Compose down + volume | `docker compose down -v` |
+
+## Документация продукта
+
+- Глоссарий: [`CONTEXT.md`](CONTEXT.md)
+- ADR: [`docs/adr/`](docs/adr/)
+- Release 0.1 spec: [`.scratch/release-0.1/spec.md`](.scratch/release-0.1/spec.md)
+- Тикеты: [`.scratch/release-0.1/issues/`](.scratch/release-0.1/issues/)

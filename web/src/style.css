@@ -1,0 +1,110 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #2c2a26;
+  background:
+    radial-gradient(circle at top left, #f7efe3 0%, transparent 45%),
+    radial-gradient(circle at bottom right, #e7eef2 0%, transparent 40%),
+    #f4f1ec;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 3rem;
+}
+
+.header h1 {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+  color: #7a7268;
+}
+
+.main {
+  margin-top: 2rem;
+}
+
+.card {
+  background: rgba(255, 252, 247, 0.92);
+  border: 1px solid #e6dfd4;
+  border-radius: 18px;
+  padding: 1.5rem 1.6rem;
+  box-shadow: 0 10px 30px rgba(70, 55, 30, 0.05);
+}
+
+.card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.card p {
+  margin: 0 0 1.25rem;
+  color: #5c564e;
+}
+
+.meta {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+}
+
+.meta dt {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a8278;
+}
+
+.meta dd {
+  margin: 0.15rem 0 0;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: #f0ebe3;
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+}
+
+.ok {
+  color: #2f6b4f;
+}
+
+.bad {
+  color: #8a4b2f;
+}
+
+.err {
+  color: #8a4b2f;
+  font-size: 0.92em;
+}
