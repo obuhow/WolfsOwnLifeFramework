@@ -6,7 +6,6 @@ services:
       POSTGRES_USER: wolf
       POSTGRES_PASSWORD: wolf
     ports:
-      # 5434: avoid system Postgres :5432 and common project :5433
       - "5434:5432"
     volumes:
       - wolf_pgdata:/var/lib/postgresql/data
@@ -18,8 +17,8 @@ services:
 
   api:
     build:
-      context: ./api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api/Dockerfile
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wolf
       SPRING_DATASOURCE_USERNAME: wolf
@@ -35,8 +34,6 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
-      args:
-        VITE_API_BASE: /api/v1
     ports:
       - "5174:80"
     depends_on:
