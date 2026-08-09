@@ -8,12 +8,15 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      # Scaffold: no migrations yet. Later tickets switch to validate + Flyway.
-      ddl-auto: none
+      ddl-auto: validate
     properties:
       hibernate:
         jdbc:
           time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
   sql:
     init:
       mode: never

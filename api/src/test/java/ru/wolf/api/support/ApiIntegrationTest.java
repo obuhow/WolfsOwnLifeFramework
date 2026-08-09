@@ -22,18 +22,19 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 public abstract class ApiIntegrationTest {
 
     @Container
-    protected static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
+    protected static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:14-alpine")
             .withDatabaseName("wolf")
             .withUsername("wolf")
-            .withPassword("wolf");
+            .withPassword("wolf")
+            .withStartupTimeout(java.time.Duration.ofMinutes(3));
 
     @DynamicPropertySource
     static void datasourceProps(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
-        // Scaffold has no Flyway schema yet; allow empty DB to boot.
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        registry.add("spring.flyway.enabled", () -> "false");
     }
 
     @LocalServerPort
@@ -42,7 +43,47 @@ public abstract class ApiIntegrationTest {
     @Autowired
     protected WebTestClient webTestClient;
 
+    /** Obtain a JWT for the given credentials and return an authenticated WebTestClient. */
+    protected WebTestClient authedClient(String username, String password) {
+        String token = login(username, password);
+        return webTestClient.mutate()
+                .defaultHeader("Authorization", "Bearer " + token)
+                .build();
+    }
+
+    /** Obtain a JWT for the default seed admin user. */
+    protected WebTestClient authedAdminClient() {
+        return authedClient("admin", "admin");
+    }
+
+    /** Login and return JWT token. */
+    protected String login(String username, String password) {
+        var loginRequest = new java.util.HashMap<String, String>();
+        loginRequest.put("username", username);
+        loginRequest.put("password", password);
+
+        String responseBody = webTestClient.post()
+                .uri("/api/v1/auth/login")
+                .bodyValue(loginRequest)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(String.class)
+                .getResponseBody()
+                .blockFirst();
+
+        // Parse JSON to extract token
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(responseBody)
+                    .get("token")
+                    .asText();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new RuntimeException("Failed to parse login response", e);
+        }
+    }
+
     /** Hook for ticket 02+: attach Authorization without changing call sites much. */
+    @Deprecated(forRemoval = true, since = "0.2")
     protected WebTestClient.Builder authedClient() {
         return webTestClient.mutate();
     }
