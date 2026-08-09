@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Павел Обухов — QA Engineer (manual + auto). Тестирование высоконагруженных микросервисов, Spring Boot, тестовая документация и планирование релизов." />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Павел Обухов — QA Engineer</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ========== RESET & BASE ========== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fafafa;
+      color: #1f2328;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+
+    /* ========== LAYOUT ========== */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    section { padding: 96px 0; position: relative; }
+    section + section { border-top: 1px solid rgba(0, 0, 0, 0.06); }
+
+    /* ========== NAVIGATION ========== */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: saturate(180%) blur(12px);
+      -webkit-backdrop-filter: saturate(180%) blur(12px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 64px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 16px; color: #1f2328;
+    }
+    .logo-mark {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #f89820 0%, #e76f00 100%);
+      display: grid; place-items: center; color: #fff;
+      font-weight: 800; font-size: 14px;
+    }
+    .nav-links { display: flex; gap: 28px; list-style: none; }
+    .nav-links a {
+      font-size: 14px; font-weight: 500; color: #57606a;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: #1f2328; }
+    .nav-right { display: flex; gap: 8px; align-items: center; }
+    .lang-switch {
+      font-size: 13px; font-weight: 600; padding: 6px 12px;
+      border-radius: 6px; border: 1px solid rgba(0, 0, 0, 0.12);
+      color: #57606a; transition: all 0.2s;
+    }
+    .lang-switch:hover { border-color: #f89820; color: #f89820; }
+    .nav-burger {
+      display: none; background: none; border: none; cursor: pointer;
+      width: 40px; height: 40px; color: #1f2328;
+    }
+
+    /* ========== HERO ========== */
+    .hero { padding: 140px 0 80px; }
+    .hero-grid {
+      display: grid; grid-template-columns: 200px 1fr; gap: 56px;
+      align-items: center;
+    }
+    .avatar-wrap {
+      position: relative; width: 200px; height: 200px;
+    }
+    .avatar {
+      width: 100%; height: 100%; border-radius: 50%;
+      background: linear-gradient(135deg, #f89820 0%, #e76f00 100%);
+      display: grid; place-items: center; color: #fff;
+      font-size: 64px; font-weight: 800; letter-spacing: -0.02em;
+      box-shadow: 0 10px 40px -10px rgba(248, 152, 32, 0.4);
+      position: relative; overflow: hidden;
+    }
+    .avatar::after {
+      content: ""; position: absolute; inset: 0;
+      background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.3) 0%, transparent 60%);
+    }
+    .avatar-ring {
+      position: absolute; inset: -8px;
+      border-radius: 50%; border: 2px dashed rgba(248, 152, 32, 0.3);
+      animation: spin 20s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 100px;
+      background: rgba(248, 152, 32, 0.08); border: 1px solid rgba(248, 152, 32, 0.25);
+      color: #c2410c; font-size: 13px; font-weight: 600; margin-bottom: 20px;
+    }
+    .hero-tag .dot { width: 8px; height: 8px; border-radius: 50%; background: #f89820; }
+    .hero h1 {
+      font-size: clamp(36px, 5vw, 56px); font-weight: 800; line-height: 1.1;
+      color: #1f2328; letter-spacing: -0.02em; margin-bottom: 14px;
+    }
+    .hero h1 .accent {
+      background: linear-gradient(135deg, #f89820 0%, #e76f00 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero h2 {
+      font-size: clamp(18px, 2.5vw, 22px); font-weight: 500; color: #57606a;
+      margin-bottom: 24px; line-height: 1.5;
+    }
+    .hero h2 strong { color: #1f2328; font-weight: 700; }
+    .hero p.lead {
+      font-size: 16px; color: #57606a; max-width: 640px; margin-bottom: 32px;
+    }
+    .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 20px; border-radius: 8px; font-weight: 600;
+      font-size: 14px; cursor: pointer; transition: all 0.2s; border: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #f89820 0%, #e76f00 100%);
+      color: #fff; box-shadow: 0 4px 14px -4px rgba(248, 152, 32, 0.4);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 25px -8px rgba(248, 152, 32, 0.5); }
+    .btn-ghost {
+      background: transparent; color: #1f2328;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+    .btn-ghost:hover { border-color: #f89820; color: #c2410c; }
+
+    .hero-meta {
+      display: flex; gap: 32px; flex-wrap: wrap; margin-top: 48px;
+      padding-top: 28px; border-top: 1px solid rgba(0, 0, 0, 0.08);
+    }
+    .meta-item { font-size: 14px; }
+    .meta-item .label { color: #6e7681; display: block; margin-bottom: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .meta-item .value { color: #1f2328; font-weight: 600; }
+
+    /* ========== SECTION HEADER ========== */
+    .section-header { margin-bottom: 56px; }
+    .section-eyebrow {
+      font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      color: #c2410c; font-weight: 600; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-eyebrow::before { content: ""; width: 24px; height: 1px; background: #c2410c; }
+    .section-title {
+      font-size: clamp(28px, 4vw, 40px); font-weight: 700;
+      color: #1f2328; letter-spacing: -0.02em; line-height: 1.2;
+    }
+
+    /* ========== ABOUT ========== */
+    .about-grid {
+      display: grid; grid-template-columns: 1fr; gap: 32px;
+      max-width: 800px;
+    }
+    .about-grid p { font-size: 16px; color: #1f2328; }
+    .about-grid p strong { color: #1f2328; font-weight: 700; }
+    .about-grid .highlight { color: #c2410c; font-weight: 600; }
+    .about-list { list-style: none; margin: 16px 0; }
+    .about-list li {
+      font-size: 15px; color: #1f2328; padding: 6px 0 6px 28px;
+      position: relative;
+    }
+    .about-list li::before {
+      content: "✓"; position: absolute; left: 0; color: #f89820; font-weight: 700; font-size: 16px;
+    }
+    .note {
+      margin-top: 24px; padding: 14px 18px; border-radius: 8px;
+      background: #fff8f0; border-left: 3px solid #f89820;
+      font-size: 14px; color: #57606a;
+    }
+
+    /* ========== STACK ========== */
+    .stack-section { display: grid; gap: 24px; }
+    .stack-group {
+      padding: 28px; border-radius: 16px;
+      background: #fff; border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    .stack-group.primary {
+      background: linear-gradient(135deg, #fff8f0 0%, #fff 100%);
+      border-color: rgba(248, 152, 32, 0.3);
+    }
+    .stack-group-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
+    }
+    .stack-group-title {
+      font-size: 16px; font-weight: 700; color: #1f2328;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .stack-group-title .icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: linear-gradient(135deg, #f89820, #e76f00);
+      display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800;
+    }
+    .stack-group-title .icon.secondary { background: #57606a; }
+    .stack-level {
+      font-size: 12px; font-weight: 600; padding: 4px 10px;
+      border-radius: 100px;
+    }
+    .stack-level.pro { background: rgba(248, 152, 32, 0.12); color: #c2410c; }
+    .stack-level.basic { background: rgba(0, 0, 0, 0.06); color: #57606a; }
+    .stack-group-desc { font-size: 13px; color: #57606a; margin-bottom: 16px; }
+    .stack-items { display: flex; flex-wrap: wrap; gap: 8px; }
+    .stack-chip {
+      padding: 6px 12px; font-size: 13px; border-radius: 6px;
+      background: #fff; color: #1f2328; font-weight: 500;
+      border: 1px solid rgba(0, 0, 0, 0.1); transition: all 0.2s;
+    }
+    .stack-chip:hover { border-color: #f89820; color: #c2410c; }
+    .stack-group.primary .stack-chip {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    /* ========== EXPERIENCE ========== */
+    .timeline { position: relative; padding-left: 32px; }
+    .timeline::before {
+      content: ""; position: absolute; left: 7px; top: 8px; bottom: 8px;
+      width: 2px; background: linear-gradient(180deg, #f89820 0%, transparent 100%);
+    }
+    .exp-item { position: relative; padding-bottom: 56px; }
+    .exp-item:last-child { padding-bottom: 0; }
+    .exp-item::before {
+      content: ""; position: absolute; left: -32px; top: 8px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #fafafa; border: 3px solid #f89820;
+      box-shadow: 0 0 0 4px rgba(248, 152, 32, 0.1);
+    }
+    .exp-header { margin-bottom: 16px; }
+    .exp-role {
+      font-size: 20px; font-weight: 700; color: #1f2328; margin-bottom: 4px;
+    }
+    .exp-company {
+      font-size: 16px; color: #c2410c; font-weight: 700; margin-bottom: 6px;
+    }
+    .exp-meta {
+      font-size: 13px; color: #6e7681; font-family: 'JetBrains Mono', monospace;
+    }
+    .exp-desc { color: #1f2328; margin-bottom: 16px; font-size: 15px; }
+    .exp-subhead {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #57606a; font-weight: 700; margin-top: 16px; margin-bottom: 10px;
+    }
+    .exp-list { list-style: none; }
+    .exp-list li {
+      font-size: 14px; color: #1f2328; padding: 4px 0 4px 24px;
+      position: relative;
+    }
+    .exp-list li::before {
+      content: "▸"; position: absolute; left: 0; color: #f89820; font-weight: 700;
+    }
+    .exp-stack {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;
+    }
+    .exp-chip {
+      padding: 4px 10px; font-size: 12px; border-radius: 4px;
+      background: rgba(248, 152, 32, 0.08); color: #c2410c;
+      font-family: 'JetBrains Mono', monospace; font-weight: 500;
+    }
+
+    /* ========== PROJECTS ========== */
+    .project-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .project-card {
+      padding: 28px; border-radius: 16px;
+      background: #fff; border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      transition: all 0.25s; display: flex; flex-direction: column;
+    }
+    .project-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.15);
+      border-color: rgba(248, 152, 32, 0.3);
+    }
+    .project-card.featured {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, #fff8f0 0%, #fff 100%);
+      border-color: rgba(248, 152, 32, 0.3);
+    }
+    .project-header {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 14px;
+    }
+    .project-icon {
+      width: 48px; height: 48px; border-radius: 10px;
+      background: linear-gradient(135deg, #f89820 0%, #e76f00 100%);
+      display: grid; place-items: center; color: #fff;
+      font-weight: 800; font-size: 18px;
+      flex-shrink: 0;
+    }
+    .project-icon.secondary { background: #57606a; }
+    .project-title {
+      font-size: 18px; font-weight: 700; color: #1f2328; margin-bottom: 2px;
+    }
+    .project-subtitle {
+      font-size: 12px; color: #57606a; font-family: 'JetBrains Mono', monospace;
+    }
+    .project-desc { font-size: 14px; color: #1f2328; margin-bottom: 16px; flex-grow: 1; line-height: 1.55; }
+    .project-section-label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #c2410c; font-weight: 700; margin-bottom: 8px;
+    }
+    .project-list { list-style: none; margin-bottom: 16px; }
+    .project-list li {
+      font-size: 13px; color: #1f2328; padding: 3px 0;
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .project-list li::before { content: "✓"; color: #f89820; flex-shrink: 0; font-weight: 700; }
+    .project-stack {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;
+    }
+    .project-stack .chip {
+      padding: 3px 8px; font-size: 11px; border-radius: 4px;
+      background: rgba(0, 0, 0, 0.04); color: #57606a;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .project-links {
+      display: flex; flex-wrap: wrap; gap: 12px; padding-top: 16px;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+    }
+    .project-link {
+      font-size: 13px; color: #c2410c; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 4px;
+      transition: gap 0.2s;
+    }
+    .project-link:hover { gap: 8px; }
+
+    /* ========== CONTACT ========== */
+    .contact-section { text-align: center; }
+    .contact-cta {
+      max-width: 700px; margin: 0 auto; padding: 56px 40px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #fff8f0 0%, #fff 100%);
+      border: 1px solid rgba(248, 152, 32, 0.3);
+      box-shadow: 0 4px 24px -8px rgba(248, 152, 32, 0.2);
+    }
+    .contact-cta h3 {
+      font-size: 28px; color: #1f2328; margin-bottom: 12px; font-weight: 800;
+    }
+    .contact-cta p { color: #57606a; margin-bottom: 28px; font-size: 15px; }
+    .contact-buttons {
+      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+    }
+    .contact-list {
+      display: flex; justify-content: center; gap: 28px; flex-wrap: wrap;
+      margin-top: 48px;
+    }
+    .contact-list a {
+      color: #57606a; font-size: 14px; font-weight: 500;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: color 0.2s;
+    }
+    .contact-list a:hover { color: #c2410c; }
+
+    /* ========== FOOTER ========== */
+    footer {
+      padding: 32px 0; border-top: 1px solid rgba(0, 0, 0, 0.06);
+      text-align: center; font-size: 13px; color: #6e7681;
+    }
+
+    /* ========== ANIMATIONS ========== */
+    .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.8s ease, transform 0.8s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ========== RESPONSIVE ========== */
+    @media (max-width: 768px) {
+      section { padding: 64px 0; }
+      .hero { padding: 110px 0 56px; }
+      .hero-grid {
+        grid-template-columns: 1fr; gap: 28px;
+        text-align: left;
+      }
+      .avatar-wrap { width: 140px; height: 140px; margin: 0 auto; }
+      .avatar { font-size: 48px; }
+      .nav-links { display: none; position: absolute; top: 64px; left: 0; right: 0; flex-direction: column; gap: 0; background: #fff; border-bottom: 1px solid rgba(0, 0, 0, 0.06); padding: 16px 24px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+      .nav-links.open { display: flex; }
+      .nav-links li { padding: 12px 0; border-bottom: 1px solid rgba(0, 0, 0, 0.04); }
+      .nav-links li:last-child { border-bottom: none; }
+      .nav-burger { display: grid; place-items: center; }
+      .hero-meta { gap: 20px; }
+      .contact-cta { padding: 40px 24px; }
+      .contact-cta h3 { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========== NAV ========== -->
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a href="#hero" class="logo">
+        <span class="logo-mark">ПО</span>
+        <span>pavel.obukhov</span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#about">О себе</a></li>
+        <li><a href="#stack">Стек</a></li>
+        <li><a href="#experience">Опыт</a></li>
+        <li><a href="#projects">Проекты</a></li>
+        <li><a href="#contact">Контакты</a></li>
+      </ul>
+      <div class="nav-right">
+        <a href="index.en.html" class="lang-switch">EN</a>
+        <button class="nav-burger" id="navBurger" aria-label="Меню">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== HERO ========== -->
+  <section id="hero" class="hero">
+    <div class="container hero-grid">
+      <div class="avatar-wrap reveal">
+        <div class="avatar-ring"></div>
+        <div class="avatar" title="Обухов Павел"><!-- <img src="your-photo.jpg" alt="Павел Обухов" /> -->ПО</div>
+      </div>
+      <div class="reveal">
+        <span class="hero-tag"><span class="dot"></span>Открыт к предложениям</span>
+        <h1>Павел Обухов</h1>
+        <h2><strong>QA Engineer</strong> — manual &amp; automation. <br/>В перспективе — fullstack QA, Backend Java.</h2>
+        <p class="lead">
+          Два года тестировал высоконагруженный сервис на микросервисной архитектуре в Сбере. Умею составлять тестовую документацию, планировать релизы
+        </p>
+        <div class="cta-row">
+          <a href="#contact" class="btn btn-primary">Связаться со мной →</a>
+          <a href="https://github.com/obuhow" target="_blank" rel="noopener" class="btn btn-ghost">GitHub профиль</a>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-item"><span class="label">Локация</span><span class="value">Новосибирск/Москва</span></div>
+          <div class="meta-item"><span class="label">Опыт в QA</span><span class="value">2 года (Sber)</span></div>
+          <div class="meta-item"><span class="label">Языки</span><span class="value">RU · EN (B1)</span></div>
+          <div class="meta-item"><span class="label">Цель</span><span class="value">QA → Fullstack QA</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== ABOUT ========== -->
+  <section id="about">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-eyebrow">01 — О себе</div>
+        <h2 class="section-title">QA-инженер с продуктовым мышлением</h2>
+      </div>
+      <div class="about-grid reveal">
+        <p>
+          Развиваюсь параллельно в QA (manual/auto), Java Backent, проектировании AI-teams.
+        </p>
+        <p>
+          Два года тестировал высоконагруженные сервисы массовых зачислений в **Сбере** — там я полюбил Java-стек (Spring, REST API, PostgreSQL, Kafka) и начал писать автотесты. После увольнения в ноябре 2025 взял курс на backend-разработку.
+        </p>
+        <ul class="project-list">
+          <li> Веду самостоятельную релизную разработку учебного проекта, который пишу сам без применения LLM. Небольшой backend на Spring Boot — с архитектурой, которую легко поддерживать (datasource / domain / web / security), со всей необходимой документацией (Swagger, Postman-коллекции, release-notes), CI/CD и планированием релизов.
+          <li> Веду разработку opensource проекта, где код пишет LLM.
+        </ul>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== STACK ========== -->
+  <section id="stack">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-eyebrow">02 — Стек и навыки</div>
+        <h2 class="section-title">Что я умею и на каком уровне</h2>
+      </div>
+
+      <div class="stack-section">
+        <!-- QA HARD SKILLS -->
+        <div class="stack-group primary reveal">
+          <div class="stack-group-head">
+            <div class="stack-group-title">
+              <span class="icon">🧪</span>
+              QA — специализация
+            </div>
+          </div>
+          <p class="stack-group-desc">
+            Production-опыт на высоконагруженном проекте. Составление тестовой документации, ручное и автоматизированное тестирование.
+          </p>
+          <div class="stack-items">
+            <span class="stack-chip">Тест-планы · чек-листы · тест-кейсы</span>
+            <span class="stack-chip">Баг-репорты · регрессионное тестирование</span>
+            <span class="stack-chip">Функциональное · интеграционное · E2E</span>
+            <span class="stack-chip">REST · gRPC · Kafka</span>
+            <span class="stack-chip">Postman · Postman-коллекции</span>
+            <span class="stack-chip">Swagger UI</span>
+            <span class="stack-chip">JUnit 5 · MockMvc</span>
+            <span class="stack-chip">ПСИ · приёмо-сдаточные испытания</span>
+          </div>
+        </div>
+
+        <!-- ОСНОВНОЙ СТЕК - Java -->
+        <div class="stack-group primary reveal">
+          <div class="stack-group-head">
+            <div class="stack-group-title">
+              <span class="icon">☕</span>
+              Java / Backend — специализация
+            </div>
+          </div>
+          <p class="stack-group-desc">
+            Учу профессионально: теория (ООП, коллекции, паттерны) + объёмная практика (автотесты в Сбере, личные проекты на Spring Boot с CI/CD).
+          </p>
+          <div class="stack-items">
+            <span class="stack-chip">Java 21 / 18</span>
+            <span class="stack-chip">Spring Boot 3.x</span>
+            <span class="stack-chip">Spring Security</span>
+            <span class="stack-chip">Spring Data JPA</span>
+            <span class="stack-chip">Hibernate</span>
+            <span class="stack-chip">Gradle · Maven</span>
+            <span class="stack-chip">JUnit 5</span>
+            <span class="stack-chip">REST API</span>
+            <span class="stack-chip">PostgreSQL</span>
+            <span class="stack-chip">Oracle</span>
+            <span class="stack-chip">MySQL · H2 · SQLite</span>
+            <span class="stack-chip">Docker</span>
+            <span class="stack-chip">GitHub Actions</span>
+            <span class="stack-chip">Swagger / OpenAPI</span>
+          </div>
+        </div>
+
+        <!-- DEVOPS & INFRA -->
+        <div class="stack-group reveal">
+          <div class="stack-group-head">
+            <div class="stack-group-title">
+              <span class="icon secondary">⚙️</span>
+              DevOps & инфраструктура — рабочий уровень
+            </div>
+            <span class="stack-level basic">Working</span>
+          </div>
+          <p class="stack-group-desc">
+            Использовал в Сбере, плюс настраивал сам для личных проектов.
+          </p>
+          <div class="stack-items">
+            <span class="stack-chip">Docker · Docker Compose</span>
+            <span class="stack-chip">Kubernetes (базово)</span>
+            <span class="stack-chip">GitHub Actions · CI/CD</span>
+            <span class="stack-chip">Jenkins</span>
+            <span class="stack-chip">Cloud.ru · GHCR</span>
+            <span class="stack-chip">Kafka (как тестировщик)</span>
+          </div>
+        </div>
+
+        <!-- SECONDARY -->
+        <div class="stack-group reveal">
+          <div class="stack-group-head">
+            <div class="stack-group-title">
+              <span class="icon secondary">📜</span>
+              Дополнительно — скрипты и небольшие проекты
+            </div>
+            <span class="stack-level basic">Basic</span>
+          </div>
+          <p class="stack-group-desc">
+            Пишу простой фронтенд на vue.js без глубокого погружения в теорию JavaScript, небольшие скрипты на python.
+          </p>
+          <div class="stack-items">
+            <span class="stack-chip">JavaScript · Vue.js (Hello World)</span>
+            <span class="stack-chip">Python · скрипты для MySQL/SEO</span>
+            <span class="stack-chip">C · алгоритмы в Школе 21</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== EXPERIENCE ========== -->
+  <section id="experience">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-eyebrow">03 — Опыт</div>
+        <h2 class="section-title">Где я работал</h2>
+      </div>
+
+      <div class="timeline">
+        <div class="exp-item reveal">
+          <div class="exp-header">
+            <div class="exp-role">QA-инженер</div>
+            <div class="exp-company">Сбер · Москва</div>
+            <div class="exp-meta">Ноябрь 2023 — Ноябрь 2025 · 2 года</div>
+          </div>
+          <p class="exp-desc">
+            <strong>Функциональное и интеграционное тестирование высоконагруженного сервиса массовых зачислений</strong> (зарплаты, стипендии, пенсии) на микросервисной облачной архитектуре с 14+ интеграциями. Сервис обрабатывал миллионы транзакций в сутки.
+          </p>
+          <div class="note">
+          💬 Бывший руководитель из Сбера готов дать обратную связь по моей работе.
+          </div>
+          <div class="exp-subhead">Тестовая документация и процесс</div>
+          <ul class="exp-list">
+            <li>Составление и актуализация тест-планов, чек-листов и тест-кейсов</li>
+            <li>Написание баг-репортов, воспроизведение дефектов, верификация фиксов</li>
+            <li>Регрессионное тестирование перед каждым релизом</li>
+            <li>Подготовка и проведение ПСИ (приёмо-сдаточных испытаний)</li>
+          </ul>
+          <div class="exp-subhead">Виды тестирования</div>
+          <ul class="exp-list">
+            <li>API: REST, gRPC, Kafka</li>
+            <li>БД: Oracle, PostgreSQL (SQL-запросы, проверка миграций)</li>
+            <li>UI: веб-интерфейс сервиса</li>
+            <li>Микросервисная архитектура — сквозные E2E-сценарии через несколько сервисов</li>
+          </ul>
+          <div class="exp-subhead">Достижения</div>
+          <ul class="exp-list">
+            <li>Протестировал миграцию сервиса на новую БД Pangolin (PostgreSQL)</li>
+            <li>Покрыл тестами запуск новых интеграций (комиссии, межбанковские переводы)</li>
+            <li>Участвовал в миграции монолита на микросервисную облачную архитектуру (2023–2024)</li>
+            <li>Участвовал в AI-хакатоне трайба</li>
+          </ul>
+          <div class="exp-subhead">Автоматизация</div>
+          <ul class="exp-list">
+            <li>Написание автотестов на Java (JUnit, до 10% рабочего времени)</li>
+            <li>Помощь команде автоматизации в поддержке тестового фреймворка</li>
+          </ul>
+          <div class="exp-stack">
+            <span class="exp-chip">Java 17</span>
+            <span class="exp-chip">Spring</span>
+            <span class="exp-chip">Kubernetes</span>
+            <span class="exp-chip">Kafka</span>
+            <span class="exp-chip">REST</span>
+            <span class="exp-chip">PostgreSQL</span>
+            <span class="exp-chip">Jenkins</span>
+            <span class="exp-chip">Postman</span>
+          </div>
+        </div>
+
+        <div class="exp-item reveal">
+          <div class="exp-header">
+            <div class="exp-role">SEO-специалист → Project Manager (совмещение)</div>
+            <div class="exp-company">Maximus Media · Москва</div>
+            <div class="exp-meta">Декабрь 2020 — Ноябрь 2023 · 2 год 11 месяцев</div>
+          </div>
+          <p class="exp-desc">
+            Пришёл в компанию на позицию SEO-специалиста; примерно через полгода получил расширение обязанностей до Project Manager онлайн-медиа (внутри той же компании).
+          </p>
+          <div class="exp-subhead">В роли SEO-специалиста</div>
+          <ul class="exp-list">
+            <li>Разработка, тестирование и приёмка 20+ сайтов (в команде)</li>
+            <li>SEO-сопровождение, настройка веб-аналитики, анализ семантического ядра</li>
+          </ul>
+          <div class="exp-subhead">В роли Project Manager</div>
+          <ul class="exp-list">
+            <li>Запустил онлайн-медиа, вёл бэклог и дорожную карту</li>
+            <li>Составление ТЗ, контроль метрик, подготовка инвестиционных презентаций</li>
+          </ul>
+        </div>
+
+        <div class="exp-item reveal">
+          <div class="exp-header">
+            <div class="exp-role">Менеджер / маркетолог</div>
+            <div class="exp-company">Москва</div>
+            <div class="exp-meta">Декабрь 2012 — Сентябрь 2020 · 7 лет 10 месяцев</div>
+          </div>
+          <p class="exp-desc">Рекламные и медиа-кампании — от контекстной рекламы до нативных интеграций. До перехода в IT.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== PROJECTS ========== -->
+  <section id="projects">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-eyebrow">04 — Проекты</div>
+        <h2 class="section-title">Приложения с Live-demo на GitHub</h2>
+      </div>
+
+      <div class="project-grid">
+        <!-- Featured: TicTacToe -->
+        <article class="project-card featured reveal">
+          <div class="project-header">
+            <div class="project-icon">TT</div>
+            <div>
+              <div class="project-title">TicTacToeWebGame · Крестики-нолики</div>
+              <div class="project-subtitle">Java 21 · Spring Boot 3 · PostgreSQL · Docker</div>
+            </div>
+          </div>
+          <p class="project-desc">
+            Полноценный backend-проект для портфолио Java-разработчика: REST API, БД, авторизация, CI/CD, документация. Пишу весь код самостоятельно, использование LLM только для ревью и помощи в документировании.
+          </p>
+          <div class="project-section-label">Архитектура (легко поддерживать)</div>
+          <ul class="project-list">
+            <li>Разделение на слои: <strong>datasource / domain / web / security / di / util</strong></li>
+            <li>Доменные модели отделены от JPA-сущностей через мапперы</li>
+            <li>Кастомный фильтр Basic Auth, конфигурация Spring Security</li>
+          </ul>
+          <div class="project-section-label">Документация</div>
+          <ul class="project-list">
+            <li><strong>Swagger UI</strong> — интерактивная документация API</li>
+            <li>Postman-коллекции для ручного и авто-тестирования</li>
+            <li>Release-notes и release-plan для каждой версии</li>
+            <li>README с инструкциями по запуску и тестированию</li>
+          </ul>
+          <div class="project-section-label">Планирование релизов</div>
+          <ul class="project-list">
+            <li>Релизы: релиз 1.0 завершён, релиз 1.1 в плане</li>
+            <li>User Stories и технические задачи для каждого релиза</li>
+            <li>CI/CD через GitHub Actions: автосборка → автодеплой на Cloud.ru</li>
+          </ul>
+          <div class="project-links">
+            <a href="http://176.109.101.94:8081/swagger-ui/index.html" target="_blank" rel="noopener" class="project-link">Swagger UI ↗</a>
+            <a href="http://176.109.101.94" target="_blank" rel="noopener" class="project-link">Live demo ↗</a>
+            <a href="https://github.com/obuhow/TicTacToeWebGame" target="_blank" rel="noopener" class="project-link">GitHub ↗</a>
+          </div>
+        </article>
+         </div>
+  </section>
+
+  <!-- ========== CONTACT ========== -->
+  <section id="contact" class="contact-section">
+    <div class="container">
+      <div class="section-header reveal" style="text-align:center;">
+        <div class="section-eyebrow" style="justify-content:center;">05 — Контакты</div>
+        <h2 class="section-title">Давайте работать вместе</h2>
+      </div>
+      <div class="contact-cta reveal">
+        <h3>Открыт к роли QA/Java/AI Engineer</h3>
+        <p>
+          Manual + auto, высоконагруженные сервисы, микросервисная архитектура.<br/>
+          Новосибирск, удалёнка или гибрид — обсудимо.
+        </p>
+        <div class="contact-buttons">
+          <a href="https://t.me/obuhow" target="_blank" rel="noopener" class="btn btn-primary">Написать в Telegram</a>
+          <a href="mailto:p@obuhov.pro" class="btn btn-ghost">p@obuhov.pro</a>
+        </div>
+      </div>
+      <div class="contact-list reveal">
+        <a href="tel:+79990962079">+7 (999) 096-20-79</a>
+        <a href="https://t.me/obuhow" target="_blank" rel="noopener">Telegram</a>
+        <a href="mailto:p@obuhov.pro">Email</a>
+        <a href="https://github.com/obuhow" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://vk.com/obuhovpro" target="_blank" rel="noopener">VK</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>Собрано с ☕ и заботой о качестве · Москва, 2026</p>
+    </div>
+  </footer>
+
+  <script>
+    // Mobile menu toggle
+    const burger = document.getElementById('navBurger');
+    const links = document.getElementById('navLinks');
+    burger.addEventListener('click', () => links.classList.toggle('open'));
+    links.querySelectorAll('a').forEach(a => a.addEventListener('click', () => links.classList.remove('open')));
+
+    // Reveal on scroll
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    // Active nav link highlight
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-links a');
+    const setActive = () => {
+      const top = window.scrollY + 120;
+      let current = '';
+      sections.forEach(s => { if (s.offsetTop <= top) current = s.id; });
+      navLinks.forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+      });
+    };
+    window.addEventListener('scroll', setActive);
+    setActive();
+  </script>
+</body>
+</html>
