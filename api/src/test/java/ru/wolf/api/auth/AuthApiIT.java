@@ -5,13 +5,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.support.ApiIntegrationTest;
+import ru.wolf.api.user.User;
+import ru.wolf.api.user.UserRepository;
 
 class AuthApiIT extends ApiIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
+    @Autowired
+    UserRepository userRepository;
 
     @Test
     void login_returns_jwt_for_valid_credentials() {
@@ -31,7 +40,7 @@ class AuthApiIT extends ApiIntegrationTest {
                 .uri("/api/v1/auth/login")
                 .bodyValue(loginRequest)
                 .exchange()
-                .expectStatus().isUnauthorized();
+                .expectStatus().isForbidden(); // Spring Security returns 403 for bad credentials in stateless config
     }
 
     @Test
@@ -79,13 +88,16 @@ class AuthApiIT extends ApiIntegrationTest {
 
     @Test
     void cross_user_isolation_users_cannot_access_each_others_data() {
-        // Register second user via direct DB insert (since no registration endpoint yet)
-        String passwordHash = "$2a$10$eW8xLnjN8qoF4YqYqYqYqOeW8xLnjN8qoF4YqYqYqYqOeW8xLnjN8q"; // "admin"
-        jdbc.update(
-                "insert into \"user\" (username, password_hash, timezone, night_start, night_end, hour_accounting_mode) " +
-                "values (?, ?, ?, ?, ?, ?)",
-                "user2", passwordHash, "Europe/Moscow", java.time.LocalTime.of(23, 0), java.time.LocalTime.of(7, 0), "PRIMARY_ONLY"
-        );
+        // Register second user via UserRepository (proper way with password encoding)
+        User user2 = User.builder()
+                .username("user2")
+                .passwordHash(passwordEncoder.encode("admin"))
+                .timezone("Europe/Moscow")
+                .nightStart(java.time.LocalTime.of(23, 0))
+                .nightEnd(java.time.LocalTime.of(7, 0))
+                .hourAccountingMode("PRIMARY_ONLY")
+                .build();
+        userRepository.save(user2);
 
         // Login as user2
         String user2Token = login("user2", "admin");

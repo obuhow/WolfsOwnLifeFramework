@@ -4,10 +4,14 @@
 
 **Blocked by:** 01 — Scaffold: API + Vue + Postgres + Compose + test harness
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] Login выдаёт JWT; защищённые эндпоинты без токена отклоняются
-- [ ] Seed Пользователь `admin` создаётся при старте/миграции
-- [ ] Экран/поток входа на Vue (RU) позволяет войти и сохранить сессию
-- [ ] API-тест: данные user A недоступны user B
-- [ ] Logout / очистка клиентского токена работает
+- [x] Login выдаёт JWT; защищённые эндпоинты без токена отклоняются
+- [x] Seed Пользователь `admin` создаётся при старте/миграции
+- [x] Экран/поток входа на Vue (RU) позволяет войти и сохранить сессию
+- [x] API-тест: данные user A недоступны user B
+- [x] Logout / очистка клиентского токена работает
+
+## Test Results
+
+See [02-auth-jwt-seed-admin-test-results.md](02-auth-jwt-seed-admin-test-results.md) — all 8 tests passing (HealthApiIT + AuthApiIT).
