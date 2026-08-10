@@ -378,6 +378,163 @@ body {
   }
 }
 
+/* Projects */
+.projects-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.projects-toolbar-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  min-width: 180px;
+}
+
+.project-form {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 720px;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
+.project-tree {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+  background: #fdfbf7;
+  border: 1px solid #e6dfd4;
+  border-radius: 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.project-row:hover {
+  border-color: #d9d1c6;
+  box-shadow: 0 4px 12px rgba(70, 55, 30, 0.05);
+}
+
+.project-row-main {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.project-title {
+  font-weight: 500;
+  color: #2c2a26;
+}
+
+.project-meta {
+  font-size: 0.82rem;
+  color: #7a7268;
+}
+
+.orphan-mark {
+  color: #8a6a3a;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem 1.5rem;
+  margin: 0;
+}
+
+.detail-grid .detail-span {
+  grid-column: 1 / -1;
+}
+
+.detail-grid dt {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a8278;
+  font-weight: 500;
+}
+
+.detail-grid dd {
+  margin: 0;
+  color: #2c2a26;
+}
+
+.detail-grid a {
+  color: #3d5a4a;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.detail-grid a:hover {
+  text-decoration: underline;
+}
+
+.muted {
+  color: #8a8278;
+}
+
+.muted-block {
+  color: #7a7268;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  padding: 0.75rem 0;
+}
+
+.preserve-lines {
+  white-space: pre-wrap;
+}
+
+.child-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.2rem;
+  color: #2c2a26;
+}
+
+.child-list a {
+  color: #3d5a4a;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.child-list a:hover {
+  text-decoration: underline;
+}
+
+.crumb {
+  color: #3d5a4a;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.crumb:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Empty state */
 .empty-state {
   text-align: center;

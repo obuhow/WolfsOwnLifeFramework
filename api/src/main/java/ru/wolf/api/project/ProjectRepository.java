@@ -1,0 +1,43 @@
+package ru.wolf.api.project;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import ru.wolf.api.user.User;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface ProjectRepository extends JpaRepository<Project, Long> {
+
+    @Query("""
+            SELECT DISTINCT p FROM Project p
+            JOIN FETCH p.lifeArea
+            LEFT JOIN FETCH p.parent
+            WHERE p.user = :user
+            ORDER BY p.title ASC
+            """)
+    List<Project> findByUserOrderByTitleAsc(@Param("user") User user);
+
+    @Query("""
+            SELECT DISTINCT p FROM Project p
+            JOIN FETCH p.lifeArea
+            LEFT JOIN FETCH p.parent
+            WHERE p.user = :user AND p.lifeArea.id = :lifeAreaId
+            ORDER BY p.title ASC
+            """)
+    List<Project> findByUserAndLifeAreaIdOrderByTitleAsc(
+            @Param("user") User user,
+            @Param("lifeAreaId") Long lifeAreaId
+    );
+
+    @Query("""
+            SELECT p FROM Project p
+            JOIN FETCH p.lifeArea
+            LEFT JOIN FETCH p.parent
+            WHERE p.user = :user AND p.id = :id
+            """)
+    Optional<Project> findByUserAndId(@Param("user") User user, @Param("id") Long id);
+}
