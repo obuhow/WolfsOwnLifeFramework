@@ -10,8 +10,5 @@ CREATE TABLE IF NOT EXISTS "user" (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Seed admin user (password: admin)
--- BCrypt hash for "admin" with cost 10
-INSERT INTO "user" (username, password_hash, timezone, night_start, night_end, hour_accounting_mode)
-VALUES ('admin', '$2a$10$eW8xLnjN8qoF4YqYqYqYqOeW8xLnjN8qoF4YqYqYqYqOeW8xLnjN8q', 'Europe/Moscow', '23:00:00', '07:00:00', 'PRIMARY_ONLY')
-ON CONFLICT (username) DO NOTHING;
+-- Seed admin is created by DataInitializer with a real BCrypt hash (admin/admin).
+-- Do not insert a placeholder hash here — BCrypt will reject it at login.

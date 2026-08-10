@@ -36,6 +36,13 @@ public class AuthController {
         return ResponseEntity.ok(new AuthResponse(token));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<MeResponse> me(Authentication authentication) {
+        ru.wolf.api.user.User user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+        return ResponseEntity.ok(new MeResponse(user.getUsername()));
+    }
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -52,5 +59,12 @@ public class AuthController {
     @AllArgsConstructor
     public static class AuthResponse {
         private String token;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MeResponse {
+        private String username;
     }
 }

@@ -24,7 +24,8 @@ async function login() {
 
     const data = await res.json()
     localStorage.setItem('wolf_token', data.token)
-    window.location.href = '/'
+    window.location.hash = '#/life-areas'
+    window.location.reload()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -38,7 +39,7 @@ function handleKey(e) {
 
 onMounted(() => {
   if (localStorage.getItem('wolf_token')) {
-    window.location.href = '/'
+    window.location.hash = '#/life-areas'
   }
 })
 </script>
