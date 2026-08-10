@@ -519,6 +519,59 @@ body {
   text-decoration: underline;
 }
 
+.link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.project-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(61, 90, 74, 0.04);
+}
+
+.project-link-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.project-link-main a {
+  color: #3d5a4a;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.project-link-main a:hover {
+  text-decoration: underline;
+}
+
+.project-link-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.primary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #3d5a4a;
+  background: rgba(61, 90, 74, 0.12);
+}
+
 .crumb {
   color: #3d5a4a;
   text-decoration: none;

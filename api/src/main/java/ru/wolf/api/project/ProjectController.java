@@ -11,7 +11,9 @@ import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.lifearea.LifeArea;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.user.User;
@@ -33,6 +35,7 @@ public class ProjectController {
     private final ProjectRepository projectRepository;
     private final LifeAreaRepository lifeAreaRepository;
     private final UserRepository userRepository;
+    private final DeloProjectRepository deloProjectRepository;
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(
@@ -52,6 +55,7 @@ public class ProjectController {
     }
 
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<ProjectDetailResponse> getProject(
             Authentication authentication,
             @PathVariable Long id
@@ -240,6 +244,14 @@ public class ProjectController {
     }
 
     private ProjectDetailResponse toDetailResponse(Project project) {
+        var links = deloProjectRepository.findByProjectId(project.getId());
+        List<DeloLink> deloLinks = links.stream()
+                .map(l -> new DeloLink(
+                        l.getDelo().getId(),
+                        l.getDelo().getTitle(),
+                        Boolean.TRUE.equals(l.getIsPrimary())
+                ))
+                .toList();
         return new ProjectDetailResponse(
                 project.getId(),
                 project.getLifeArea().getId(),
@@ -251,7 +263,7 @@ public class ProjectController {
                 project.getStartDate(),
                 project.getEndDate(),
                 project.getTotalPlanHours(),
-                List.of(), // delos — ticket 06
+                deloLinks,
                 null       // aggregates — ticket 13
         );
     }
@@ -284,8 +296,17 @@ public class ProjectController {
         private LocalDate startDate;
         private LocalDate endDate;
         private BigDecimal totalPlanHours;
-        private List<Object> delos;
+        private List<DeloLink> delos;
         private Object aggregates;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DeloLink {
+        private Long id;
+        private String title;
+        private Boolean isPrimary;
     }
 
     @Data
