@@ -16,11 +16,14 @@ import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.TemporalAdjusters;
+import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -109,6 +112,88 @@ public class TimeEntryController {
                 user.getTimezone(),
                 formatLdt(dayStart),
                 formatLdt(dayEnd),
+                entries
+        ));
+    }
+
+    /**
+     * GET /api/v1/time-entries/week
+     * ISO week Mon–Sun in user timezone wall-clock.
+     * Query (mutually preferred in order):
+     * <ul>
+     *   <li>{@code isoYear}+{@code isoWeek} — pick week by ISO week-year numbers</li>
+     *   <li>{@code date=YYYY-MM-DD} — week containing that local date</li>
+     *   <li>default — week of «today» in user TZ</li>
+     * </ul>
+     * Range is half-open: [Monday 00:00, next Monday 00:00).
+     */
+    @GetMapping("/week")
+    @Transactional(readOnly = true)
+    public ResponseEntity<WeekResponse> week(
+            Authentication authentication,
+            @RequestParam(value = "date", required = false) String date,
+            @RequestParam(value = "isoYear", required = false) Integer isoYear,
+            @RequestParam(value = "isoWeek", required = false) Integer isoWeek
+    ) {
+        User user = currentUser(authentication);
+        ZoneId zone = ZoneId.of(user.getTimezone());
+
+        LocalDate monday;
+        if (isoYear != null || isoWeek != null) {
+            if (isoYear == null || isoWeek == null) {
+                throw new IllegalArgumentException("Укажите оба параметра isoYear и isoWeek");
+            }
+            if (isoWeek < 1 || isoWeek > 53) {
+                throw new IllegalArgumentException("isoWeek должен быть от 1 до 53");
+            }
+            try {
+                monday = LocalDate.of(isoYear, 1, 4)
+                        .with(WeekFields.ISO.weekOfWeekBasedYear(), isoWeek)
+                        .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Некорректная ISO-неделя: " + isoYear + "-W" + isoWeek);
+            }
+            // Reject week numbers that don't exist for that ISO year (e.g. 2026-W54)
+            int resolvedWeek = monday.get(WeekFields.ISO.weekOfWeekBasedYear());
+            int resolvedYear = monday.get(WeekFields.ISO.weekBasedYear());
+            if (resolvedWeek != isoWeek || resolvedYear != isoYear) {
+                throw new IllegalArgumentException("Некорректная ISO-неделя: " + isoYear + "-W" + isoWeek);
+            }
+        } else {
+            LocalDate anchor = date != null && !date.isBlank()
+                    ? LocalDate.parse(date)
+                    : ZonedDateTime.now(zone).toLocalDate();
+            monday = anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        }
+
+        LocalDate nextMonday = monday.plusDays(7);
+        LocalDateTime rangeStart = monday.atStartOfDay();
+        LocalDateTime rangeEnd = nextMonday.atStartOfDay();
+
+        int year = monday.get(WeekFields.ISO.weekBasedYear());
+        int weekNo = monday.get(WeekFields.ISO.weekOfWeekBasedYear());
+
+        List<WeekDayInfo> days = new ArrayList<>(7);
+        for (int i = 0; i < 7; i++) {
+            LocalDate d = monday.plusDays(i);
+            days.add(new WeekDayInfo(d.toString(), d.getDayOfWeek().name()));
+        }
+
+        List<TimeEntryResponse> entries = timeEntryRepository
+                .findByUserIdAndStartAtBetween(user.getId(), rangeStart, rangeEnd)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+        return ResponseEntity.ok(new WeekResponse(
+                year,
+                weekNo,
+                monday.toString(),
+                nextMonday.toString(),
+                formatLdt(rangeStart),
+                formatLdt(rangeEnd),
+                user.getTimezone(),
+                days,
                 entries
         ));
     }
@@ -435,6 +520,32 @@ public class TimeEntryController {
         private String timezone;
         private String dayStart;
         private String dayEnd;
+        private List<TimeEntryResponse> entries;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WeekDayInfo {
+        private String date;
+        /** java.time.DayOfWeek name, e.g. MONDAY */
+        private String weekday;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WeekResponse {
+        private int isoYear;
+        private int isoWeek;
+        /** Monday date YYYY-MM-DD */
+        private String weekStart;
+        /** Next Monday date YYYY-MM-DD (exclusive end of week) */
+        private String weekEndExclusive;
+        private String rangeStart;
+        private String rangeEnd;
+        private String timezone;
+        private List<WeekDayInfo> days;
         private List<TimeEntryResponse> entries;
     }
 

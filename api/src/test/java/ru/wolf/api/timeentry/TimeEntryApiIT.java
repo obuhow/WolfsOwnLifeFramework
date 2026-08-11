@@ -710,6 +710,140 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 .expectStatus().isForbidden();
     }
 
+    @Test
+    void week_bounds_are_iso_monday_to_next_monday_exclusive() {
+        WebTestClient authed = authedAdminClient();
+        // 2026-03-11 is Wednesday → ISO week 11, Mon 2026-03-09 .. Sun 2026-03-15
+        LocalDate wednesday = LocalDate.of(2026, 3, 11);
+        LocalDate monday = LocalDate.of(2026, 3, 9);
+        LocalDate nextMonday = LocalDate.of(2026, 3, 16);
+
+        Long deloId = createDelo(authed, "Неделя");
+        LocalDateTime monLate = monday.atTime(23, 45);
+        LocalDateTime sunMid = LocalDate.of(2026, 3, 15).atTime(12, 0);
+        LocalDateTime nextMonEarly = nextMonday.atTime(0, 0);
+
+        Map<String, Object> b1 = new HashMap<>();
+        b1.put("startAt", monLate.toString());
+        b1.put("deloId", deloId);
+        b1.put("status", "PLANNED");
+        putEntryRaw(authed, b1);
+
+        Map<String, Object> b2 = new HashMap<>();
+        b2.put("startAt", sunMid.toString());
+        b2.put("deloId", deloId);
+        b2.put("status", "PLANNED");
+        putEntryRaw(authed, b2);
+
+        // Outside week (next Monday) must not appear
+        Map<String, Object> b3 = new HashMap<>();
+        b3.put("startAt", nextMonEarly.toString());
+        b3.put("deloId", deloId);
+        b3.put("status", "PLANNED");
+        putEntryRaw(authed, b3);
+
+        TimeEntryController.WeekResponse week = authed.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/time-entries/week")
+                        .queryParam("date", wednesday.toString())
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.WeekResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(week).isNotNull();
+        assertThat(week.getTimezone()).isEqualTo("Europe/Moscow");
+        assertThat(week.getWeekStart()).isEqualTo(monday.toString());
+        assertThat(week.getWeekEndExclusive()).isEqualTo(nextMonday.toString());
+        assertThat(week.getRangeStart()).isEqualTo(monday.atStartOfDay().toString());
+        assertThat(week.getRangeEnd()).isEqualTo(nextMonday.atStartOfDay().toString());
+        assertThat(week.getIsoYear()).isEqualTo(2026);
+        assertThat(week.getIsoWeek()).isEqualTo(11);
+        assertThat(week.getDays()).hasSize(7);
+        assertThat(week.getDays().get(0).getDate()).isEqualTo(monday.toString());
+        assertThat(week.getDays().get(0).getWeekday()).isEqualTo("MONDAY");
+        assertThat(week.getDays().get(6).getDate()).isEqualTo(LocalDate.of(2026, 3, 15).toString());
+        assertThat(week.getDays().get(6).getWeekday()).isEqualTo("SUNDAY");
+
+        assertThat(week.getEntries()).extracting(e -> normalize(e.getStartAt()))
+                .containsExactlyInAnyOrder(
+                        normalize(monLate.toString()),
+                        normalize(sunMid.toString())
+                )
+                .doesNotContain(normalize(nextMonEarly.toString()));
+    }
+
+    @Test
+    void week_default_is_current_iso_week_in_user_timezone() {
+        WebTestClient authed = authedAdminClient();
+        LocalDate today = LocalDate.now(MOSCOW);
+        LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        LocalDate nextMonday = monday.plusDays(7);
+        int isoWeek = today.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear());
+        int isoYear = today.get(java.time.temporal.WeekFields.ISO.weekBasedYear());
+
+        TimeEntryController.WeekResponse week = authed.get()
+                .uri("/api/v1/time-entries/week")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.WeekResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(week).isNotNull();
+        assertThat(week.getWeekStart()).isEqualTo(monday.toString());
+        assertThat(week.getWeekEndExclusive()).isEqualTo(nextMonday.toString());
+        assertThat(week.getIsoWeek()).isEqualTo(isoWeek);
+        assertThat(week.getIsoYear()).isEqualTo(isoYear);
+        assertThat(week.getEntries()).isEmpty();
+    }
+
+    @Test
+    void week_by_iso_year_and_week_number() {
+        WebTestClient authed = authedAdminClient();
+        // ISO 2025-W01 starts Monday 2024-12-30
+        TimeEntryController.WeekResponse week = authed.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/time-entries/week")
+                        .queryParam("isoYear", 2025)
+                        .queryParam("isoWeek", 1)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.WeekResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(week).isNotNull();
+        assertThat(week.getIsoYear()).isEqualTo(2025);
+        assertThat(week.getIsoWeek()).isEqualTo(1);
+        assertThat(week.getWeekStart()).isEqualTo("2024-12-30");
+        assertThat(week.getWeekEndExclusive()).isEqualTo("2025-01-06");
+    }
+
+    @Test
+    void week_rejects_invalid_iso_week() {
+        WebTestClient authed = authedAdminClient();
+        authed.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/time-entries/week")
+                        .queryParam("isoYear", 2026)
+                        .queryParam("isoWeek", 54)
+                        .build())
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void week_unauthenticated_rejected() {
+        webTestClient.get()
+                .uri("/api/v1/time-entries/week")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
     private TimeEntryController.EnsureSleepResponse ensureSleep(
             WebTestClient client,
             LocalDateTime from,
