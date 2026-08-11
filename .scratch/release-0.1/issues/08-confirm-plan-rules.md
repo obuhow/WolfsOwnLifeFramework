@@ -4,9 +4,9 @@
 
 **Blocked by:** 07 — Запись времени + сетка «Сегодня»
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] Прошедшие planned не авто-done
-- [ ] Confirm single + confirm-all за день/видимый диапазон
-- [ ] UI кнопки на Сегодня (и готовность для Недели)
-- [ ] API-тесты переходов статусов
+- [x] Прошедшие planned не авто-done
+- [x] Confirm single + confirm-all за день/видимый диапазон
+- [x] UI кнопки на Сегодня (и готовность для Недели)
+- [x] API-тесты переходов статусов

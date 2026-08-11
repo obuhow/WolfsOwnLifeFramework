@@ -405,6 +405,195 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 .expectStatus().isBadRequest();
     }
 
+    @Test
+    void past_planned_does_not_auto_flip_without_confirm() {
+        WebTestClient authed = authedAdminClient();
+        Long deloId = createDelo(authed, "Ждёт подтверждения");
+        LocalDateTime past = nextAlignedSlot(LocalDateTime.now(MOSCOW).minusHours(3));
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("startAt", past.toString());
+        body.put("deloId", deloId);
+        body.put("status", "PLANNED");
+        putEntryRaw(authed, body);
+
+        // Re-fetch via today — still planned (no background auto-done).
+        TimeEntryController.TodayResponse today = authed.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/time-entries/today")
+                        .queryParam("date", past.toLocalDate().toString())
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.TodayResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(today.getEntries()).hasSize(1);
+        assertThat(today.getEntries().get(0).getStatus()).isEqualTo(TimeEntry.Status.PLANNED);
+    }
+
+    @Test
+    void confirm_single_planned_becomes_done() {
+        WebTestClient authed = authedAdminClient();
+        Long deloId = createDelo(authed, "Один слот");
+        LocalDateTime past = nextAlignedSlot(LocalDateTime.now(MOSCOW).minusHours(2));
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("startAt", past.toString());
+        body.put("deloId", deloId);
+        body.put("status", "PLANNED");
+        putEntryRaw(authed, body);
+
+        TimeEntryController.TimeEntryResponse confirmed = authed.post()
+                .uri("/api/v1/time-entries/confirm")
+                .bodyValue(Map.of("startAt", past.toString()))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(confirmed).isNotNull();
+        assertThat(confirmed.getStatus()).isEqualTo(TimeEntry.Status.DONE);
+        assertThat(confirmed.getDeloId()).isEqualTo(deloId);
+
+        // Idempotent second confirm
+        TimeEntryController.TimeEntryResponse again = authed.post()
+                .uri("/api/v1/time-entries/confirm")
+                .bodyValue(Map.of("startAt", past.toString()))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .returnResult()
+                .getResponseBody();
+        assertThat(again.getStatus()).isEqualTo(TimeEntry.Status.DONE);
+    }
+
+    @Test
+    void confirm_missing_entry_is_bad_request() {
+        WebTestClient authed = authedAdminClient();
+        LocalDateTime past = nextAlignedSlot(LocalDateTime.now(MOSCOW).minusHours(1));
+
+        authed.post()
+                .uri("/api/v1/time-entries/confirm")
+                .bodyValue(Map.of("startAt", past.toString()))
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void confirm_all_only_past_planned_in_range() {
+        WebTestClient authed = authedAdminClient();
+        Long deloId = createDelo(authed, "Блок");
+
+        LocalDateTime past1 = nextAlignedSlot(LocalDateTime.now(MOSCOW).minusHours(4));
+        LocalDateTime past2 = nextAlignedSlot(LocalDateTime.now(MOSCOW).minusHours(2));
+        LocalDateTime future = nextAlignedSlot(LocalDateTime.now(MOSCOW).plusHours(3));
+        LocalDateTime pastDone = nextAlignedSlot(LocalDateTime.now(MOSCOW).minusHours(1));
+
+        // two past planned
+        putEntryRaw(authed, Map.of(
+                "startAt", past1.toString(),
+                "deloId", deloId,
+                "status", "PLANNED"
+        ));
+        putEntryRaw(authed, Map.of(
+                "startAt", past2.toString(),
+                "deloId", deloId,
+                "status", "PLANNED"
+        ));
+        // future planned — must stay planned
+        putEntryRaw(authed, Map.of(
+                "startAt", future.toString(),
+                "deloId", deloId,
+                "status", "PLANNED"
+        ));
+        // past already done — not counted
+        putEntry(authed, pastDone, Map.of("deloId", deloId));
+
+        LocalDate day = past1.toLocalDate();
+        // Range covering the whole day (and possibly next if future spills — still ok)
+        LocalDateTime from = day.atStartOfDay();
+        LocalDateTime to = day.plusDays(2).atStartOfDay();
+
+        TimeEntryController.ConfirmAllResponse result = authed.post()
+                .uri("/api/v1/time-entries/confirm-all")
+                .bodyValue(Map.of(
+                        "from", from.toString(),
+                        "to", to.toString()
+                ))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.ConfirmAllResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(result).isNotNull();
+        assertThat(result.getConfirmedCount()).isEqualTo(2);
+        assertThat(result.getEntries()).hasSize(2);
+        assertThat(result.getEntries()).allMatch(e -> e.getStatus() == TimeEntry.Status.DONE);
+
+        List<TimeEntryController.TimeEntryResponse> range = authed.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/time-entries")
+                        .queryParam("from", from.toString())
+                        .queryParam("to", to.toString())
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(TimeEntryController.TimeEntryResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        Map<String, TimeEntry.Status> byStart = new HashMap<>();
+        for (var e : range) {
+            byStart.put(normalize(e.getStartAt()), e.getStatus());
+        }
+        assertThat(byStart.get(normalize(past1.toString()))).isEqualTo(TimeEntry.Status.DONE);
+        assertThat(byStart.get(normalize(past2.toString()))).isEqualTo(TimeEntry.Status.DONE);
+        assertThat(byStart.get(normalize(future.toString()))).isEqualTo(TimeEntry.Status.PLANNED);
+        assertThat(byStart.get(normalize(pastDone.toString()))).isEqualTo(TimeEntry.Status.DONE);
+    }
+
+    @Test
+    void confirm_all_empty_range_is_zero() {
+        WebTestClient authed = authedAdminClient();
+        LocalDate day = LocalDate.now(MOSCOW);
+
+        TimeEntryController.ConfirmAllResponse result = authed.post()
+                .uri("/api/v1/time-entries/confirm-all")
+                .bodyValue(Map.of(
+                        "from", day.atStartOfDay().toString(),
+                        "to", day.plusDays(1).atStartOfDay().toString()
+                ))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.ConfirmAllResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(result.getConfirmedCount()).isZero();
+        assertThat(result.getEntries()).isEmpty();
+    }
+
+    @Test
+    void confirm_endpoints_unauthenticated_rejected() {
+        webTestClient.post()
+                .uri("/api/v1/time-entries/confirm")
+                .bodyValue(Map.of("startAt", "2026-01-01T10:00:00"))
+                .exchange()
+                .expectStatus().isForbidden();
+        webTestClient.post()
+                .uri("/api/v1/time-entries/confirm-all")
+                .bodyValue(Map.of(
+                        "from", "2026-01-01T00:00:00",
+                        "to", "2026-01-02T00:00:00"
+                ))
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
     private Long createDelo(WebTestClient client, String title) {
         var req = new DeloController.CreateDeloRequest();
         req.setTitle(title);
