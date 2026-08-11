@@ -25,12 +25,7 @@ public class UserSettingsController {
         User user = userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        return ResponseEntity.ok(new UserSettingsResponse(
-                user.getTimezone(),
-                user.getNightStart(),
-                user.getNightEnd(),
-                user.getHourAccountingMode()
-        ));
+        return ResponseEntity.ok(toResponse(user));
     }
 
     @PutMapping
@@ -44,16 +39,28 @@ public class UserSettingsController {
         user.setTimezone(request.getTimezone());
         user.setNightStart(LocalTime.parse(request.getNightStart()));
         user.setNightEnd(LocalTime.parse(request.getNightEnd()));
+        if (request.getDayEnd() != null && !request.getDayEnd().isBlank()) {
+            user.setDayEnd(LocalTime.parse(request.getDayEnd()));
+        }
+        if (request.getDefaultSleepEnd() != null && !request.getDefaultSleepEnd().isBlank()) {
+            user.setDefaultSleepEnd(LocalTime.parse(request.getDefaultSleepEnd()));
+        }
         user.setHourAccountingMode(request.getHourAccountingMode());
 
         userRepository.save(user);
 
-        return ResponseEntity.ok(new UserSettingsResponse(
+        return ResponseEntity.ok(toResponse(user));
+    }
+
+    private static UserSettingsResponse toResponse(User user) {
+        return new UserSettingsResponse(
                 user.getTimezone(),
                 user.getNightStart(),
                 user.getNightEnd(),
+                user.getDayEnd(),
+                user.getDefaultSleepEnd(),
                 user.getHourAccountingMode()
-        ));
+        );
     }
 
     @Data
@@ -63,6 +70,10 @@ public class UserSettingsController {
         private String timezone;
         private LocalTime nightStart;
         private LocalTime nightEnd;
+        /** Конец дня (граница логических суток), e.g. 02:00 */
+        private LocalTime dayEnd;
+        /** Конец интервала авто-Сна, e.g. 09:00 */
+        private LocalTime defaultSleepEnd;
         private String hourAccountingMode;
     }
 
@@ -78,6 +89,11 @@ public class UserSettingsController {
 
         @NotBlank
         private String nightEnd;
+
+        /** Optional for backward compat; default 02:00 on entity */
+        private String dayEnd;
+
+        private String defaultSleepEnd;
 
         @NotBlank
         private String hourAccountingMode;

@@ -11,8 +11,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 
 /**
- * Запись времени — one 15-minute calendar cell for a Пользователь.
- * Empty cells are represented by absence of a row (status «неопределено»).
+ * Запись времени — continuous interval [startAt, endAt) on the grid (multiples of 15 min).
+ * Empty cells are absence of a covering interval (status «неопределено»).
  */
 @Entity
 @Table(name = "time_entry")
@@ -38,10 +38,11 @@ public class TimeEntry {
     @Column(name = "ad_hoc_text", length = 500)
     private String adHocText;
 
-    /** Start of the 15-minute slot, wall-clock in user timezone (no zone stored). */
+    /** Inclusive start of the interval, wall-clock in user timezone (aligned to 15 min). */
     @Column(name = "start_at", nullable = false)
     private LocalDateTime startAt;
 
+    /** Exclusive end of the interval (aligned to 15 min), must be after startAt. */
     @Column(name = "end_at", nullable = false)
     private LocalDateTime endAt;
 

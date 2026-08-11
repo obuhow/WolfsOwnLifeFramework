@@ -40,6 +40,16 @@ public class User implements UserDetails {
     @Column(name = "night_end", nullable = false)
     private java.time.LocalTime nightEnd = java.time.LocalTime.of(7, 0);
 
+    /** Logical day rolls at this wall-clock time (may be after midnight for prior calendar date). */
+    @Builder.Default
+    @Column(name = "day_end", nullable = false)
+    private java.time.LocalTime dayEnd = java.time.LocalTime.of(2, 0);
+
+    /** Default «Сон» interval ends at this clock time on the calendar date of day start. */
+    @Builder.Default
+    @Column(name = "default_sleep_end", nullable = false)
+    private java.time.LocalTime defaultSleepEnd = java.time.LocalTime.of(9, 0);
+
     @Builder.Default
     @Column(name = "hour_accounting_mode", nullable = false, length = 20)
     private String hourAccountingMode = "PRIMARY_ONLY";
