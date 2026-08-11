@@ -4,10 +4,10 @@
 
 **Blocked by:** 05 — Проекты (дерево) + страница Проекта
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] CRUD Дело + execution mode
-- [ ] Many-to-many Дело–Проект + primary constraint when linked
-- [ ] Дело без Проекта валидно
-- [ ] Страницы Дела и attach/detach на Проекте
-- [ ] API-тесты связей, primary, isolation
+- [x] CRUD Дело + execution mode
+- [x] Many-to-many Дело–Проект + primary constraint when linked
+- [x] Дело без Проекта валидно
+- [x] Страницы Дела и attach/detach на Проекте
+- [x] API-тесты связей, primary, isolation

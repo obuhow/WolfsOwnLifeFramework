@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import ru.wolf.api.delo.DeloProjectRepository;
+import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
@@ -24,6 +26,12 @@ class ProjectApiIT extends ApiIntegrationTest {
     ProjectRepository projectRepository;
 
     @Autowired
+    DeloRepository deloRepository;
+
+    @Autowired
+    DeloProjectRepository deloProjectRepository;
+
+    @Autowired
     LifeAreaRepository lifeAreaRepository;
 
     @Autowired
@@ -34,6 +42,8 @@ class ProjectApiIT extends ApiIntegrationTest {
 
     @BeforeEach
     void cleanup() {
+        deloProjectRepository.deleteAll();
+        deloRepository.deleteAll();
         projectRepository.deleteAll();
         lifeAreaRepository.deleteAll();
         userRepository.findAll().stream()

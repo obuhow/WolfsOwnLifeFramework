@@ -7,6 +7,8 @@ import SettingsView from './components/SettingsView.vue'
 import LifeAreasView from './components/LifeAreasView.vue'
 import ProjectsView from './components/ProjectsView.vue'
 import ProjectDetailView from './components/ProjectDetailView.vue'
+import DelosView from './components/DelosView.vue'
+import DeloDetailView from './components/DeloDetailView.vue'
 
 const routes = [
   { path: '/', redirect: '/life-areas' },
@@ -15,6 +17,8 @@ const routes = [
   { path: '/life-areas', component: LifeAreasView, meta: { requiresAuth: true } },
   { path: '/projects', component: ProjectsView, meta: { requiresAuth: true } },
   { path: '/projects/:id', component: ProjectDetailView, meta: { requiresAuth: true } },
+  { path: '/delos', component: DelosView, meta: { requiresAuth: true } },
+  { path: '/delos/:id', component: DeloDetailView, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

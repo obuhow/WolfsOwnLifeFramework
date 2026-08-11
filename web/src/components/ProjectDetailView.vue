@@ -11,8 +11,10 @@ const error = ref('')
 const success = ref('')
 const areas = ref([])
 const projects = ref([])
+const delos = ref([])
 const detail = ref(null)
 const editing = ref(false)
+const selectedDeloId = ref('')
 
 const form = ref({
   lifeAreaId: '',
@@ -36,6 +38,14 @@ const parentOptions = computed(() => {
       return true
     })
     .map(p => ({ id: p.id, label: p.title }))
+})
+
+const availableDelos = computed(() => {
+  const linkedIds = new Set(detail.value?.delos?.map(d => d.id) || [])
+  return delos.value
+    .filter(d => !linkedIds.has(d.id))
+    .slice()
+    .sort((a, b) => a.title.localeCompare(b.title, 'ru'))
 })
 
 const children = computed(() =>
@@ -96,6 +106,14 @@ async function loadProjects() {
   projects.value = await res.json()
 }
 
+async function loadDelos() {
+  const headers = authHeaders()
+  if (!headers) return
+  const res = await fetch(`${apiBase()}/delos`, { headers })
+  if (!res.ok) throw new Error(`Дела: HTTP ${res.status}`)
+  delos.value = await res.json()
+}
+
 async function loadDetail() {
   const headers = authHeaders()
   if (!headers) return
@@ -112,9 +130,10 @@ async function loadAll() {
   loading.value = true
   error.value = ''
   try {
-    await Promise.all([loadAreas(), loadProjects()])
+    await Promise.all([loadAreas(), loadProjects(), loadDelos()])
     await loadDetail()
     editing.value = false
+    selectedDeloId.value = ''
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
     detail.value = null
@@ -197,6 +216,74 @@ async function remove() {
     router.push('/projects')
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
+    loading.value = false
+  }
+}
+
+async function linkDelo() {
+  if (!selectedDeloId.value) return
+  loading.value = true
+  error.value = ''
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/delos/${selectedDeloId.value}/link/${projectId.value}`, {
+      method: 'POST',
+      headers
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    selectedDeloId.value = ''
+    await Promise.all([loadDetail(), loadDelos()])
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function unlinkDelo(deloId) {
+  loading.value = true
+  error.value = ''
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/delos/${deloId}/link/${projectId.value}`, {
+      method: 'DELETE',
+      headers
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    await Promise.all([loadDetail(), loadDelos()])
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function setDeloPrimary(deloId) {
+  loading.value = true
+  error.value = ''
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/delos/${deloId}/primary/${projectId.value}`, {
+      method: 'PUT',
+      headers
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    await loadDetail()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
     loading.value = false
   }
 }
@@ -327,13 +414,48 @@ onMounted(loadAll)
       </section>
 
       <section class="card" style="margin-bottom: 1.5rem">
-        <h2>Связанные Дела</h2>
-        <div class="muted-block">
-          Прикрепление Дел появится в следующем шаге (тикет 06). Место уже есть — список пока пуст.
+        <div class="projects-toolbar" style="margin-bottom: 1rem">
+          <h2 style="margin: 0">Связанные Дела</h2>
+          <div v-if="!editing" class="projects-toolbar-actions">
+            <select v-model="selectedDeloId" class="input filter-select" :disabled="loading || availableDelos.length === 0" aria-label="Дело для прикрепления">
+              <option value="">— выбрать Дело —</option>
+              <option v-for="d in availableDelos" :key="d.id" :value="String(d.id)">{{ d.title }}</option>
+            </select>
+            <button class="btn btn-primary" :disabled="loading || !selectedDeloId" @click="linkDelo">
+              Прикрепить
+            </button>
+          </div>
         </div>
-        <ul v-if="detail.delos && detail.delos.length" class="child-list">
-          <li v-for="(d, i) in detail.delos" :key="i">{{ d }}</li>
-        </ul>
+
+        <div v-if="detail.delos && detail.delos.length" class="link-list">
+          <div v-for="d in detail.delos" :key="d.id" class="project-link-row">
+            <div class="project-link-main">
+              <router-link :to="`/delos/${d.id}`">{{ d.title }}</router-link>
+              <span v-if="d.isPrimary" class="primary-badge">основной</span>
+            </div>
+            <div class="project-link-actions">
+              <button
+                v-if="!d.isPrimary"
+                class="btn btn-ghost"
+                title="Сделать основным для этого Дела"
+                :disabled="loading"
+                @click="setDeloPrimary(d.id)"
+              >
+                Основной
+              </button>
+              <button
+                class="btn btn-ghost"
+                style="color: #8a3a3a"
+                title="Открепить"
+                :disabled="loading"
+                @click="unlinkDelo(d.id)"
+              >
+                Открепить
+              </button>
+            </div>
+          </div>
+        </div>
+        <div v-else class="muted-block">Пока не прикреплено ни одного Дела. Можно создать Дело в каталоге и прикрепить сюда.</div>
       </section>
 
       <section class="card">

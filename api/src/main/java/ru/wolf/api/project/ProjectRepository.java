@@ -40,4 +40,10 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             WHERE p.user = :user AND p.id = :id
             """)
     Optional<Project> findByUserAndId(@Param("user") User user, @Param("id") Long id);
+
+    @Query("""
+            SELECT p FROM Project p
+            WHERE p.user = :user AND p.id IN :ids
+            """)
+    List<Project> findByUserAndIdIn(@Param("user") User user, @Param("ids") List<Long> ids);
 }
