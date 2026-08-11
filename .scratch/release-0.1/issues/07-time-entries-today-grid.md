@@ -4,10 +4,10 @@
 
 **Blocked by:** 03 — Настройки Пользователя; 06 — Дела + связи/primary/способ исполнения
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] API create/clear/get range Записей времени; unique (user, start 15m)
-- [ ] Статусы planned/done (+ empty); ad-hoc без deloId
-- [ ] Сетка Сегодня + picker Дела по проектам
-- [ ] Панель «на сегодня»
-- [ ] API-тесты uniqueness, timezone day bounds, status on create past vs future
+- [x] API create/clear/get range Записей времени; unique (user, start 15m)
+- [x] Статусы planned/done (+ empty); ad-hoc без deloId
+- [x] Сетка Сегодня + picker Дела по проектам
+- [x] Панель «на сегодня»
+- [x] API-тесты uniqueness, timezone day bounds, status on create past vs future
