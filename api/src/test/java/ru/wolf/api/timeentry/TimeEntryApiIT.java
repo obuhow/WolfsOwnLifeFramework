@@ -65,6 +65,9 @@ class TimeEntryApiIT extends ApiIntegrationTest {
             u.setTimezone("Europe/Moscow");
             u.setNightStart(LocalTime.of(23, 0));
             u.setNightEnd(LocalTime.of(7, 0));
+            // Classic midnight day for legacy IT expectations; interval feature tests override.
+            u.setDayEnd(LocalTime.MIDNIGHT);
+            u.setDefaultSleepEnd(LocalTime.of(9, 0));
             userRepository.save(u);
         });
     }
@@ -596,106 +599,81 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 .expectStatus().isForbidden();
     }
 
+    
     @Test
-    void ensure_sleep_fills_empty_night_slots_only() {
+    void ensure_sleep_creates_one_default_interval_per_day() {
         WebTestClient authed = authedAdminClient();
-        // Fixed calendar day far from "now edge": past day → sleep cells DONE
         LocalDate day = LocalDate.of(2026, 3, 10);
         LocalDateTime from = day.atStartOfDay();
         LocalDateTime to = day.plusDays(1).atStartOfDay();
 
         TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
 
-        // Default night 23:00–07:00 → 23:00..06:45 = 1h + 7h = 8h = 32 slots
-        assertThat(result.getFilledCount()).isEqualTo(32);
-        assertThat(result.getSleepDeloId()).isNotNull();
-        assertThat(result.getEntries()).hasSize(32);
-        assertThat(result.getEntries()).allMatch(e ->
-                "Сон".equals(e.getDeloTitle())
-                        && e.getDeloId().equals(result.getSleepDeloId())
-                        && e.getStatus() == TimeEntry.Status.DONE
-                        && e.getAdHocText() == null
-        );
+        assertThat(result.getFilledCount()).isEqualTo(1);
+        assertThat(result.getEntries()).hasSize(1);
+        TimeEntryController.TimeEntryResponse sleep = result.getEntries().get(0);
+        assertThat(sleep.getDeloTitle()).isEqualTo("Сон");
+        assertThat(normalize(sleep.getStartAt())).isEqualTo(normalize(day.atTime(0, 0).toString()));
+        assertThat(normalize(sleep.getEndAt())).isEqualTo(normalize(day.atTime(9, 0).toString()));
+        assertThat(sleep.getStatus()).isEqualTo(TimeEntry.Status.DONE);
 
-        // Daytime empty stays empty
-        List<TimeEntryController.TimeEntryResponse> range = listRange(authed, from, to);
-        assertThat(range).hasSize(32);
-        assertThat(range.stream().noneMatch(e -> e.getStartAt().contains("T12:00"))).isTrue();
-
-        // Second ensure is idempotent — no duplicates, filledCount 0
         TimeEntryController.EnsureSleepResponse again = ensureSleep(authed, from, to);
         assertThat(again.getFilledCount()).isZero();
-        assertThat(again.getSleepDeloId()).isEqualTo(result.getSleepDeloId());
-        assertThat(listRange(authed, from, to)).hasSize(32);
-        assertThat(deloRepository.findAll().stream().filter(d -> "Сон".equals(d.getTitle())).count()).isEqualTo(1);
+        assertThat(listRange(authed, from, to)).hasSize(1);
     }
 
     @Test
-    void ensure_sleep_does_not_overwrite_manual_entry() {
+    void ensure_sleep_skips_day_when_any_overlap() {
         WebTestClient authed = authedAdminClient();
         Long workId = createDelo(authed, "Ночная работа");
         LocalDate day = LocalDate.of(2026, 3, 11);
-        LocalDateTime nightSlot = day.atTime(2, 0);
         LocalDateTime from = day.atStartOfDay();
         LocalDateTime to = day.plusDays(1).atStartOfDay();
 
         putEntryRaw(authed, Map.of(
-                "startAt", nightSlot.toString(),
+                "startAt", day.atTime(2, 0).toString(),
                 "deloId", workId,
                 "status", "DONE"
         ));
 
         TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
-
-        assertThat(result.getFilledCount()).isEqualTo(31); // 32 - 1 occupied
+        assertThat(result.getFilledCount()).isZero();
         List<TimeEntryController.TimeEntryResponse> range = listRange(authed, from, to);
-        TimeEntryController.TimeEntryResponse kept = range.stream()
-                .filter(e -> normalize(e.getStartAt()).equals(normalize(nightSlot.toString())))
-                .findFirst()
-                .orElseThrow();
-        assertThat(kept.getDeloId()).isEqualTo(workId);
-        assertThat(kept.getDeloTitle()).isEqualTo("Ночная работа");
+        assertThat(range).hasSize(1);
+        assertThat(range.get(0).getDeloTitle()).isEqualTo("Ночная работа");
     }
 
     @Test
-    void ensure_sleep_respects_custom_night_hours() {
+    void ensure_sleep_uses_day_end_boundary() {
         WebTestClient authed = authedAdminClient();
         userRepository.findByUsername("admin").ifPresent(u -> {
-            u.setNightStart(LocalTime.of(1, 0));
-            u.setNightEnd(LocalTime.of(3, 0));
+            u.setDayEnd(LocalTime.of(2, 0));
+            u.setDefaultSleepEnd(LocalTime.of(9, 0));
             userRepository.save(u);
         });
 
         LocalDate day = LocalDate.of(2026, 4, 1);
-        LocalDateTime from = day.atStartOfDay();
-        LocalDateTime to = day.plusDays(1).atStartOfDay();
+        // Range covering logical day starting Apr1 02:00
+        LocalDateTime from = day.atTime(2, 0);
+        LocalDateTime to = day.plusDays(1).atTime(2, 0);
 
         TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
-
-        // 01:00, 01:15, … 02:45 = 8 slots
-        assertThat(result.getFilledCount()).isEqualTo(8);
-        assertThat(result.getEntries()).allMatch(e -> {
-            LocalTime t = LocalDateTime.parse(normalize(e.getStartAt())).toLocalTime();
-            return !t.isBefore(LocalTime.of(1, 0)) && t.isBefore(LocalTime.of(3, 0));
-        });
-        // 00:00 and 03:00 not filled
-        List<String> starts = result.getEntries().stream().map(e -> normalize(e.getStartAt())).toList();
-        assertThat(starts).doesNotContain(normalize(day.atTime(0, 0).toString()));
-        assertThat(starts).doesNotContain(normalize(day.atTime(3, 0).toString()));
+        assertThat(result.getFilledCount()).isEqualTo(1);
+        TimeEntryController.TimeEntryResponse sleep = result.getEntries().get(0);
+        assertThat(normalize(sleep.getStartAt())).isEqualTo(normalize(day.atTime(2, 0).toString()));
+        assertThat(normalize(sleep.getEndAt())).isEqualTo(normalize(day.atTime(9, 0).toString()));
     }
 
     @Test
-    void ensure_sleep_future_night_slots_are_planned() {
+    void ensure_sleep_future_interval_is_planned() {
         WebTestClient authed = authedAdminClient();
-        // Far future day → all sleep PLANNED
         LocalDate day = LocalDate.now(MOSCOW).plusDays(5);
         LocalDateTime from = day.atStartOfDay();
         LocalDateTime to = day.plusDays(1).atStartOfDay();
 
         TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
-
-        assertThat(result.getFilledCount()).isEqualTo(32);
-        assertThat(result.getEntries()).allMatch(e -> e.getStatus() == TimeEntry.Status.PLANNED);
+        assertThat(result.getFilledCount()).isEqualTo(1);
+        assertThat(result.getEntries().get(0).getStatus()).isEqualTo(TimeEntry.Status.PLANNED);
     }
 
     @Test
@@ -711,6 +689,79 @@ class TimeEntryApiIT extends ApiIntegrationTest {
     }
 
     @Test
+    void grid_click_shrink_extend_split_interval() {
+        WebTestClient authed = authedAdminClient();
+        Long sleepId = createDelo(authed, "Сон");
+        LocalDate day = LocalDate.of(2026, 5, 1);
+        // Place 02:00–09:00
+        putEntryRaw(authed, Map.of(
+                "startAt", day.atTime(2, 0).toString(),
+                "endAt", day.atTime(9, 0).toString(),
+                "deloId", sleepId,
+                "status", "DONE"
+        ));
+
+        // Shrink end: click 08:45
+        TimeEntryController.GridClickResponse shrink = gridClick(authed, day.atTime(8, 45).toString());
+        assertThat(shrink.getAction()).isEqualTo("SHRINK");
+        assertThat(normalize(shrink.getEntries().get(0).getEndAt()))
+                .isEqualTo(normalize(day.atTime(8, 45).toString()));
+
+        // Extend end: click empty 08:45 (after shrink end is 08:45)
+        TimeEntryController.GridClickResponse extend = gridClick(authed, day.atTime(8, 45).toString());
+        assertThat(extend.getAction()).isEqualTo("EXTEND");
+        assertThat(normalize(extend.getEntries().get(0).getEndAt()))
+                .isEqualTo(normalize(day.atTime(9, 0).toString()));
+
+        // Split middle: click 06:00
+        TimeEntryController.GridClickResponse split = gridClick(authed, day.atTime(6, 0).toString());
+        assertThat(split.getAction()).isEqualTo("SPLIT");
+        assertThat(split.getEntries()).hasSize(2);
+        assertThat(normalize(split.getEntries().get(0).getStartAt()))
+                .isEqualTo(normalize(day.atTime(2, 0).toString()));
+        assertThat(normalize(split.getEntries().get(0).getEndAt()))
+                .isEqualTo(normalize(day.atTime(6, 0).toString()));
+        assertThat(normalize(split.getEntries().get(1).getStartAt()))
+                .isEqualTo(normalize(day.atTime(6, 15).toString()));
+        assertThat(normalize(split.getEntries().get(1).getEndAt()))
+                .isEqualTo(normalize(day.atTime(9, 0).toString()));
+    }
+
+    @Test
+    void today_respects_day_end_after_midnight() {
+        WebTestClient authed = authedAdminClient();
+        userRepository.findByUsername("admin").ifPresent(u -> {
+            u.setDayEnd(LocalTime.of(2, 0));
+            userRepository.save(u);
+        });
+        Long deloId = createDelo(authed, "Чтение");
+        LocalDate day = LocalDate.of(2026, 6, 10);
+        // 00:30 next calendar morning belongs to logical day June 10
+        putEntryRaw(authed, Map.of(
+                "startAt", day.plusDays(1).atTime(0, 30).toString(),
+                "endAt", day.plusDays(1).atTime(1, 30).toString(),
+                "deloId", deloId,
+                "status", "DONE"
+        ));
+
+        TimeEntryController.TodayResponse body = authed.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/time-entries/today")
+                        .queryParam("date", day.toString())
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.TodayResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(body).isNotNull();
+        assertThat(normalize(body.getDayStart())).isEqualTo(normalize(day.atTime(2, 0).toString()));
+        assertThat(normalize(body.getDayEnd())).isEqualTo(normalize(day.plusDays(1).atTime(2, 0).toString()));
+        assertThat(body.getEntries()).hasSize(1);
+        assertThat(body.getEntries().get(0).getDeloTitle()).isEqualTo("Чтение");
+    }
+
     void week_bounds_are_iso_monday_to_next_monday_exclusive() {
         WebTestClient authed = authedAdminClient();
         // 2026-03-11 is Wednesday → ISO week 11, Mon 2026-03-09 .. Sun 2026-03-15
@@ -842,6 +893,18 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 .uri("/api/v1/time-entries/week")
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+
+    private TimeEntryController.GridClickResponse gridClick(WebTestClient client, String slotStart) {
+        return client.post()
+                .uri("/api/v1/time-entries/grid-click")
+                .bodyValue(Map.of("slotStart", slotStart))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.GridClickResponse.class)
+                .returnResult()
+                .getResponseBody();
     }
 
     private TimeEntryController.EnsureSleepResponse ensureSleep(

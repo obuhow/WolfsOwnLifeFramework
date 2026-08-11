@@ -6,6 +6,8 @@ const settings = ref({
   timezone: 'Europe/Moscow',
   nightStart: '23:00',
   nightEnd: '07:00',
+  dayEnd: '02:00',
+  defaultSleepEnd: '09:00',
   hourAccountingMode: 'PRIMARY_ONLY'
 })
 
@@ -56,6 +58,8 @@ async function loadSettings() {
       timezone: data.timezone,
       nightStart: data.nightStart?.slice(0, 5) || '23:00',
       nightEnd: data.nightEnd?.slice(0, 5) || '07:00',
+      dayEnd: data.dayEnd?.slice(0, 5) || '02:00',
+      defaultSleepEnd: data.defaultSleepEnd?.slice(0, 5) || '09:00',
       hourAccountingMode: data.hourAccountingMode
     }
   } catch (e) {
@@ -105,7 +109,7 @@ onMounted(loadSettings)
   <div class="settings-page">
     <header class="page-header">
       <h1>Настройки</h1>
-      <p class="eyebrow">Часовой пояс, ночные часы, режим учёта</p>
+      <p class="eyebrow">Часовой пояс, конец дня, ночные часы, режим учёта</p>
     </header>
 
     <section class="card">
@@ -123,6 +127,31 @@ onMounted(loadSettings)
             <option v-for="tz in timezones" :key="tz" :value="tz">{{ tz }}</option>
           </select>
           <p class="hint">Используется для границ дня и недели в календаре и Гантте</p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="dayEnd">Конец дня</label>
+            <input
+              id="dayEnd"
+              type="time"
+              v-model="settings.dayEnd"
+              :disabled="loading"
+              class="input"
+            />
+            <p class="hint">Граница логических суток (например 02:00). Дела после полуночи до этого времени относятся к предыдущему календарному дню сетки.</p>
+          </div>
+          <div class="form-group">
+            <label for="defaultSleepEnd">Конец авто-Сна</label>
+            <input
+              id="defaultSleepEnd"
+              type="time"
+              v-model="settings.defaultSleepEnd"
+              :disabled="loading"
+              class="input"
+            />
+            <p class="hint">Интервал «Сон» по умолчанию: от конца дня до этого времени (напр. 02:00–09:00)</p>
+          </div>
         </div>
 
         <div class="form-row">

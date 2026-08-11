@@ -23,6 +23,38 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
     @Query("""
             SELECT te FROM TimeEntry te
             LEFT JOIN FETCH te.delo
+            WHERE te.user.id = :userId AND te.endAt = :endAt
+            """)
+    Optional<TimeEntry> findByUserIdAndEndAt(@Param("userId") Long userId,
+                                             @Param("endAt") LocalDateTime endAt);
+
+    /** Entry that covers slot: startAt <= slotStart < endAt */
+    @Query("""
+            SELECT te FROM TimeEntry te
+            LEFT JOIN FETCH te.delo
+            WHERE te.user.id = :userId
+              AND te.startAt <= :slotStart
+              AND te.endAt > :slotStart
+            """)
+    Optional<TimeEntry> findCoveringSlot(@Param("userId") Long userId,
+                                         @Param("slotStart") LocalDateTime slotStart);
+
+    /** Intervals overlapping half-open [from, to): start < to AND end > from */
+    @Query("""
+            SELECT te FROM TimeEntry te
+            LEFT JOIN FETCH te.delo
+            WHERE te.user.id = :userId
+              AND te.startAt < :to
+              AND te.endAt > :from
+            ORDER BY te.startAt ASC
+            """)
+    List<TimeEntry> findOverlapping(@Param("userId") Long userId,
+                                    @Param("from") LocalDateTime from,
+                                    @Param("to") LocalDateTime to);
+
+    @Query("""
+            SELECT te FROM TimeEntry te
+            LEFT JOIN FETCH te.delo
             WHERE te.user.id = :userId
               AND te.startAt >= :start
               AND te.startAt < :end
@@ -37,15 +69,15 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
             LEFT JOIN FETCH te.delo
             WHERE te.user.id = :userId
               AND te.status = :status
-              AND te.startAt >= :start
-              AND te.startAt < :end
+              AND te.startAt < :to
+              AND te.endAt > :from
             ORDER BY te.startAt ASC
             """)
-    List<TimeEntry> findByUserIdAndStatusAndStartAtBetween(
+    List<TimeEntry> findByUserIdAndStatusOverlapping(
             @Param("userId") Long userId,
             @Param("status") TimeEntry.Status status,
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end);
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
 
     void deleteByUserIdAndStartAt(Long userId, LocalDateTime startAt);
 }

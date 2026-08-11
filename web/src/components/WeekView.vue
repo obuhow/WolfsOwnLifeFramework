@@ -17,6 +17,7 @@ const delos = ref([])
 const projects = ref([])
 const nightStart = ref('23:00')
 const nightEnd = ref('07:00')
+const dayEndSetting = ref('02:00')
 const showNightHours = ref(false)
 
 // Picker
@@ -84,6 +85,36 @@ function normalizeStart(s) {
   return s
 }
 
+
+function parseLdt(s) {
+  const n = normalizeStart(s)
+  const [d, tm] = n.split('T')
+  const [y, mo, da] = d.split('-').map(Number)
+  const [h, mi, se] = (tm || '00:00:00').split(':').map(Number)
+  return new Date(y, mo - 1, da, h, mi || 0, se || 0, 0)
+}
+
+function formatLdt(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${formatTime(d.getHours(), d.getMinutes())}:00`
+}
+
+function addMinutes(ldtStr, mins) {
+  const d = parseLdt(ldtStr)
+  d.setMinutes(d.getMinutes() + mins)
+  return formatLdt(d)
+}
+
+function entryCovering(slotStart) {
+  const s = normalizeStart(slotStart)
+  for (const e of entries.value) {
+    const a = normalizeStart(e.startAt)
+    const b = normalizeStart(e.endAt || addMinutes(a, 15))
+    if (a <= s && s < b) return e
+  }
+  return null
+}
+
+
 function timeToMinutes(t) {
   if (!t) return 0
   const [h, m] = t.slice(0, 5).split(':').map(Number)
@@ -120,17 +151,35 @@ const entryByStart = computed(() => {
 })
 
 const timeRows = computed(() => {
+  // Prefer first day bounds from week payload
+  const d0 = days.value[0]
+  let start = d0?.dayStart ? normalizeStart(d0.dayStart) : (rangeStart.value ? normalizeStart(rangeStart.value) : null)
+  let end = d0?.dayEnd ? normalizeStart(d0.dayEnd) : (rangeStart.value ? addMinutes(normalizeStart(rangeStart.value), 24 * 60) : null)
+  if (!start || !end) {
+    const rows = []
+    for (let i = 0; i < SLOTS_PER_DAY; i++) {
+      const totalMin = i * 15
+      const label = formatTime(Math.floor(totalMin / 60), totalMin % 60)
+      rows.push({ index: i, label, hour: Math.floor(totalMin / 60), minute: totalMin % 60, isNight: isNightSlotLabel(label), absStart: null })
+    }
+    return rows
+  }
   const rows = []
-  for (let i = 0; i < SLOTS_PER_DAY; i++) {
-    const totalMin = i * 15
-    const label = formatTime(Math.floor(totalMin / 60), totalMin % 60)
+  let cur = normalizeStart(start)
+  const endN = normalizeStart(end)
+  let i = 0
+  while (cur < endN && i < 200) {
+    const label = parseSlotLabel(cur)
     rows.push({
       index: i,
       label,
-      hour: Math.floor(totalMin / 60),
-      minute: totalMin % 60,
-      isNight: isNightSlotLabel(label)
+      hour: Number(label.slice(0, 2)),
+      minute: Number(label.slice(3, 5)),
+      isNight: isNightSlotLabel(label),
+      absStart: cur
     })
+    cur = addMinutes(cur, 15)
+    i++
   }
   return rows
 })
@@ -139,6 +188,7 @@ const visibleTimeRows = computed(() => {
   if (showNightHours.value) return timeRows.value
   return timeRows.value.filter(r => !r.isNight)
 })
+
 
 function cellFor(dayDate, row) {
   const startAt = slotStartAt(dayDate, row.index)
@@ -205,7 +255,7 @@ const panelItems = computed(() => {
     .map(e => ({
       ...e,
       title: e.deloTitle || e.adHocText || '—',
-      time: parseSlotLabel(e.startAt),
+      time: `${parseSlotLabel(e.startAt)}–${parseSlotLabel(e.endAt)}`,
       day: parseSlotDate(e.startAt),
       statusLabel: e.status === 'DONE' ? 'выполнена' : 'запланирована'
     }))
@@ -223,6 +273,151 @@ const weekLabel = computed(() => {
 })
 
 const nightHoursLabel = computed(() => `${nightStart.value}–${nightEnd.value}`)
+
+/** Identity of a slot content for merge: same delo OR same ad-hoc text + same status. */
+function entryMergeKey(entry) {
+  if (!entry) return null
+  if (entry.deloId != null) return `d:${entry.deloId}:${entry.status}`
+  if (entry.adHocText) return `a:${entry.adHocText}:${entry.status}`
+  return null
+}
+
+/**
+ * Per day column: for each visible row either a block-start cell (with rowspan)
+ * or a continuation (skipped in template) or an empty single cell.
+ * Contiguous same-name entries render as one block: "Сон 00:00–07:00".
+ */
+const dayBlocks = computed(() => {
+  const rows = visibleTimeRows.value
+  if (!days.value.length) return []
+  return days.value.map(day => {
+    const cells = []
+    let i = 0
+    while (i < rows.length) {
+      const row = rows[i]
+      // Map row clock onto this day's absolute timeline
+      let slotStart
+      if (row.absStart && days.value[0]) {
+        // same offset from day start as row.absStart from first day start
+        const d0 = days.value[0]
+        const base0 = d0.dayStart ? normalizeStart(d0.dayStart) : normalizeStart(row.absStart)
+        const offsetMs = parseLdt(row.absStart) - parseLdt(base0)
+        const dayBase = day.dayStart ? normalizeStart(day.dayStart) : `${day.date}T${row.label}:00`
+        const dt = parseLdt(dayBase)
+        dt.setTime(dt.getTime() + offsetMs)
+        slotStart = formatLdt(dt)
+      } else if (day.dayStart) {
+        slotStart = addMinutes(normalizeStart(day.dayStart), row.index * 15)
+      } else {
+        slotStart = `${day.date}T${row.label}:00`
+      }
+      slotStart = normalizeStart(slotStart)
+      const entry = entryCovering(slotStart)
+      if (!entry) {
+        cells.push({
+          kind: 'empty',
+          rowIndex: i,
+          span: 1,
+          slot: {
+            startAt: slotStart,
+            label: row.label,
+            entry: null,
+            date: day.date,
+            isNight: row.isNight,
+            minute: row.minute,
+            hour: row.hour
+          },
+          displayLabel: '',
+          rangeLabel: row.label
+        })
+        i += 1
+        continue
+      }
+      let j = i + 1
+      while (j < rows.length) {
+        const r2 = rows[j]
+        let s2
+        if (r2.absStart && days.value[0]) {
+          const d0 = days.value[0]
+          const base0 = d0.dayStart ? normalizeStart(d0.dayStart) : normalizeStart(r2.absStart)
+          const offsetMs = parseLdt(r2.absStart) - parseLdt(base0)
+          const dayBase = day.dayStart ? normalizeStart(day.dayStart) : `${day.date}T${r2.label}:00`
+          const dt = parseLdt(dayBase)
+          dt.setTime(dt.getTime() + offsetMs)
+          s2 = formatLdt(dt)
+        } else if (day.dayStart) {
+          s2 = addMinutes(normalizeStart(day.dayStart), r2.index * 15)
+        } else {
+          s2 = `${day.date}T${r2.label}:00`
+        }
+        const e2 = entryCovering(normalizeStart(s2))
+        if (!e2 || e2.id !== entry.id) break
+        j += 1
+      }
+      const span = j - i
+      const startLabel = parseSlotLabel(entry.startAt)
+      const endLabel = parseSlotLabel(entry.endAt)
+      const name = entry.deloTitle || entry.adHocText || ''
+      const displayLabel = span > 1 ? `${name} ${startLabel}–${endLabel}` : name
+      cells.push({
+        kind: 'block',
+        rowIndex: i,
+        span,
+        slot: {
+          startAt: slotStart,
+          label: row.label,
+          entry,
+          date: day.date,
+          isNight: row.isNight,
+          minute: row.minute,
+          hour: row.hour
+        },
+        displayLabel,
+        rangeLabel: `${startLabel}–${endLabel}`
+      })
+      for (let k = i + 1; k < j; k++) {
+        cells.push({
+          kind: 'cont',
+          rowIndex: k,
+          span: 0,
+          slot: { startAt: slotStart, label: rows[k].label, entry, date: day.date, isNight: rows[k].isNight, minute: rows[k].minute, hour: rows[k].hour },
+          displayLabel: '',
+          rangeLabel: ''
+        })
+      }
+      i = j
+    }
+    return cells
+  })
+})
+
+function blockAt(dayIdx, rowIdx) {
+  const col = dayBlocks.value[dayIdx]
+  if (!col) return null
+  return col[rowIdx] || null
+}
+
+function blockClass(block) {
+  if (!block) return ['week-cell']
+  const classes = cellClass(block.slot)
+  if (block.kind === 'block' && block.span > 1) classes.push('cell-span')
+  return classes
+}
+
+function blockTitle(block) {
+  if (!block || block.kind === 'cont') return ''
+  if (block.kind === 'empty' || !block.slot.entry) {
+    return `${block.slot.date} ${block.slot.label} — пусто, нажмите чтобы поставить`
+  }
+  const name = block.slot.entry.deloTitle || block.slot.entry.adHocText
+  const range = block.span > 1 ? ` ${block.rangeLabel}` : ''
+  if (block.slot.entry.status === 'PLANNED' && isPastSlot(block.slot.startAt)) {
+    return `${name}${range} (запланирована, прошло) — подтвердить`
+  }
+  const st = block.slot.entry.status === 'DONE' ? 'выполнена' : 'запланирована'
+  return `${name}${range} (${st}) — снять`
+}
+
 
 async function loadProjects() {
   const headers = authHeaders()
@@ -249,6 +444,7 @@ async function loadSettings() {
   timezone.value = data.timezone || timezone.value
   nightStart.value = (data.nightStart || '23:00:00').slice(0, 5)
   nightEnd.value = (data.nightEnd || '07:00:00').slice(0, 5)
+  dayEndSetting.value = (data.dayEnd || '02:00:00').slice(0, 5)
 }
 
 function applyWeekBody(body) {
@@ -261,6 +457,7 @@ function applyWeekBody(body) {
   isoWeek.value = body.isoWeek
   days.value = body.days || []
   entries.value = body.entries || []
+  if (body.dayEndSetting) dayEndSetting.value = String(body.dayEndSetting).slice(0, 5)
 }
 
 async function ensureSleepForWeek() {
@@ -282,11 +479,14 @@ async function ensureSleepForWeek() {
 }
 
 /**
- * @param {{ date?: string, isoYear?: number, isoWeek?: number } | null} query
+ * @param {{ date?: string, isoYear?: number, isoWeek?: number, ensureSleep?: boolean } | null} query
+ * ensureSleep (default true) — only on navigation/first open. After place/clear/confirm
+ * we skip it so manually cleared night «Сон» is not immediately refilled.
  */
 async function loadWeek(query = null) {
   const headers = authHeaders()
   if (!headers) return
+  const doEnsureSleep = query == null ? true : query.ensureSleep !== false
 
   const params = new URLSearchParams()
   if (query?.isoYear != null && query?.isoWeek != null) {
@@ -307,17 +507,18 @@ async function loadWeek(query = null) {
   let body = await res.json()
   applyWeekBody(body)
 
-  await ensureSleepForWeek()
-
-  // reload after sleep autofill
-  const reloadParams = new URLSearchParams({
-    isoYear: String(isoYear.value),
-    isoWeek: String(isoWeek.value)
-  })
-  res = await fetch(`${apiBase()}/time-entries/week?${reloadParams}`, { headers })
-  if (!res.ok) throw new Error(`Неделя: HTTP ${res.status}`)
-  body = await res.json()
-  applyWeekBody(body)
+  if (doEnsureSleep) {
+    await ensureSleepForWeek()
+    // reload after sleep autofill
+    const reloadParams = new URLSearchParams({
+      isoYear: String(isoYear.value),
+      isoWeek: String(isoWeek.value)
+    })
+    res = await fetch(`${apiBase()}/time-entries/week?${reloadParams}`, { headers })
+    if (!res.ok) throw new Error(`Неделя: HTTP ${res.status}`)
+    body = await res.json()
+    applyWeekBody(body)
+  }
 }
 
 async function loadAll() {
@@ -382,16 +583,32 @@ async function onWeekDatePick(ev) {
   }
 }
 
-function onCellClick(slot) {
-  if (slot.entry) {
-    if (slot.entry.status === 'PLANNED' && isPastSlot(slot.startAt)) {
-      confirmSlot(slot.startAt)
+async function onCellClick(slot, span = 1) {
+  const headers = authHeaders(true)
+  if (!headers) return
+  saving.value = true
+  error.value = ''
+  try {
+    const res = await fetch(`${apiBase()}/time-entries/grid-click`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ slotStart: normalizeStart(slot.startAt) })
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.message || `Клик: HTTP ${res.status}`)
+    }
+    const body = await res.json()
+    if (body.action === 'NEED_PICKER') {
+      openPicker(slot.startAt)
       return
     }
-    clearSlot(slot.startAt)
-    return
+    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value, ensureSleep: false })
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    saving.value = false
   }
-  openPicker(slot.startAt)
 }
 
 function openPicker(startAt) {
@@ -421,7 +638,7 @@ async function clearSlot(startAt) {
       headers
     })
     if (!res.ok && res.status !== 204) throw new Error(`Очистка: HTTP ${res.status}`)
-    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value })
+    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value, ensureSleep: false })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -444,7 +661,7 @@ async function confirmSlot(startAt) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.message || `Подтверждение: HTTP ${res.status}`)
     }
-    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value })
+    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value, ensureSleep: false })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -471,7 +688,7 @@ async function confirmAllWeek() {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.message || `Подтвердить все: HTTP ${res.status}`)
     }
-    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value })
+    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value, ensureSleep: false })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -505,17 +722,20 @@ async function submitPicker() {
   saving.value = true
   error.value = ''
   try {
-    const res = await fetch(`${apiBase()}/time-entries`, {
-      method: 'PUT',
+    const payload = { slotStart: normalizeStart(pickerSlot.value) }
+    if (body.deloId != null) payload.deloId = body.deloId
+    if (body.adHocText) payload.adHocText = body.adHocText
+    const res = await fetch(`${apiBase()}/time-entries/grid-click`, {
+      method: 'POST',
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(payload)
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.message || `Сохранение: HTTP ${res.status}`)
     }
     closePicker()
-    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value })
+    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value, ensureSleep: false })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -653,35 +873,47 @@ onMounted(loadAll)
         <div class="week-scroll">
           <div class="week-grid" :style="{ '--day-cols': days.length || 7 }">
             <!-- header row -->
-            <div class="week-corner" aria-hidden="true"></div>
+            <div class="week-corner" aria-hidden="true" :style="{ gridColumn: 1, gridRow: 1 }"></div>
             <div
-              v-for="day in days"
+              v-for="(day, dayIdx) in days"
               :key="'h-' + day.date"
               class="week-day-head"
               :class="{ 'is-today': isTodayCol(day.date) }"
+              :style="{ gridColumn: dayIdx + 2, gridRow: 1 }"
             >
               <span class="wd-name">{{ WEEKDAY_RU[day.weekday] || day.weekday }}</span>
               <span class="wd-date">{{ formatDayHeader(day.date) }}</span>
             </div>
 
-            <!-- time rows -->
-            <template v-for="row in visibleTimeRows" :key="'r-' + row.index">
-              <div class="week-time" :class="{ 'cell-hour': row.minute === 0, 'cell-night': row.isNight }">
+            <!-- time rows: contiguous same-name entries merge into one block -->
+            <template v-for="(row, rowIdx) in visibleTimeRows" :key="'r-' + row.index">
+              <div
+                class="week-time"
+                :class="{ 'cell-hour': row.minute === 0, 'cell-night': row.isNight }"
+                :style="{ gridColumn: 1, gridRow: rowIdx + 2 }"
+              >
                 {{ row.label }}
               </div>
-              <button
-                v-for="day in days"
-                :key="day.date + '-' + row.index"
-                type="button"
-                :class="cellClass(cellFor(day.date, row))"
-                :title="cellTitle(cellFor(day.date, row))"
-                :disabled="saving"
-                @click="onCellClick(cellFor(day.date, row))"
-              >
-                <span v-if="cellLabel(cellFor(day.date, row))" class="week-cell-label">
-                  {{ cellLabel(cellFor(day.date, row)) }}
-                </span>
-              </button>
+              <template v-for="(day, dayIdx) in days" :key="day.date + '-' + row.index">
+                <button
+                  v-if="blockAt(dayIdx, rowIdx) && blockAt(dayIdx, rowIdx).kind !== 'cont'"
+                  type="button"
+                  :class="blockClass(blockAt(dayIdx, rowIdx))"
+                  :title="blockTitle(blockAt(dayIdx, rowIdx))"
+                  :disabled="saving"
+                  :style="{
+                    gridColumn: dayIdx + 2,
+                    gridRow: blockAt(dayIdx, rowIdx).span > 1
+                      ? ((rowIdx + 2) + ' / span ' + blockAt(dayIdx, rowIdx).span)
+                      : (rowIdx + 2)
+                  }"
+                  @click="onCellClick(blockAt(dayIdx, rowIdx).slot, blockAt(dayIdx, rowIdx).span)"
+                >
+                  <span v-if="blockAt(dayIdx, rowIdx).displayLabel" class="week-cell-label">
+                    {{ blockAt(dayIdx, rowIdx).displayLabel }}
+                  </span>
+                </button>
+              </template>
             </template>
           </div>
         </div>
@@ -689,7 +921,7 @@ onMounted(loadAll)
           <span class="legend-swatch planned"></span> запланирована
           <span class="legend-swatch done"></span> выполнена
           · клик: поставить / снять / подтвердить прошлое плановое
-          · ночь {{ nightHoursLabel }} скрыта по умолчанию; пустые → авто «Сон»
+          · конец дня {{ dayEndSetting }} · ночь {{ nightHoursLabel }} скрыта по умолчанию; авто «Сон» интервалом
         </p>
       </section>
 
@@ -892,6 +1124,9 @@ onMounted(loadAll)
 .week-grid {
   display: grid;
   grid-template-columns: 3.25rem repeat(var(--day-cols, 7), minmax(5.5rem, 1fr));
+  /* Row 1 = day headers (taller); body slots stay 1.35rem */
+  grid-template-rows: 2.85rem;
+  grid-auto-rows: 1.35rem;
   min-width: 48rem;
 }
 
@@ -899,25 +1134,31 @@ onMounted(loadAll)
   position: sticky;
   top: 0;
   left: 0;
-  z-index: 3;
+  z-index: 6;
   background: #f0ebe3;
   border-bottom: 1px solid #d9d1c6;
   border-right: 1px solid #e6dfd4;
+  min-height: 2.85rem;
+  box-sizing: border-box;
 }
 
 .week-day-head {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0.1rem;
-  padding: 0.45rem 0.25rem;
+  padding: 0.35rem 0.25rem;
   background: #f0ebe3;
   border-bottom: 1px solid #d9d1c6;
   border-right: 1px solid #e6dfd4;
   font-size: 0.78rem;
+  min-height: 2.85rem;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .week-day-head.is-today {
@@ -980,6 +1221,8 @@ onMounted(loadAll)
   cursor: pointer;
   overflow: hidden;
   transition: background 0.1s;
+  position: relative;
+  z-index: 0;
 }
 
 .week-cell:hover:not(:disabled) {
@@ -1002,6 +1245,27 @@ onMounted(loadAll)
   white-space: nowrap;
   font-weight: 500;
   line-height: 1.2;
+}
+
+.week-cell.cell-span {
+  align-self: stretch;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 0.15rem;
+  /* Keep under sticky day headers (z-index 5) when scrolling */
+  position: relative;
+  z-index: 0;
+}
+
+.week-cell.cell-span .week-cell-label {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.15;
+  max-width: 100%;
+  pointer-events: none;
 }
 
 .cell-planned {

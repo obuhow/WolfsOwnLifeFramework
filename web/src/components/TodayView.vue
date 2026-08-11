@@ -6,6 +6,9 @@ const loading = ref(false)
 const error = ref('')
 const timezone = ref('Europe/Moscow')
 const selectedDate = ref('')
+const dayStart = ref('') // logical day start LDT from API
+const dayEndExclusive = ref('')
+const dayEndSetting = ref('02:00')
 const entries = ref([])
 const delos = ref([])
 const projects = ref([])
@@ -45,17 +48,27 @@ function formatTime(hour, minute) {
   return `${pad2(hour)}:${pad2(minute)}`
 }
 
-function slotStartAt(dateStr, index) {
-  const totalMin = index * 15
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return `${dateStr}T${formatTime(h, m)}:00`
-}
-
 function parseSlotLabel(startAt) {
-  // "2026-08-11T10:15:00" or "2026-08-11T10:15"
   const t = startAt.includes('T') ? startAt.split('T')[1] : startAt
   return t.slice(0, 5)
+}
+
+function parseLdt(s) {
+  const n = normalizeStart(s)
+  const [d, tm] = n.split('T')
+  const [y, mo, da] = d.split('-').map(Number)
+  const [h, mi, se] = (tm || '00:00:00').split(':').map(Number)
+  return new Date(y, mo - 1, da, h, mi || 0, se || 0, 0)
+}
+
+function formatLdt(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${formatTime(d.getHours(), d.getMinutes())}:00`
+}
+
+function addMinutes(ldtStr, mins) {
+  const d = parseLdt(ldtStr)
+  d.setMinutes(d.getMinutes() + mins)
+  return formatLdt(d)
 }
 
 /** Parse "HH:mm" or "HH:mm:ss" → minutes from midnight. */
@@ -65,10 +78,6 @@ function timeToMinutes(t) {
   return h * 60 + m
 }
 
-/**
- * Night window (half-open on the daily cycle).
- * start < end → same day; start > end → wraps midnight; equal → no night.
- */
 function isNightSlotLabel(labelHHMM) {
   const start = timeToMinutes(nightStart.value)
   const end = timeToMinutes(nightEnd.value)
@@ -78,31 +87,95 @@ function isNightSlotLabel(labelHHMM) {
   return slot >= start || slot < end
 }
 
+function entryCovering(slotStart) {
+  const s = normalizeStart(slotStart)
+  for (const e of entries.value) {
+    const a = normalizeStart(e.startAt)
+    const b = normalizeStart(e.endAt)
+    if (a <= s && s < b) return e
+  }
+  return null
+}
+
+/** 15-min slots spanning logical day [dayStart, dayEndExclusive). */
 const slots = computed(() => {
-  if (!selectedDate.value) return []
-  const byStart = new Map(entries.value.map(e => [normalizeStart(e.startAt), e]))
+  if (!dayStart.value || !dayEndExclusive.value) return []
   const list = []
-  for (let i = 0; i < SLOTS_PER_DAY; i++) {
-    const startAt = slotStartAt(selectedDate.value, i)
-    const entry = byStart.get(normalizeStart(startAt)) || null
-    const totalMin = i * 15
-    const label = formatTime(Math.floor(totalMin / 60), totalMin % 60)
+  let cur = normalizeStart(dayStart.value)
+  const end = normalizeStart(dayEndExclusive.value)
+  let i = 0
+  while (cur < end && i < 200) {
+    const entry = entryCovering(cur)
+    const label = parseSlotLabel(cur)
     list.push({
       index: i,
-      startAt,
+      startAt: cur,
       label,
-      hour: Math.floor(totalMin / 60),
-      minute: totalMin % 60,
-      entry,
+      hour: Number(label.slice(0, 2)),
+      minute: Number(label.slice(3, 5)),
+      covering: entry,
       isNight: isNightSlotLabel(label)
     })
+    cur = addMinutes(cur, 15)
+    i++
   }
   return list
 })
 
+/**
+ * Night filter + interval blocks recomputed on *visible* rows.
+ * (If Сон starts at 02:00 and night is hidden until 08:30, first visible cell
+ * must still be a block start for the remaining tail — same as WeekView.)
+ */
 const visibleSlots = computed(() => {
-  if (showNightHours.value) return slots.value
-  return slots.value.filter(s => !s.isNight)
+  let base = slots.value
+  if (!showNightHours.value) base = base.filter(s => !s.isNight)
+
+  const out = []
+  let i = 0
+  while (i < base.length) {
+    const s = base[i]
+    const entry = s.covering || null
+    if (!entry) {
+      out.push({
+        ...s,
+        entry: null,
+        isBlockStart: false,
+        isContinuation: false,
+        span: 1,
+        displayLabel: ''
+      })
+      i += 1
+      continue
+    }
+    let j = i + 1
+    while (j < base.length) {
+      const e2 = base[j].covering
+      if (!e2 || e2.id !== entry.id) break
+      j += 1
+    }
+    const span = j - i
+    const name = entry.deloTitle || entry.adHocText || ''
+    const startLab = parseSlotLabel(entry.startAt)
+    const endLab = parseSlotLabel(entry.endAt)
+    // Always show full interval range when block spans or true start is off-screen (night)
+    const trueStartHidden = normalizeStart(entry.startAt) !== normalizeStart(s.startAt)
+    const displayLabel = span > 1 || trueStartHidden
+      ? `${name} ${startLab}–${endLab}`
+      : name
+    out.push({
+      ...s,
+      entry,
+      covering: entry,
+      isBlockStart: true,
+      isContinuation: false,
+      span,
+      displayLabel
+    })
+    // skip same-entry tail cells (rendered via min-height span)
+    i = j
+  }
+  return out
 })
 
 function normalizeStart(s) {
@@ -143,7 +216,7 @@ const panelItems = computed(() => {
     .map(e => ({
       ...e,
       title: e.deloTitle || e.adHocText || '—',
-      time: parseSlotLabel(e.startAt),
+      time: `${parseSlotLabel(e.startAt)}–${parseSlotLabel(e.endAt)}`,
       statusLabel: e.status === 'DONE' ? 'выполнена' : 'запланирована'
     }))
 })
@@ -202,16 +275,21 @@ async function loadSettings() {
   timezone.value = data.timezone || timezone.value
   nightStart.value = (data.nightStart || '23:00:00').slice(0, 5)
   nightEnd.value = (data.nightEnd || '07:00:00').slice(0, 5)
+  dayEndSetting.value = (data.dayEnd || '02:00:00').slice(0, 5)
 }
 
 function dayBounds(dateStr) {
-  const from = `${dateStr}T00:00:00`
+  // Prefer server bounds when already loaded for this date
+  if (selectedDate.value === dateStr && dayStart.value && dayEndExclusive.value) {
+    return { from: normalizeStart(dayStart.value), to: normalizeStart(dayEndExclusive.value) }
+  }
   const [y, m, d] = dateStr.split('-').map(Number)
-  const next = new Date(y, m - 1, d + 1)
-  const toDate = `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-${pad2(next.getDate())}`
-  const to = `${toDate}T00:00:00`
-  return { from, to }
+  const [eh, em] = (dayEndSetting.value || '02:00').split(':').map(Number)
+  const start = new Date(y, m - 1, d, eh, em, 0, 0)
+  const end = new Date(y, m - 1, d + 1, eh, em, 0, 0)
+  return { from: formatLdt(start), to: formatLdt(end) }
 }
+
 
 /** Autofill empty night cells with Дело «Сон» for the viewed day. Idempotent; manual wins. */
 async function ensureSleepForDay() {
@@ -230,9 +308,15 @@ async function ensureSleepForDay() {
   }
 }
 
-async function loadToday() {
+/**
+ * @param {{ ensureSleep?: boolean }} [opts]
+ * ensureSleep (default true) on day open/navigation only — not after place/clear/confirm,
+ * otherwise cleared night «Сон» snaps back immediately.
+ */
+async function loadToday(opts = {}) {
   const headers = authHeaders()
   if (!headers) return
+  const doEnsureSleep = opts.ensureSleep !== false
   // Need a date for ensure-sleep; first load without date to resolve "today"
   const qs = selectedDate.value ? `?date=${encodeURIComponent(selectedDate.value)}` : ''
   let res = await fetch(`${apiBase()}/time-entries/today${qs}`, { headers })
@@ -240,8 +324,13 @@ async function loadToday() {
   let body = await res.json()
   timezone.value = body.timezone || timezone.value
   selectedDate.value = body.date
+  dayStart.value = body.dayStart || ''
+  dayEndExclusive.value = body.dayEnd || ''
+  if (body.dayEndSetting) dayEndSetting.value = String(body.dayEndSetting).slice(0, 5)
 
-  await ensureSleepForDay()
+  if (doEnsureSleep) {
+    await ensureSleepForDay()
+  }
 
   res = await fetch(
     `${apiBase()}/time-entries/today?date=${encodeURIComponent(selectedDate.value)}`,
@@ -249,6 +338,11 @@ async function loadToday() {
   )
   if (!res.ok) throw new Error(`Записи: HTTP ${res.status}`)
   body = await res.json()
+  timezone.value = body.timezone || timezone.value
+  selectedDate.value = body.date
+  dayStart.value = body.dayStart || ''
+  dayEndExclusive.value = body.dayEnd || ''
+  if (body.dayEndSetting) dayEndSetting.value = String(body.dayEndSetting).slice(0, 5)
   entries.value = body.entries || []
 }
 
@@ -260,7 +354,7 @@ async function loadAll() {
     if (stored === '1') showNightHours.value = true
     if (stored === '0') showNightHours.value = false
     await Promise.all([loadProjects(), loadDelos(), loadSettings()])
-    await loadToday()
+    await loadToday({ ensureSleep: true })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -288,7 +382,7 @@ watch(selectedDate, async (val, old) => {
   loading.value = true
   error.value = ''
   try {
-    await loadToday()
+    await loadToday({ ensureSleep: true })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -296,18 +390,34 @@ watch(selectedDate, async (val, old) => {
   }
 })
 
-function onCellClick(slot) {
-  if (slot.entry) {
-    // Past planned: confirm on primary click; clear stays available from panel / Ctrl+click.
-    if (slot.entry.status === 'PLANNED' && isPastSlot(slot.startAt)) {
-      confirmSlot(slot.startAt)
+async function onCellClick(slot) {
+  // Continuations are not rendered as buttons; still guard
+  if (slot.isContinuation) return
+  const headers = authHeaders(true)
+  if (!headers) return
+  saving.value = true
+  error.value = ''
+  try {
+    const res = await fetch(`${apiBase()}/time-entries/grid-click`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ slotStart: normalizeStart(slot.startAt) })
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.message || `Клик: HTTP ${res.status}`)
+    }
+    const body = await res.json()
+    if (body.action === 'NEED_PICKER') {
+      openPicker(slot.startAt)
       return
     }
-    // Toggle clear for future planned / done
-    clearSlot(slot.startAt)
-    return
+    await loadToday({ ensureSleep: false })
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    saving.value = false
   }
-  openPicker(slot.startAt)
 }
 
 function openPicker(startAt) {
@@ -336,7 +446,7 @@ async function clearSlot(startAt) {
       headers
     })
     if (!res.ok && res.status !== 204) throw new Error(`Очистка: HTTP ${res.status}`)
-    await loadToday()
+    await loadToday({ ensureSleep: false })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -359,7 +469,7 @@ async function confirmSlot(startAt) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.message || `Подтверждение: HTTP ${res.status}`)
     }
-    await loadToday()
+    await loadToday({ ensureSleep: false })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -395,7 +505,7 @@ async function confirmAllDay() {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.message || `Подтвердить все: HTTP ${res.status}`)
     }
-    await loadToday()
+    await loadToday({ ensureSleep: false })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -427,17 +537,20 @@ async function submitPicker() {
   saving.value = true
   error.value = ''
   try {
-    const res = await fetch(`${apiBase()}/time-entries`, {
-      method: 'PUT',
+    const payload = { slotStart: normalizeStart(pickerSlot.value) }
+    if (body.deloId != null) payload.deloId = body.deloId
+    if (body.adHocText) payload.adHocText = body.adHocText
+    const res = await fetch(`${apiBase()}/time-entries/grid-click`, {
+      method: 'POST',
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(payload)
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.message || `Сохранение: HTTP ${res.status}`)
     }
     closePicker()
-    await loadToday()
+    await loadToday({ ensureSleep: false })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -447,8 +560,9 @@ async function submitPicker() {
 
 function cellClass(slot) {
   const classes = ['grid-cell']
-  if (slot.entry) {
-    classes.push(slot.entry.status === 'DONE' ? 'cell-done' : 'cell-planned')
+  const e = slot.entry || slot.covering
+  if (e) {
+    classes.push(e.status === 'DONE' ? 'cell-done' : 'cell-planned')
   } else {
     classes.push('cell-empty')
   }
@@ -457,17 +571,18 @@ function cellClass(slot) {
     classes.push('cell-now')
   }
   if (slot.minute === 0) classes.push('cell-hour')
+  if (slot.span > 1) classes.push('cell-span')
   return classes
 }
 
 function cellTitle(slot) {
-  if (!slot.entry) return 'Пусто — нажмите, чтобы поставить Запись времени'
-  const name = slot.entry.deloTitle || slot.entry.adHocText
-  if (slot.entry.status === 'PLANNED' && isPastSlot(slot.startAt)) {
-    return `${name} (запланирована, прошло) — нажмите, чтобы подтвердить факт`
+  if (!slot.entry && !slot.covering) {
+    return 'Пусто — край блока удлинит соседнее Дело; иначе откроется выбор'
   }
-  const st = slot.entry.status === 'DONE' ? 'выполнена' : 'запланирована'
-  return `${name} (${st}) — нажмите, чтобы снять`
+  const e = slot.entry || slot.covering
+  const name = e.deloTitle || e.adHocText
+  const range = `${parseSlotLabel(e.startAt)}–${parseSlotLabel(e.endAt)}`
+  return `${name} ${range} — клик: край −/+15м, середина — разрез`
 }
 
 const nightHoursLabel = computed(() => {
@@ -538,11 +653,12 @@ onMounted(loadAll)
               :class="cellClass(slot)"
               :title="cellTitle(slot)"
               :disabled="saving"
+              :style="slot.span > 1 ? { minHeight: `calc(${slot.span} * 1.5rem)` } : undefined"
               @click="onCellClick(slot)"
             >
               <span class="cell-time">{{ slot.label }}</span>
-              <span v-if="slot.entry" class="cell-label">
-                {{ slot.entry.deloTitle || slot.entry.adHocText }}
+              <span v-if="slot.displayLabel" class="cell-label">
+                {{ slot.displayLabel }}
               </span>
             </button>
           </div>
@@ -550,9 +666,9 @@ onMounted(loadAll)
         <p class="hint grid-legend">
           <span class="legend-swatch planned"></span> запланирована
           <span class="legend-swatch done"></span> выполнена
-          · ночные ({{ nightHoursLabel }}) по умолчанию скрыты; пустые → авто «Сон»
-          · ручная запись перекрывает сон
-          · прошлое плановое не факт само — клик или «Подтвердить все»
+          · логический день до {{ dayEndSetting }} · ночные ({{ nightHoursLabel }}) скрыты по умолчанию
+          · авто «Сон» одним интервалом; клик по краю ±15м, по середине — разрез
+          · подтверждение факта: панель / «Подтвердить все»
         </p>
       </section>
 
@@ -756,6 +872,12 @@ onMounted(loadAll)
   font-size: 0.72rem;
 }
 
+.cell-span {
+  align-items: flex-start;
+}
+.cell-span .cell-label {
+  white-space: normal;
+}
 .cell-label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -763,7 +885,13 @@ onMounted(loadAll)
   font-weight: 500;
 }
 
-.cell-empty .cell-label {
+.cell-empty .cell-span {
+  align-items: flex-start;
+}
+.cell-span .cell-label {
+  white-space: normal;
+}
+.cell-label {
   color: transparent;
 }
 
