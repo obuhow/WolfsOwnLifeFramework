@@ -9,6 +9,10 @@ const selectedDate = ref('')
 const entries = ref([])
 const delos = ref([])
 const projects = ref([])
+const nightStart = ref('23:00')
+const nightEnd = ref('07:00')
+// Default hidden per glossary / US-17
+const showNightHours = ref(false)
 
 // Picker state
 const pickerOpen = ref(false)
@@ -20,6 +24,7 @@ const pickerFilter = ref('')
 const saving = ref(false)
 
 const SLOTS_PER_DAY = 96 // 00:00 .. 23:45
+const SHOW_NIGHT_KEY = 'wolf_show_night_hours'
 
 function authHeaders(json = false) {
   const token = localStorage.getItem('wolf_token')
@@ -53,6 +58,26 @@ function parseSlotLabel(startAt) {
   return t.slice(0, 5)
 }
 
+/** Parse "HH:mm" or "HH:mm:ss" → minutes from midnight. */
+function timeToMinutes(t) {
+  if (!t) return 0
+  const [h, m] = t.slice(0, 5).split(':').map(Number)
+  return h * 60 + m
+}
+
+/**
+ * Night window (half-open on the daily cycle).
+ * start < end → same day; start > end → wraps midnight; equal → no night.
+ */
+function isNightSlotLabel(labelHHMM) {
+  const start = timeToMinutes(nightStart.value)
+  const end = timeToMinutes(nightEnd.value)
+  const slot = timeToMinutes(labelHHMM)
+  if (start === end) return false
+  if (start < end) return slot >= start && slot < end
+  return slot >= start || slot < end
+}
+
 const slots = computed(() => {
   if (!selectedDate.value) return []
   const byStart = new Map(entries.value.map(e => [normalizeStart(e.startAt), e]))
@@ -61,16 +86,23 @@ const slots = computed(() => {
     const startAt = slotStartAt(selectedDate.value, i)
     const entry = byStart.get(normalizeStart(startAt)) || null
     const totalMin = i * 15
+    const label = formatTime(Math.floor(totalMin / 60), totalMin % 60)
     list.push({
       index: i,
       startAt,
-      label: formatTime(Math.floor(totalMin / 60), totalMin % 60),
+      label,
       hour: Math.floor(totalMin / 60),
       minute: totalMin % 60,
-      entry
+      entry,
+      isNight: isNightSlotLabel(label)
     })
   }
   return list
+})
+
+const visibleSlots = computed(() => {
+  if (showNightHours.value) return slots.value
+  return slots.value.filter(s => !s.isNight)
 })
 
 function normalizeStart(s) {
@@ -161,15 +193,62 @@ async function loadDelos() {
   delos.value = await res.json()
 }
 
+async function loadSettings() {
+  const headers = authHeaders()
+  if (!headers) return
+  const res = await fetch(`${apiBase()}/settings`, { headers })
+  if (!res.ok) throw new Error(`Настройки: HTTP ${res.status}`)
+  const data = await res.json()
+  timezone.value = data.timezone || timezone.value
+  nightStart.value = (data.nightStart || '23:00:00').slice(0, 5)
+  nightEnd.value = (data.nightEnd || '07:00:00').slice(0, 5)
+}
+
+function dayBounds(dateStr) {
+  const from = `${dateStr}T00:00:00`
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const next = new Date(y, m - 1, d + 1)
+  const toDate = `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-${pad2(next.getDate())}`
+  const to = `${toDate}T00:00:00`
+  return { from, to }
+}
+
+/** Autofill empty night cells with Дело «Сон» for the viewed day. Idempotent; manual wins. */
+async function ensureSleepForDay() {
+  if (!selectedDate.value) return
+  const headers = authHeaders(true)
+  if (!headers) return
+  const { from, to } = dayBounds(selectedDate.value)
+  const res = await fetch(`${apiBase()}/time-entries/ensure-sleep`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ from, to })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || `Авто-Сон: HTTP ${res.status}`)
+  }
+}
+
 async function loadToday() {
   const headers = authHeaders()
   if (!headers) return
+  // Need a date for ensure-sleep; first load without date to resolve "today"
   const qs = selectedDate.value ? `?date=${encodeURIComponent(selectedDate.value)}` : ''
-  const res = await fetch(`${apiBase()}/time-entries/today${qs}`, { headers })
+  let res = await fetch(`${apiBase()}/time-entries/today${qs}`, { headers })
   if (!res.ok) throw new Error(`Записи: HTTP ${res.status}`)
-  const body = await res.json()
-  timezone.value = body.timezone || 'Europe/Moscow'
+  let body = await res.json()
+  timezone.value = body.timezone || timezone.value
   selectedDate.value = body.date
+
+  await ensureSleepForDay()
+
+  res = await fetch(
+    `${apiBase()}/time-entries/today?date=${encodeURIComponent(selectedDate.value)}`,
+    { headers }
+  )
+  if (!res.ok) throw new Error(`Записи: HTTP ${res.status}`)
+  body = await res.json()
   entries.value = body.entries || []
 }
 
@@ -177,13 +256,21 @@ async function loadAll() {
   loading.value = true
   error.value = ''
   try {
-    await Promise.all([loadProjects(), loadDelos()])
+    const stored = localStorage.getItem(SHOW_NIGHT_KEY)
+    if (stored === '1') showNightHours.value = true
+    if (stored === '0') showNightHours.value = false
+    await Promise.all([loadProjects(), loadDelos(), loadSettings()])
     await loadToday()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
   }
+}
+
+function toggleNightHours() {
+  showNightHours.value = !showNightHours.value
+  localStorage.setItem(SHOW_NIGHT_KEY, showNightHours.value ? '1' : '0')
 }
 
 function shiftDay(delta) {
@@ -365,6 +452,7 @@ function cellClass(slot) {
   } else {
     classes.push('cell-empty')
   }
+  if (slot.isNight) classes.push('cell-night')
   if (nowSlotStart.value && normalizeStart(slot.startAt) === normalizeStart(nowSlotStart.value)) {
     classes.push('cell-now')
   }
@@ -382,6 +470,10 @@ function cellTitle(slot) {
   return `${name} (${st}) — нажмите, чтобы снять`
 }
 
+const nightHoursLabel = computed(() => {
+  return `${nightStart.value}–${nightEnd.value}`
+})
+
 onMounted(loadAll)
 </script>
 
@@ -390,7 +482,7 @@ onMounted(loadAll)
     <header class="page-header today-header">
       <div>
         <h1>Сегодня</h1>
-        <p class="eyebrow">15-минутная сетка · {{ timezone }}</p>
+        <p class="eyebrow">15-минутная сетка · {{ timezone }} · ночь {{ nightHoursLabel }}</p>
       </div>
       <div class="day-nav">
         <button type="button" class="btn btn-ghost" @click="shiftDay(-1)" :disabled="loading" aria-label="Предыдущий день">←</button>
@@ -408,6 +500,16 @@ onMounted(loadAll)
           :disabled="loading"
         >
           Сегодня
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost"
+          :aria-pressed="showNightHours"
+          :title="showNightHours ? 'Скрыть ночные часы' : 'Показать ночные часы'"
+          :disabled="loading"
+          @click="toggleNightHours"
+        >
+          {{ showNightHours ? 'Скрыть ночь' : 'Показать ночь' }}
         </button>
         <button
           type="button"
@@ -430,7 +532,7 @@ onMounted(loadAll)
         <div class="grid-scroll">
           <div class="day-grid">
             <button
-              v-for="slot in slots"
+              v-for="slot in visibleSlots"
               :key="slot.startAt"
               type="button"
               :class="cellClass(slot)"
@@ -448,8 +550,9 @@ onMounted(loadAll)
         <p class="hint grid-legend">
           <span class="legend-swatch planned"></span> запланирована
           <span class="legend-swatch done"></span> выполнена
-          · прошлое плановое не становится фактом само — клик по ячейке или «Подтвердить все»
-          · пустая: будущее → план, прошлое → факт · повторный клик по done/future снимает
+          · ночные ({{ nightHoursLabel }}) по умолчанию скрыты; пустые → авто «Сон»
+          · ручная запись перекрывает сон
+          · прошлое плановое не факт само — клик или «Подтвердить все»
         </p>
       </section>
 
@@ -682,6 +785,10 @@ onMounted(loadAll)
 
 .cell-now {
   box-shadow: inset 3px 0 0 #3d5a4a;
+}
+
+.cell-night .cell-time {
+  color: #6b6488;
 }
 
 .grid-legend {

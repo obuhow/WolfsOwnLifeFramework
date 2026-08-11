@@ -63,6 +63,8 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 .forEach(userRepository::delete);
         userRepository.findByUsername("admin").ifPresent(u -> {
             u.setTimezone("Europe/Moscow");
+            u.setNightStart(LocalTime.of(23, 0));
+            u.setNightEnd(LocalTime.of(7, 0));
             userRepository.save(u);
         });
     }
@@ -592,6 +594,156 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 ))
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void ensure_sleep_fills_empty_night_slots_only() {
+        WebTestClient authed = authedAdminClient();
+        // Fixed calendar day far from "now edge": past day → sleep cells DONE
+        LocalDate day = LocalDate.of(2026, 3, 10);
+        LocalDateTime from = day.atStartOfDay();
+        LocalDateTime to = day.plusDays(1).atStartOfDay();
+
+        TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
+
+        // Default night 23:00–07:00 → 23:00..06:45 = 1h + 7h = 8h = 32 slots
+        assertThat(result.getFilledCount()).isEqualTo(32);
+        assertThat(result.getSleepDeloId()).isNotNull();
+        assertThat(result.getEntries()).hasSize(32);
+        assertThat(result.getEntries()).allMatch(e ->
+                "Сон".equals(e.getDeloTitle())
+                        && e.getDeloId().equals(result.getSleepDeloId())
+                        && e.getStatus() == TimeEntry.Status.DONE
+                        && e.getAdHocText() == null
+        );
+
+        // Daytime empty stays empty
+        List<TimeEntryController.TimeEntryResponse> range = listRange(authed, from, to);
+        assertThat(range).hasSize(32);
+        assertThat(range.stream().noneMatch(e -> e.getStartAt().contains("T12:00"))).isTrue();
+
+        // Second ensure is idempotent — no duplicates, filledCount 0
+        TimeEntryController.EnsureSleepResponse again = ensureSleep(authed, from, to);
+        assertThat(again.getFilledCount()).isZero();
+        assertThat(again.getSleepDeloId()).isEqualTo(result.getSleepDeloId());
+        assertThat(listRange(authed, from, to)).hasSize(32);
+        assertThat(deloRepository.findAll().stream().filter(d -> "Сон".equals(d.getTitle())).count()).isEqualTo(1);
+    }
+
+    @Test
+    void ensure_sleep_does_not_overwrite_manual_entry() {
+        WebTestClient authed = authedAdminClient();
+        Long workId = createDelo(authed, "Ночная работа");
+        LocalDate day = LocalDate.of(2026, 3, 11);
+        LocalDateTime nightSlot = day.atTime(2, 0);
+        LocalDateTime from = day.atStartOfDay();
+        LocalDateTime to = day.plusDays(1).atStartOfDay();
+
+        putEntryRaw(authed, Map.of(
+                "startAt", nightSlot.toString(),
+                "deloId", workId,
+                "status", "DONE"
+        ));
+
+        TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
+
+        assertThat(result.getFilledCount()).isEqualTo(31); // 32 - 1 occupied
+        List<TimeEntryController.TimeEntryResponse> range = listRange(authed, from, to);
+        TimeEntryController.TimeEntryResponse kept = range.stream()
+                .filter(e -> normalize(e.getStartAt()).equals(normalize(nightSlot.toString())))
+                .findFirst()
+                .orElseThrow();
+        assertThat(kept.getDeloId()).isEqualTo(workId);
+        assertThat(kept.getDeloTitle()).isEqualTo("Ночная работа");
+    }
+
+    @Test
+    void ensure_sleep_respects_custom_night_hours() {
+        WebTestClient authed = authedAdminClient();
+        userRepository.findByUsername("admin").ifPresent(u -> {
+            u.setNightStart(LocalTime.of(1, 0));
+            u.setNightEnd(LocalTime.of(3, 0));
+            userRepository.save(u);
+        });
+
+        LocalDate day = LocalDate.of(2026, 4, 1);
+        LocalDateTime from = day.atStartOfDay();
+        LocalDateTime to = day.plusDays(1).atStartOfDay();
+
+        TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
+
+        // 01:00, 01:15, … 02:45 = 8 slots
+        assertThat(result.getFilledCount()).isEqualTo(8);
+        assertThat(result.getEntries()).allMatch(e -> {
+            LocalTime t = LocalDateTime.parse(normalize(e.getStartAt())).toLocalTime();
+            return !t.isBefore(LocalTime.of(1, 0)) && t.isBefore(LocalTime.of(3, 0));
+        });
+        // 00:00 and 03:00 not filled
+        List<String> starts = result.getEntries().stream().map(e -> normalize(e.getStartAt())).toList();
+        assertThat(starts).doesNotContain(normalize(day.atTime(0, 0).toString()));
+        assertThat(starts).doesNotContain(normalize(day.atTime(3, 0).toString()));
+    }
+
+    @Test
+    void ensure_sleep_future_night_slots_are_planned() {
+        WebTestClient authed = authedAdminClient();
+        // Far future day → all sleep PLANNED
+        LocalDate day = LocalDate.now(MOSCOW).plusDays(5);
+        LocalDateTime from = day.atStartOfDay();
+        LocalDateTime to = day.plusDays(1).atStartOfDay();
+
+        TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
+
+        assertThat(result.getFilledCount()).isEqualTo(32);
+        assertThat(result.getEntries()).allMatch(e -> e.getStatus() == TimeEntry.Status.PLANNED);
+    }
+
+    @Test
+    void ensure_sleep_unauthenticated_rejected() {
+        webTestClient.post()
+                .uri("/api/v1/time-entries/ensure-sleep")
+                .bodyValue(Map.of(
+                        "from", "2026-01-01T00:00:00",
+                        "to", "2026-01-02T00:00:00"
+                ))
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    private TimeEntryController.EnsureSleepResponse ensureSleep(
+            WebTestClient client,
+            LocalDateTime from,
+            LocalDateTime to
+    ) {
+        return client.post()
+                .uri("/api/v1/time-entries/ensure-sleep")
+                .bodyValue(Map.of(
+                        "from", from.toString(),
+                        "to", to.toString()
+                ))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(TimeEntryController.EnsureSleepResponse.class)
+                .returnResult()
+                .getResponseBody();
+    }
+
+    private List<TimeEntryController.TimeEntryResponse> listRange(
+            WebTestClient client,
+            LocalDateTime from,
+            LocalDateTime to
+    ) {
+        return client.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/time-entries")
+                        .queryParam("from", from.toString())
+                        .queryParam("to", to.toString())
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(TimeEntryController.TimeEntryResponse.class)
+                .returnResult()
+                .getResponseBody();
     }
 
     private Long createDelo(WebTestClient client, String title) {

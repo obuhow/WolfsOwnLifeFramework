@@ -18,10 +18,14 @@ import ru.wolf.api.user.UserRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * API for Записи времени (15-minute grid cells).
@@ -34,6 +38,7 @@ import java.util.Optional;
  *   <li>Past PLANNED stays PLANNED until explicit confirm (single or confirm-all)</li>
  *   <li>At most one entry per (user, start_at)</li>
  *   <li>Ad-hoc text allowed without creating a Дело</li>
+ *   <li>Ночные часы: POST ensure-sleep fills empty night slots with Дело «Сон»; manual entry wins</li>
  * </ul>
  */
 @RestController
@@ -249,6 +254,113 @@ public class TimeEntryController {
         return ResponseEntity.ok(new ConfirmAllResponse(confirmed.size(), confirmed));
     }
 
+    /**
+     * POST /api/v1/time-entries/ensure-sleep
+     * For each empty night-hour slot in [from, to) place Дело «Сон» (seed/ensure per user).
+     * Existing entries are never overwritten (manual override wins). Idempotent.
+     *
+     * <p>Called by UI on day/week load. Range rules match list/confirm-all (to &gt; from, max 14d).
+     * Slot status: past → DONE, future → PLANNED (same as PUT without explicit status).
+     */
+    @PostMapping("/ensure-sleep")
+    @Transactional
+    public ResponseEntity<EnsureSleepResponse> ensureSleep(
+            Authentication authentication,
+            @Valid @RequestBody EnsureSleepRequest request
+    ) {
+        User user = currentUser(authentication);
+        ZoneId zone = ZoneId.of(user.getTimezone());
+        LocalDateTime from = parseLocalDateTime(request.getFrom());
+        LocalDateTime to = parseLocalDateTime(request.getTo());
+        if (!to.isAfter(from)) {
+            throw new IllegalArgumentException("Параметр to должен быть позже from");
+        }
+        if (from.plusDays(14).isBefore(to)) {
+            throw new IllegalArgumentException("Диапазон не должен превышать 14 дней");
+        }
+
+        // Align range starts to 15-min grid so we never invent unaligned slots
+        from = alignUpToSlot(from);
+        to = alignDownExclusiveEnd(to);
+        if (!to.isAfter(from)) {
+            Delo sleep = ensureSleepDelo(user);
+            return ResponseEntity.ok(new EnsureSleepResponse(0, sleep.getId(), List.of()));
+        }
+
+        Delo sleep = ensureSleepDelo(user);
+        LocalTime nightStart = user.getNightStart();
+        LocalTime nightEnd = user.getNightEnd();
+
+        List<LocalDateTime> nightSlots = NightHours.nightSlotsInRange(from, to, nightStart, nightEnd);
+        if (nightSlots.isEmpty()) {
+            return ResponseEntity.ok(new EnsureSleepResponse(0, sleep.getId(), List.of()));
+        }
+
+        List<TimeEntry> existing = timeEntryRepository.findByUserIdAndStartAtBetween(
+                user.getId(), from, to);
+        Set<LocalDateTime> occupied = new HashSet<>();
+        for (TimeEntry e : existing) {
+            occupied.add(e.getStartAt());
+        }
+
+        List<TimeEntryResponse> filled = new ArrayList<>();
+        for (LocalDateTime slot : nightSlots) {
+            if (occupied.contains(slot)) {
+                continue;
+            }
+            TimeEntry.Status status = resolveStatus(null, slot, zone);
+            TimeEntry entry = TimeEntry.builder()
+                    .user(user)
+                    .delo(sleep)
+                    .adHocText(null)
+                    .startAt(slot)
+                    .endAt(slot.plusMinutes(15))
+                    .status(status)
+                    .build();
+            TimeEntry saved = timeEntryRepository.save(entry);
+            filled.add(toResponse(saved));
+        }
+
+        return ResponseEntity.ok(new EnsureSleepResponse(filled.size(), sleep.getId(), filled));
+    }
+
+    /** Ensure per-user system Дело «Сон» (no project links). Reuses existing by title. */
+    private Delo ensureSleepDelo(User user) {
+        return deloRepository.findFirstByUserAndTitleIgnoreCaseOrderByIdAsc(user, "Сон")
+                .orElseGet(() -> deloRepository.save(Delo.builder()
+                        .user(user)
+                        .title("Сон")
+                        .description("Системное Дело для автозаполнения ночных часов")
+                        .executionMode(Delo.ExecutionMode.SELF)
+                        .build()));
+    }
+
+    /** Snap forward to next 15-min boundary if not already aligned. */
+    private static LocalDateTime alignUpToSlot(LocalDateTime value) {
+        LocalDateTime t = value.withSecond(0).withNano(0);
+        if (value.getSecond() == 0 && value.getNano() == 0 && t.getMinute() % 15 == 0) {
+            return t;
+        }
+        int rem = t.getMinute() % 15;
+        if (rem != 0) {
+            t = t.plusMinutes(15 - rem);
+        } else {
+            // aligned minute but had sub-minute junk → next slot
+            t = t.plusMinutes(15);
+        }
+        return t.withSecond(0).withNano(0);
+    }
+
+    /** Snap exclusive end down to a 15-min boundary. */
+    private static LocalDateTime alignDownExclusiveEnd(LocalDateTime value) {
+        LocalDateTime t = value.withSecond(0).withNano(0);
+        int rem = t.getMinute() % 15;
+        if (rem != 0) {
+            t = t.minusMinutes(rem);
+        }
+        return t;
+    }
+
     private TimeEntry.Status resolveStatus(TimeEntry.Status requested, LocalDateTime start, ZoneId zone) {
         if (requested != null) {
             return requested;
@@ -366,6 +478,28 @@ public class TimeEntryController {
     @AllArgsConstructor
     public static class ConfirmAllResponse {
         private int confirmedCount;
+        private List<TimeEntryResponse> entries;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EnsureSleepRequest {
+        @NotBlank
+        private String from;
+
+        @NotBlank
+        private String to;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EnsureSleepResponse {
+        /** How many empty night cells were filled in this call (0 if already ensured). */
+        private int filledCount;
+        private Long sleepDeloId;
+        /** Only newly created sleep entries (not the full day). */
         private List<TimeEntryResponse> entries;
     }
 }
