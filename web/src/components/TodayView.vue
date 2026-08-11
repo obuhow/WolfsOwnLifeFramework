@@ -211,7 +211,12 @@ watch(selectedDate, async (val, old) => {
 
 function onCellClick(slot) {
   if (slot.entry) {
-    // Toggle clear
+    // Past planned: confirm on primary click; clear stays available from panel / Ctrl+click.
+    if (slot.entry.status === 'PLANNED' && isPastSlot(slot.startAt)) {
+      confirmSlot(slot.startAt)
+      return
+    }
+    // Toggle clear for future planned / done
     clearSlot(slot.startAt)
     return
   }
@@ -244,6 +249,65 @@ async function clearSlot(startAt) {
       headers
     })
     if (!res.ok && res.status !== 204) throw new Error(`Очистка: HTTP ${res.status}`)
+    await loadToday()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function confirmSlot(startAt) {
+  const headers = authHeaders(true)
+  if (!headers) return
+  saving.value = true
+  error.value = ''
+  try {
+    const res = await fetch(`${apiBase()}/time-entries/confirm`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ startAt: normalizeStart(startAt) })
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.message || `Подтверждение: HTTP ${res.status}`)
+    }
+    await loadToday()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    saving.value = false
+  }
+}
+
+const pendingConfirmCount = computed(() => {
+  return entries.value.filter(
+    e => e.status === 'PLANNED' && isPastSlot(normalizeStart(e.startAt))
+  ).length
+})
+
+async function confirmAllDay() {
+  if (!selectedDate.value) return
+  const headers = authHeaders(true)
+  if (!headers) return
+  saving.value = true
+  error.value = ''
+  try {
+    const from = `${selectedDate.value}T00:00:00`
+    // exclusive end = next day 00:00
+    const [y, m, d] = selectedDate.value.split('-').map(Number)
+    const next = new Date(y, m - 1, d + 1)
+    const toDate = `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-${pad2(next.getDate())}`
+    const to = `${toDate}T00:00:00`
+    const res = await fetch(`${apiBase()}/time-entries/confirm-all`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ from, to })
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.message || `Подтвердить все: HTTP ${res.status}`)
+    }
     await loadToday()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -311,6 +375,9 @@ function cellClass(slot) {
 function cellTitle(slot) {
   if (!slot.entry) return 'Пусто — нажмите, чтобы поставить Запись времени'
   const name = slot.entry.deloTitle || slot.entry.adHocText
+  if (slot.entry.status === 'PLANNED' && isPastSlot(slot.startAt)) {
+    return `${name} (запланирована, прошло) — нажмите, чтобы подтвердить факт`
+  }
   const st = slot.entry.status === 'DONE' ? 'выполнена' : 'запланирована'
   return `${name} (${st}) — нажмите, чтобы снять`
 }
@@ -342,6 +409,16 @@ onMounted(loadAll)
         >
           Сегодня
         </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="loading || saving || pendingConfirmCount === 0"
+          :title="pendingConfirmCount ? `Подтвердить ${pendingConfirmCount} прошедших плановых` : 'Нет прошедших плановых записей'"
+          @click="confirmAllDay"
+        >
+          Подтвердить все
+          <template v-if="pendingConfirmCount"> ({{ pendingConfirmCount }})</template>
+        </button>
       </div>
     </header>
 
@@ -371,7 +448,8 @@ onMounted(loadAll)
         <p class="hint grid-legend">
           <span class="legend-swatch planned"></span> запланирована
           <span class="legend-swatch done"></span> выполнена
-          · пустая ячейка: будущее → план, прошлое → факт · повторный клик снимает
+          · прошлое плановое не становится фактом само — клик по ячейке или «Подтвердить все»
+          · пустая: будущее → план, прошлое → факт · повторный клик по done/future снимает
         </p>
       </section>
 
@@ -390,13 +468,23 @@ onMounted(loadAll)
                 <template v-if="!item.deloId"> · ad-hoc</template>
               </span>
             </div>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              title="Снять"
-              :disabled="saving"
-              @click="clearSlot(item.startAt)"
-            >×</button>
+            <div class="today-list-actions">
+              <button
+                v-if="item.status === 'PLANNED' && isPastSlot(normalizeStart(item.startAt))"
+                type="button"
+                class="btn btn-ghost btn-sm"
+                title="Подтвердить факт"
+                :disabled="saving"
+                @click="confirmSlot(item.startAt)"
+              >✓</button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                title="Снять"
+                :disabled="saving"
+                @click="clearSlot(item.startAt)"
+              >×</button>
+            </div>
           </li>
         </ul>
         <p v-else class="hint">Пока пусто — кликните ячейку в сетке.</p>
@@ -642,6 +730,12 @@ onMounted(loadAll)
   border-radius: 10px;
   background: #f7f3ec;
   border: 1px solid #ebe3d6;
+}
+
+.today-list-actions {
+  display: flex;
+  gap: 0.15rem;
+  align-items: center;
 }
 
 .today-list-time {

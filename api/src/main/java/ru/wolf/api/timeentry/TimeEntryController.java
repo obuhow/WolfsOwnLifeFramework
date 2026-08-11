@@ -31,6 +31,7 @@ import java.util.Optional;
  *   <li>Empty cell → no row (status «неопределено»)</li>
  *   <li>Create on future empty → PLANNED (запланирована)</li>
  *   <li>Create on past empty → DONE (выполнена)</li>
+ *   <li>Past PLANNED stays PLANNED until explicit confirm (single or confirm-all)</li>
  *   <li>At most one entry per (user, start_at)</li>
  *   <li>Ad-hoc text allowed without creating a Дело</li>
  * </ul>
@@ -184,6 +185,70 @@ public class TimeEntryController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * POST /api/v1/time-entries/confirm
+     * Manual confirm of one cell: PLANNED → DONE. Already DONE is idempotent.
+     * System never auto-flips past planned without this (or confirm-all).
+     */
+    @PostMapping("/confirm")
+    @Transactional
+    public ResponseEntity<TimeEntryResponse> confirmOne(
+            Authentication authentication,
+            @Valid @RequestBody ConfirmOneRequest request
+    ) {
+        User user = currentUser(authentication);
+        LocalDateTime start = parseAndValidateSlot(request.getStartAt());
+        TimeEntry entry = timeEntryRepository.findByUserIdAndStartAt(user.getId(), start)
+                .orElseThrow(() -> new IllegalArgumentException("Запись времени не найдена"));
+
+        if (entry.getStatus() == TimeEntry.Status.PLANNED) {
+            entry.setStatus(TimeEntry.Status.DONE);
+            entry = timeEntryRepository.save(entry);
+        }
+        return ResponseEntity.ok(toResponse(entry));
+    }
+
+    /**
+     * POST /api/v1/time-entries/confirm-all
+     * Confirm all PLANNED entries in [from, to) whose slot start is not after now
+     * in the user timezone — accepts a block of past plan as fact.
+     * Future planned in the same range is left untouched.
+     */
+    @PostMapping("/confirm-all")
+    @Transactional
+    public ResponseEntity<ConfirmAllResponse> confirmAll(
+            Authentication authentication,
+            @Valid @RequestBody ConfirmAllRequest request
+    ) {
+        User user = currentUser(authentication);
+        ZoneId zone = ZoneId.of(user.getTimezone());
+        LocalDateTime from = parseLocalDateTime(request.getFrom());
+        LocalDateTime to = parseLocalDateTime(request.getTo());
+        if (!to.isAfter(from)) {
+            throw new IllegalArgumentException("Параметр to должен быть позже from");
+        }
+        if (from.plusDays(14).isBefore(to)) {
+            throw new IllegalArgumentException("Диапазон не должен превышать 14 дней");
+        }
+
+        LocalDateTime nowWall = ZonedDateTime.now(zone).toLocalDateTime();
+
+        List<TimeEntry> planned = timeEntryRepository.findByUserIdAndStatusAndStartAtBetween(
+                user.getId(), TimeEntry.Status.PLANNED, from, to);
+
+        List<TimeEntryResponse> confirmed = new java.util.ArrayList<>();
+        for (TimeEntry entry : planned) {
+            // Only past/current slots: startAt <= now in user wall-clock.
+            if (!entry.getStartAt().isAfter(nowWall)) {
+                entry.setStatus(TimeEntry.Status.DONE);
+                TimeEntry saved = timeEntryRepository.save(entry);
+                confirmed.add(toResponse(saved));
+            }
+        }
+
+        return ResponseEntity.ok(new ConfirmAllResponse(confirmed.size(), confirmed));
+    }
+
     private TimeEntry.Status resolveStatus(TimeEntry.Status requested, LocalDateTime start, ZoneId zone) {
         if (requested != null) {
             return requested;
@@ -275,5 +340,32 @@ public class TimeEntryController {
 
         /** Optional; if null, derived from past/future relative to now in user TZ. */
         private TimeEntry.Status status;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConfirmOneRequest {
+        @NotBlank
+        private String startAt;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConfirmAllRequest {
+        @NotBlank
+        private String from;
+
+        @NotBlank
+        private String to;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConfirmAllResponse {
+        private int confirmedCount;
+        private List<TimeEntryResponse> entries;
     }
 }
