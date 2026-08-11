@@ -28,4 +28,6 @@ public interface DeloRepository extends JpaRepository<Delo, Long> {
             WHERE d.user = :user AND d.id = :id
             """)
     Optional<Delo> findByUserAndId(@Param("user") User user, @Param("id") Long id);
+
+    Optional<Delo> findFirstByUserAndTitleIgnoreCaseOrderByIdAsc(User user, String title);
 }
