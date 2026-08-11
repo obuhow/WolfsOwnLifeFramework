@@ -9,10 +9,12 @@ import ProjectsView from './components/ProjectsView.vue'
 import ProjectDetailView from './components/ProjectDetailView.vue'
 import DelosView from './components/DelosView.vue'
 import DeloDetailView from './components/DeloDetailView.vue'
+import TodayView from './components/TodayView.vue'
 
 const routes = [
-  { path: '/', redirect: '/life-areas' },
+  { path: '/', redirect: '/today' },
   { path: '/login', component: LoginView, meta: { public: true } },
+  { path: '/today', component: TodayView, meta: { requiresAuth: true } },
   { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
   { path: '/life-areas', component: LifeAreasView, meta: { requiresAuth: true } },
   { path: '/projects', component: ProjectsView, meta: { requiresAuth: true } },
@@ -32,7 +34,7 @@ router.beforeEach((to) => {
     return '/login'
   }
   if (to.path === '/login' && token) {
-    return '/life-areas'
+    return '/today'
   }
 })
 
