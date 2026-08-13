@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { apiBase } from '../api'
+import { apiBase, authHeaders, handleAuthFailure } from '../api'
 
 const loading = ref(false)
 const error = ref('')
@@ -17,6 +17,19 @@ const nightEnd = ref('07:00')
 // Default hidden per glossary / US-17
 const showNightHours = ref(false)
 
+// Week backlog state
+const weekBacklog = ref([])
+const backlogLoading = ref(false)
+const backlogError = ref('')
+// Execution mode filter for panels: 'SELF' | 'DELEGATABLE' | 'AUTOMATABLE' | 'ALL'
+const executionModeFilter = ref('ALL')
+const EXECUTION_MODES = [
+  { value: 'ALL', label: 'Все' },
+  { value: 'SELF', label: 'Мне' },
+  { value: 'DELEGATABLE', label: 'Делегировать' },
+  { value: 'AUTOMATABLE', label: 'Автоматизировать' }
+]
+
 // Picker state
 const pickerOpen = ref(false)
 const pickerSlot = ref(null) // LocalDateTime string
@@ -28,17 +41,6 @@ const saving = ref(false)
 
 const SLOTS_PER_DAY = 96 // 00:00 .. 23:45
 const SHOW_NIGHT_KEY = 'wolf_show_night_hours'
-
-function authHeaders(json = false) {
-  const token = localStorage.getItem('wolf_token')
-  if (!token) {
-    window.location.href = '#/login'
-    return null
-  }
-  const headers = { Authorization: `Bearer ${token}` }
-  if (json) headers['Content-Type'] = 'application/json'
-  return headers
-}
 
 function pad2(n) {
   return String(n).padStart(2, '0')
@@ -217,8 +219,13 @@ const panelItems = computed(() => {
       ...e,
       title: e.deloTitle || e.adHocText || '—',
       time: `${parseSlotLabel(e.startAt)}–${parseSlotLabel(e.endAt)}`,
-      statusLabel: e.status === 'DONE' ? 'выполнена' : 'запланирована'
+      statusLabel: e.status === 'DONE' ? 'выполнена' : 'запланирована',
+      executionMode: e.deloExecutionMode || 'SELF'
     }))
+    .filter(e => {
+      if (executionModeFilter.value === 'ALL') return true
+      return e.executionMode === executionModeFilter.value
+    })
 })
 
 const delosByProject = computed(() => {
@@ -250,10 +257,16 @@ const delosByProject = computed(() => {
   })
 })
 
+const filteredWeekBacklog = computed(() => {
+  if (executionModeFilter.value === 'ALL') return weekBacklog.value
+  return weekBacklog.value.filter(d => d.executionMode === executionModeFilter.value)
+})
+
 async function loadProjects() {
   const headers = authHeaders()
   if (!headers) return
   const res = await fetch(`${apiBase()}/projects`, { headers })
+  if (handleAuthFailure(res)) return
   if (!res.ok) throw new Error(`Проекты: HTTP ${res.status}`)
   projects.value = await res.json()
 }
@@ -262,6 +275,7 @@ async function loadDelos() {
   const headers = authHeaders()
   if (!headers) return
   const res = await fetch(`${apiBase()}/delos`, { headers })
+  if (handleAuthFailure(res)) return
   if (!res.ok) throw new Error(`Дела: HTTP ${res.status}`)
   delos.value = await res.json()
 }
@@ -270,6 +284,7 @@ async function loadSettings() {
   const headers = authHeaders()
   if (!headers) return
   const res = await fetch(`${apiBase()}/settings`, { headers })
+  if (handleAuthFailure(res)) return
   if (!res.ok) throw new Error(`Настройки: HTTP ${res.status}`)
   const data = await res.json()
   timezone.value = data.timezone || timezone.value
@@ -355,10 +370,50 @@ async function loadAll() {
     if (stored === '0') showNightHours.value = false
     await Promise.all([loadProjects(), loadDelos(), loadSettings()])
     await loadToday({ ensureSleep: true })
+    await loadWeekBacklog()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
+  }
+}
+
+/** ISO week-year + week number for a YYYY-MM-DD date (Monday-based ISO). */
+function isoWeekParts(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`)
+  // Thursday of this ISO week determines week-based year
+  const day = (d.getDay() + 6) % 7 // Mon=0 … Sun=6
+  const thursday = new Date(d)
+  thursday.setDate(d.getDate() - day + 3)
+  const isoYear = thursday.getFullYear()
+  const jan4 = new Date(isoYear, 0, 4)
+  const jan4Day = (jan4.getDay() + 6) % 7
+  const week1Monday = new Date(jan4)
+  week1Monday.setDate(jan4.getDate() - jan4Day)
+  const weekNo = 1 + Math.round((thursday - week1Monday) / 604800000)
+  return { isoYear, weekNo }
+}
+
+async function loadWeekBacklog() {
+  backlogLoading.value = true
+  backlogError.value = ''
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    let url = `${apiBase()}/backlog/week`
+    if (selectedDate.value) {
+      const { isoYear, weekNo } = isoWeekParts(selectedDate.value)
+      url = `${apiBase()}/backlog/week/${isoYear}/${weekNo}`
+    }
+    const res = await fetch(url, { headers })
+    if (handleAuthFailure(res)) return
+    if (!res.ok) throw new Error(`Бэклог недели: HTTP ${res.status}`)
+    const body = await res.json()
+    weekBacklog.value = body.delos || []
+  } catch (e) {
+    backlogError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    backlogLoading.value = false
   }
 }
 
@@ -383,6 +438,7 @@ watch(selectedDate, async (val, old) => {
   error.value = ''
   try {
     await loadToday({ ensureSleep: true })
+    await loadWeekBacklog()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -589,6 +645,34 @@ const nightHoursLabel = computed(() => {
   return `${nightStart.value}–${nightEnd.value}`
 })
 
+const weekLabel = computed(() => {
+  if (!selectedDate.value) return ''
+  const { isoYear, weekNo } = isoWeekParts(selectedDate.value)
+  return `${isoYear}-W${String(weekNo).padStart(2, '0')}`
+})
+
+async function removeFromBacklog(deloId) {
+  if (!selectedDate.value) return
+  const headers = authHeaders()
+  if (!headers) return
+  saving.value = true
+  error.value = ''
+  try {
+    const { isoYear, weekNo } = isoWeekParts(selectedDate.value)
+    const res = await fetch(`${apiBase()}/backlog/week/${isoYear}/${weekNo}/delos/${deloId}`, {
+      method: 'DELETE',
+      headers
+    })
+    if (handleAuthFailure(res)) return
+    if (!res.ok) throw new Error(`Удаление из бэклога: HTTP ${res.status}`)
+    await loadWeekBacklog()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    saving.value = false
+  }
+}
+
 onMounted(loadAll)
 </script>
 
@@ -673,7 +757,20 @@ onMounted(loadAll)
       </section>
 
       <aside class="card panel-card" aria-label="На сегодня">
-        <h2>На сегодня</h2>
+        <div class="panel-header">
+          <h2>На сегодня</h2>
+          <div class="panel-filter">
+            <label for="execution-mode-filter" class="visually-hidden">Фильтр по способу исполнения</label>
+            <select
+              id="execution-mode-filter"
+              class="input input-sm"
+              v-model="executionModeFilter"
+              @change="loadWeekBacklog"
+            >
+              <option v-for="mode in EXECUTION_MODES" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
+            </select>
+          </div>
+        </div>
         <p class="hint" style="margin-bottom: 1rem">
           Дела и записи, уже стоящие в сетке этого дня.
         </p>
@@ -685,6 +782,7 @@ onMounted(loadAll)
               <span class="today-list-meta" :class="item.status === 'DONE' ? 'meta-done' : 'meta-planned'">
                 {{ item.statusLabel }}
                 <template v-if="!item.deloId"> · ad-hoc</template>
+                <template v-else> · {{ item.executionMode }}</template>
               </span>
             </div>
             <div class="today-list-actions">
@@ -707,6 +805,48 @@ onMounted(loadAll)
           </li>
         </ul>
         <p v-else class="hint">Пока пусто — кликните ячейку в сетке.</p>
+      </aside>
+
+      <!-- Week Backlog Panel -->
+      <aside class="card panel-card" aria-label="Бэклог недели">
+        <div class="panel-header">
+          <h2>Бэклог недели</h2>
+          <div class="panel-filter">
+            <label for="backlog-execution-mode-filter" class="visually-hidden">Фильтр по способу исполнения</label>
+            <select
+              id="backlog-execution-mode-filter"
+              class="input input-sm"
+              v-model="executionModeFilter"
+              @change="loadWeekBacklog"
+            >
+              <option v-for="mode in EXECUTION_MODES" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom: 1rem">
+          Дела, запланированные на эту неделю. Кликните чтобы добавить в сетку.
+        </p>
+        <div v-if="backlogLoading" class="loading">Загрузка бэклога…</div>
+        <div v-else-if="backlogError" class="alert alert-error">{{ backlogError }}</div>
+        <ul v-else-if="filteredWeekBacklog.length" class="backlog-list">
+          <li v-for="delo in filteredWeekBacklog" :key="delo.id" class="backlog-list-item">
+            <div class="backlog-item-body">
+              <strong>{{ delo.title }}</strong>
+              <span class="backlog-item-meta">{{ delo.executionMode }}</span>
+            </div>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              title="Убрать из бэклога"
+              :disabled="saving"
+              @click="removeFromBacklog(delo.id)"
+            >×</button>
+          </li>
+        </ul>
+        <p v-else class="hint">Бэклог недели пуст — добавьте Дела через «Дела» или неделю.</p>
+        <p class="hint" style="margin-top: 1rem; font-size: 0.75rem;">
+          Неделя: {{ weekLabel }}
+        </p>
       </aside>
     </div>
 
@@ -1010,6 +1150,81 @@ onMounted(loadAll)
   padding: 0.2rem 0.5rem;
   font-size: 1rem;
   line-height: 1;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.panel-header h2 {
+  margin: 0;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.panel-filter {
+  flex-shrink: 0;
+}
+
+.input-sm {
+  font-size: 0.75rem;
+  padding: 0.25rem 2rem 0.25rem 0.5rem;
+  min-width: 120px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.backlog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.backlog-list-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  background: #f7f3ec;
+  border: 1px solid #ebe3d6;
+}
+
+.backlog-item-body {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.backlog-item-body strong {
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backlog-item-meta {
+  font-size: 0.7rem;
+  color: #8a8278;
+  text-transform: capitalize;
 }
 
 .modal-backdrop {
