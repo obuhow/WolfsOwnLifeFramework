@@ -29,12 +29,19 @@ async function loadUser() {
     const res = await fetch(`${apiBase()}/auth/me`, {
       headers: { 'Authorization': `Bearer ${t}` }
     })
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('wolf_token')
+      token.value = ''
+      username.value = ''
+      router.push('/login')
+      return
+    }
     if (res.ok) {
       const data = await res.json()
       username.value = data.username || 'admin'
     }
   } catch (e) {
-    // ignore
+    // ignore network blips
   }
 }
 

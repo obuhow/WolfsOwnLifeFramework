@@ -640,6 +640,7 @@ public class TimeEntryController {
                 entry.getId(),
                 d != null ? d.getId() : null,
                 d != null ? d.getTitle() : null,
+                d != null ? d.getExecutionMode() : null,
                 entry.getAdHocText(),
                 formatLdt(entry.getStartAt()),
                 formatLdt(entry.getEndAt()),
@@ -654,6 +655,7 @@ public class TimeEntryController {
         private Long id;
         private Long deloId;
         private String deloTitle;
+        private Delo.ExecutionMode deloExecutionMode;
         private String adHocText;
         private String startAt;
         private String endAt;
