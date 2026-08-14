@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import ru.wolf.api.aggregate.FactAggregate;
+import ru.wolf.api.aggregate.FactAggregateService;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.lifearea.LifeArea;
 import ru.wolf.api.lifearea.LifeAreaRepository;
@@ -36,6 +38,7 @@ public class ProjectController {
     private final LifeAreaRepository lifeAreaRepository;
     private final UserRepository userRepository;
     private final DeloProjectRepository deloProjectRepository;
+    private final FactAggregateService factAggregateService;
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(
@@ -252,6 +255,7 @@ public class ProjectController {
                         Boolean.TRUE.equals(l.getIsPrimary())
                 ))
                 .toList();
+        FactAggregate aggregates = factAggregateService.forProject(project.getUser(), project.getId());
         return new ProjectDetailResponse(
                 project.getId(),
                 project.getLifeArea().getId(),
@@ -264,7 +268,7 @@ public class ProjectController {
                 project.getEndDate(),
                 project.getTotalPlanHours(),
                 deloLinks,
-                null       // aggregates — ticket 13
+                aggregates
         );
     }
 
@@ -297,7 +301,7 @@ public class ProjectController {
         private LocalDate endDate;
         private BigDecimal totalPlanHours;
         private List<DeloLink> delos;
-        private Object aggregates;
+        private FactAggregate aggregates;
     }
 
     @Data

@@ -38,6 +38,20 @@ const availableProjects = computed(() => {
     .sort((a, b) => a.title.localeCompare(b.title, 'ru'))
 })
 
+const aggregates = computed(() => detail.value?.aggregates || null)
+const aggregateDays = computed(() => aggregates.value?.byDay || [])
+const totalFactHours = computed(() => {
+  const v = aggregates.value?.totalFactHours
+  if (v == null) return '0'
+  return formatHours(v)
+})
+
+function formatHours(v) {
+  const n = Number(v)
+  if (Number.isNaN(n)) return String(v)
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
+}
+
 function authHeaders(json = false) {
   const token = localStorage.getItem('wolf_token')
   if (!token) {
@@ -399,9 +413,42 @@ onMounted(loadAll)
       </section>
 
       <section class="card">
-        <h2>Фактические часы</h2>
-        <div class="muted-block">
-          Сводка по факту часов появится позже (тикет 13).
+        <div class="projects-toolbar" style="margin-bottom: 1rem">
+          <h2 style="margin: 0">Фактические часы</h2>
+          <div v-if="aggregates" class="aggregate-total">
+            <span class="aggregate-total-value">{{ totalFactHours }} ч</span>
+            <span class="muted">факт</span>
+          </div>
+        </div>
+
+        <p v-if="aggregates" class="aggregate-mode muted">
+          Сумма выполненных Записей времени по этому Делу (без разбиения по проектам).
+        </p>
+
+        <div v-if="aggregateDays.length" class="aggregate-table-wrap">
+          <table class="aggregate-table">
+            <thead>
+              <tr>
+                <th>День</th>
+                <th class="num">Часы</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in aggregateDays" :key="row.date">
+                <td>{{ row.date }}</td>
+                <td class="num">{{ formatHours(row.hours) }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Всего</td>
+                <td class="num">{{ totalFactHours }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div v-else class="muted-block">
+          Пока нет учтённых часов по этому Делу.
         </div>
       </section>
     </template>
