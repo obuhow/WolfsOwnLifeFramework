@@ -189,7 +189,7 @@ function cancelForm() {
 }
 
 function payloadFromForm() {
-  const hoursRaw = form.value.totalPlanHours.trim()
+  const hoursRaw = String(form.value.totalPlanHours || '').trim()
   return {
     lifeAreaId: Number(form.value.lifeAreaId),
     parentId: form.value.parentId ? Number(form.value.parentId) : null,
@@ -338,17 +338,12 @@ onMounted(loadAll)
             <input id="project-start" v-model="form.startDate" type="date" class="input" :disabled="loading" />
           </div>
           <div class="form-group">
-            <label for="project-end">Окончание</label>
-            <input id="project-end" v-model="form.endDate" type="date" class="input" :disabled="loading" />
-          </div>
-          <div class="form-group">
             <label for="project-hours">План, часы</label>
             <input
               id="project-hours"
               v-model="form.totalPlanHours"
-              type="number"
-              min="0"
-              step="0.25"
+              type="text"
+              inputmode="decimal"
               class="input"
               :disabled="loading"
               placeholder="опционально"

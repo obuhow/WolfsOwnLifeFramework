@@ -358,7 +358,7 @@ onMounted(loadAll)
             </div>
             <div class="form-group">
               <label for="detail-hours">План, часы</label>
-              <input id="detail-hours" v-model="form.totalPlanHours" type="number" min="0" step="0.25" class="input" :disabled="loading" />
+              <input id="detail-hours" v-model="form.totalPlanHours" type="text" inputmode="decimal" class="input" :disabled="loading" placeholder="опционально" />
             </div>
           </div>
 

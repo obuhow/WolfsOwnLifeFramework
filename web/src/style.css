@@ -172,6 +172,13 @@ body {
   padding: 2rem 1.5rem 3rem;
 }
 
+/* Full-bleed pages (Gantt needs horizontal weeks) */
+.app-main:has(.gantt-page) {
+  max-width: none;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
 .page-header {
   margin-bottom: 2rem;
 }
