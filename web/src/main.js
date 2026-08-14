@@ -11,12 +11,14 @@ import DelosView from './components/DelosView.vue'
 import DeloDetailView from './components/DeloDetailView.vue'
 import TodayView from './components/TodayView.vue'
 import WeekView from './components/WeekView.vue'
+import GanttView from './components/GanttView.vue'
 
 const routes = [
   { path: '/', redirect: '/today' },
   { path: '/login', component: LoginView, meta: { public: true } },
   { path: '/today', component: TodayView, meta: { requiresAuth: true } },
   { path: '/week', component: WeekView, meta: { requiresAuth: true } },
+  { path: '/gantt', component: GanttView, meta: { requiresAuth: true } },
   { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
   { path: '/life-areas', component: LifeAreasView, meta: { requiresAuth: true } },
   { path: '/projects', component: ProjectsView, meta: { requiresAuth: true } },
