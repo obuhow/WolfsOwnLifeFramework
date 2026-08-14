@@ -231,7 +231,8 @@ public class DeloController {
                         body.getWeekdays(),
                         body.getWindowStart(),
                         body.getWindowEnd(),
-                        body.getHorizonWeeks()
+                        body.getHorizonWeeks(),
+                        toSlots(body.getSlots())
                 )
         );
         return ResponseEntity.ok(new ApplyRecurrenceResponse(
@@ -364,8 +365,24 @@ public class DeloController {
                 aggregates,
                 RecurrenceService.decodeWeekdays(delo.getRecurrenceWeekdays()),
                 delo.getRecurrenceWindowStart(),
-                delo.getRecurrenceWindowEnd()
+                delo.getRecurrenceWindowEnd(),
+                toSlotDtos(recurrenceService.slotsOf(delo))
         );
+    }
+
+    private List<RecurrenceService.Slot> toSlots(List<RecurrenceSlotDto> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            return List.of();
+        }
+        return dtos.stream()
+                .map(d -> new RecurrenceService.Slot(d.getWeekday(), d.getWindowStart(), d.getWindowEnd()))
+                .toList();
+    }
+
+    private List<RecurrenceSlotDto> toSlotDtos(List<RecurrenceService.Slot> slots) {
+        return slots.stream()
+                .map(s -> new RecurrenceSlotDto(s.weekday(), s.windowStart(), s.windowEnd()))
+                .toList();
     }
 
     @Data
@@ -395,6 +412,16 @@ public class DeloController {
         private List<DayOfWeek> recurrenceWeekdays;
         private LocalTime recurrenceWindowStart;
         private LocalTime recurrenceWindowEnd;
+        private List<RecurrenceSlotDto> recurrenceSlots;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RecurrenceSlotDto {
+        private DayOfWeek weekday;
+        private LocalTime windowStart;
+        private LocalTime windowEnd;
     }
 
     @Data
@@ -405,6 +432,7 @@ public class DeloController {
         private LocalTime windowStart;
         private LocalTime windowEnd;
         private Integer horizonWeeks;
+        private List<RecurrenceSlotDto> slots;
     }
 
     @Data

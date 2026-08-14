@@ -1,5 +1,8 @@
 package ru.wolf.api.recurrence;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,31 +37,27 @@ public class RecurrenceService {
 
     private final DeloRepository deloRepository;
     private final TimeEntryRepository timeEntryRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public ApplyResult apply(User user, Long deloId, ApplyCommand command) {
         Delo delo = deloRepository.findByUserAndId(user, deloId)
                 .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
 
-        Set<DayOfWeek> weekdays = resolveWeekdays(command.weekdays(), delo);
-        if ((command.windowStart() == null) != (command.windowEnd() == null)) {
-            throw new IllegalArgumentException("Окно времени должно содержать начало и конец");
-        }
-        LocalTime windowStart = command.windowStart() != null
-                ? command.windowStart()
-                : (delo.getRecurrenceWindowStart() != null ? delo.getRecurrenceWindowStart() : DEFAULT_WINDOW_START);
-        LocalTime windowEnd = command.windowEnd() != null
-                ? command.windowEnd()
-                : (delo.getRecurrenceWindowEnd() != null ? delo.getRecurrenceWindowEnd() : DEFAULT_WINDOW_END);
+        List<Slot> slots = resolveSlots(command, delo);
         int horizonWeeks = command.horizonWeeks() != null ? command.horizonWeeks() : DEFAULT_HORIZON_WEEKS;
-
-        validateWindow(windowStart, windowEnd);
         validateHorizon(horizonWeeks);
-        if (weekdays.isEmpty()) {
-            throw new IllegalArgumentException("Задайте хотя бы один день недели");
+        if (slots.isEmpty()) {
+            throw new IllegalArgumentException("Задайте хотя бы один слот: день недели и окно времени");
+        }
+        for (Slot slot : slots) {
+            if (slot.weekday() == null) {
+                throw new IllegalArgumentException("У слота должен быть день недели");
+            }
+            validateWindow(slot.windowStart(), slot.windowEnd());
         }
 
-        persistRule(delo, weekdays, windowStart, windowEnd);
+        persistRule(delo, slots);
         deloRepository.save(delo);
 
         ZoneId zone = ZoneId.of(user.getTimezone());
@@ -71,37 +70,42 @@ public class RecurrenceService {
         int skippedPast = 0;
 
         for (LocalDate day = from; day.isBefore(toExclusive); day = day.plusDays(1)) {
-            if (!weekdays.contains(day.getDayOfWeek())) {
-                continue;
+            for (Slot slot : slots) {
+                if (day.getDayOfWeek() != slot.weekday()) {
+                    continue;
+                }
+                LocalDateTime start = day.atTime(slot.windowStart());
+                LocalDateTime end = day.atTime(slot.windowEnd());
+                if (start.isBefore(now)) {
+                    skippedPast++;
+                    continue;
+                }
+                if (!timeEntryRepository.findOverlapping(user.getId(), start, end).isEmpty()) {
+                    skippedOccupied++;
+                    continue;
+                }
+                timeEntryRepository.save(TimeEntry.builder()
+                        .user(user)
+                        .delo(delo)
+                        .startAt(start)
+                        .endAt(end)
+                        .status(TimeEntry.Status.PLANNED)
+                        .build());
+                created++;
             }
-            LocalDateTime start = day.atTime(windowStart);
-            LocalDateTime end = day.atTime(windowEnd);
-            if (start.isBefore(now)) {
-                skippedPast++;
-                continue;
-            }
-            if (!timeEntryRepository.findOverlapping(user.getId(), start, end).isEmpty()) {
-                skippedOccupied++;
-                continue;
-            }
-            timeEntryRepository.save(TimeEntry.builder()
-                    .user(user)
-                    .delo(delo)
-                    .startAt(start)
-                    .endAt(end)
-                    .status(TimeEntry.Status.PLANNED)
-                    .build());
-            created++;
         }
 
         return new ApplyResult(created, skippedOccupied, skippedPast, horizonWeeks, from, toExclusive);
     }
 
+    public record Slot(DayOfWeek weekday, LocalTime windowStart, LocalTime windowEnd) {}
+
     public record ApplyCommand(
             List<DayOfWeek> weekdays,
             LocalTime windowStart,
             LocalTime windowEnd,
-            Integer horizonWeeks
+            Integer horizonWeeks,
+            List<Slot> slots
     ) {}
 
     public record ApplyResult(
@@ -134,21 +138,78 @@ public class RecurrenceService {
                 .toList();
     }
 
-    private Set<DayOfWeek> resolveWeekdays(List<DayOfWeek> requested, Delo delo) {
-        if (requested != null && !requested.isEmpty()) {
-            return EnumSet.copyOf(requested);
+    public List<Slot> slotsOf(Delo delo) {
+        List<Slot> stored = decodeSlots(delo.getRecurrenceSlots());
+        if (!stored.isEmpty()) {
+            return stored;
         }
-        List<DayOfWeek> stored = decodeWeekdays(delo.getRecurrenceWeekdays());
-        if (stored.isEmpty()) {
-            return EnumSet.noneOf(DayOfWeek.class);
+        List<DayOfWeek> weekdays = decodeWeekdays(delo.getRecurrenceWeekdays());
+        if (weekdays.isEmpty()) {
+            return List.of();
         }
-        return EnumSet.copyOf(stored);
+        LocalTime start = delo.getRecurrenceWindowStart() != null ? delo.getRecurrenceWindowStart() : DEFAULT_WINDOW_START;
+        LocalTime end = delo.getRecurrenceWindowEnd() != null ? delo.getRecurrenceWindowEnd() : DEFAULT_WINDOW_END;
+        return expand(weekdays, start, end);
     }
 
-    private void persistRule(Delo delo, Set<DayOfWeek> weekdays, LocalTime windowStart, LocalTime windowEnd) {
+    private List<Slot> resolveSlots(ApplyCommand command, Delo delo) {
+        if (command.slots() != null && !command.slots().isEmpty()) {
+            return command.slots();
+        }
+        if ((command.windowStart() == null) != (command.windowEnd() == null)) {
+            throw new IllegalArgumentException("Окно времени должно содержать начало и конец");
+        }
+        List<DayOfWeek> requestedDays = command.weekdays() != null && !command.weekdays().isEmpty()
+                ? command.weekdays()
+                : List.of();
+        if (!requestedDays.isEmpty()) {
+            LocalTime start = command.windowStart() != null
+                    ? command.windowStart()
+                    : (delo.getRecurrenceWindowStart() != null ? delo.getRecurrenceWindowStart() : DEFAULT_WINDOW_START);
+            LocalTime end = command.windowEnd() != null
+                    ? command.windowEnd()
+                    : (delo.getRecurrenceWindowEnd() != null ? delo.getRecurrenceWindowEnd() : DEFAULT_WINDOW_END);
+            return expand(requestedDays, start, end);
+        }
+        return slotsOf(delo);
+    }
+
+    private List<Slot> expand(Collection<DayOfWeek> weekdays, LocalTime start, LocalTime end) {
+        return weekdays.stream()
+                .distinct()
+                .sorted()
+                .map(day -> new Slot(day, start, end))
+                .toList();
+    }
+
+    private void persistRule(Delo delo, List<Slot> slots) {
+        Set<DayOfWeek> weekdays = EnumSet.noneOf(DayOfWeek.class);
+        slots.forEach(s -> weekdays.add(s.weekday()));
         delo.setRecurrenceWeekdays(encodeWeekdays(weekdays));
-        delo.setRecurrenceWindowStart(windowStart);
-        delo.setRecurrenceWindowEnd(windowEnd);
+        Slot first = slots.get(0);
+        delo.setRecurrenceWindowStart(first.windowStart());
+        delo.setRecurrenceWindowEnd(first.windowEnd());
+        delo.setRecurrenceSlots(encodeSlots(slots));
+    }
+
+    private String encodeSlots(List<Slot> slots) {
+        try {
+            return objectMapper.writeValueAsString(slots);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Не удалось сохранить правило повторения", e);
+        }
+    }
+
+    private List<Slot> decodeSlots(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<Slot> parsed = objectMapper.readValue(raw, new TypeReference<List<Slot>>() {});
+            return parsed == null ? List.of() : parsed;
+        } catch (JsonProcessingException e) {
+            return List.of();
+        }
     }
 
     private void validateHorizon(int horizonWeeks) {

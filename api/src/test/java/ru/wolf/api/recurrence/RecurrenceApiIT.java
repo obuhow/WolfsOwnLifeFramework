@@ -194,6 +194,66 @@ class RecurrenceApiIT extends ApiIntegrationTest {
     }
 
     @Test
+    void apply_uses_different_windows_per_weekday() {
+        WebTestClient authed = authedAdminClient();
+        Long deloId = createDelo(authed, "Спортзал");
+
+        ApplyResult applied = applyRecurrence(authed, deloId, Map.of(
+                "slots", List.of(
+                        Map.of("weekday", "TUESDAY", "windowStart", "20:00", "windowEnd", "21:30"),
+                        Map.of("weekday", "SATURDAY", "windowStart", "10:00", "windowEnd", "11:00")
+                ),
+                "horizonWeeks", 4
+        ));
+
+        LocalDate today = LocalDate.now(MOSCOW);
+        LocalDate horizonEnd = today.plusWeeks(4);
+        List<LocalDate> tuesdays = expectedFutureDays(DayOfWeek.TUESDAY, LocalTime.of(20, 0), today, horizonEnd);
+        List<LocalDate> saturdays = expectedFutureDays(DayOfWeek.SATURDAY, LocalTime.of(10, 0), today, horizonEnd);
+        assertThat(tuesdays).isNotEmpty();
+        assertThat(saturdays).isNotEmpty();
+        assertThat(applied.created()).isEqualTo(tuesdays.size() + saturdays.size());
+
+        List<TimeEntryController.TimeEntryResponse> inHorizon = listRange(authed, today.atStartOfDay(), horizonEnd.atStartOfDay())
+                .stream()
+                .filter(e -> deloId.equals(e.getDeloId()))
+                .toList();
+
+        List<TimeEntryController.TimeEntryResponse> tueEntries = inHorizon.stream()
+                .filter(e -> LocalDateTime.parse(normalize(e.getStartAt())).getDayOfWeek() == DayOfWeek.TUESDAY)
+                .toList();
+        List<TimeEntryController.TimeEntryResponse> satEntries = inHorizon.stream()
+                .filter(e -> LocalDateTime.parse(normalize(e.getStartAt())).getDayOfWeek() == DayOfWeek.SATURDAY)
+                .toList();
+
+        assertThat(tueEntries).hasSize(tuesdays.size());
+        assertThat(tueEntries).allMatch(e -> normalize(e.getStartAt()).endsWith("T20:00:00"));
+        assertThat(tueEntries).allMatch(e -> normalize(e.getEndAt()).endsWith("T21:30:00"));
+        assertThat(tueEntries).allMatch(e -> e.getStatus() == TimeEntry.Status.PLANNED);
+
+        assertThat(satEntries).hasSize(saturdays.size());
+        assertThat(satEntries).allMatch(e -> normalize(e.getStartAt()).endsWith("T10:00:00"));
+        assertThat(satEntries).allMatch(e -> normalize(e.getEndAt()).endsWith("T11:00:00"));
+
+        DeloController.DeloDetailResponse detail = authed.get()
+                .uri("/api/v1/delos/{id}", deloId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(DeloController.DeloDetailResponse.class)
+                .returnResult()
+                .getResponseBody();
+        assertThat(detail).isNotNull();
+        assertThat(detail.getRecurrenceSlots()).hasSize(2);
+        assertThat(detail.getRecurrenceSlots())
+                .extracting(DeloController.RecurrenceSlotDto::getWeekday)
+                .containsExactly(DayOfWeek.TUESDAY, DayOfWeek.SATURDAY);
+        assertThat(detail.getRecurrenceSlots().get(0).getWindowStart()).isEqualTo(LocalTime.of(20, 0));
+        assertThat(detail.getRecurrenceSlots().get(0).getWindowEnd()).isEqualTo(LocalTime.of(21, 30));
+        assertThat(detail.getRecurrenceSlots().get(1).getWindowStart()).isEqualTo(LocalTime.of(10, 0));
+        assertThat(detail.getRecurrenceSlots().get(1).getWindowEnd()).isEqualTo(LocalTime.of(11, 0));
+    }
+
+    @Test
     void unauthenticated_apply_rejected() {
         webTestClient.post()
                 .uri("/api/v1/delos/1/apply-recurrence")

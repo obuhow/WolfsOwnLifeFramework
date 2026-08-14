@@ -49,6 +49,10 @@ public class Delo {
     @Column(name = "recurrence_window_end")
     private LocalTime recurrenceWindowEnd;
 
+    /** JSON list of {weekday, windowStart, windowEnd}. */
+    @Column(name = "recurrence_slots", columnDefinition = "TEXT")
+    private String recurrenceSlots;
+
     @OneToMany(mappedBy = "delo", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private Set<DeloProject> deloProjects = new HashSet<>();
