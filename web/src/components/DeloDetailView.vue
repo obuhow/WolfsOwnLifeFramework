@@ -14,6 +14,23 @@ const detail = ref(null)
 const editing = ref(false)
 const selectedProjectId = ref('')
 
+const recurrence = ref({
+  weekdays: [],
+  windowStart: '',
+  windowEnd: '',
+  horizonWeeks: 4
+})
+
+const weekdayOptions = [
+  { value: 'MONDAY', label: 'Пн' },
+  { value: 'TUESDAY', label: 'Вт' },
+  { value: 'WEDNESDAY', label: 'Ср' },
+  { value: 'THURSDAY', label: 'Чт' },
+  { value: 'FRIDAY', label: 'Пт' },
+  { value: 'SATURDAY', label: 'Сб' },
+  { value: 'SUNDAY', label: 'Вс' }
+]
+
 const form = ref({
   title: '',
   description: '',
@@ -50,6 +67,11 @@ function formatHours(v) {
   const n = Number(v)
   if (Number.isNaN(n)) return String(v)
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
+}
+
+function toTimeInput(v) {
+  if (!v) return ''
+  return String(v).slice(0, 5)
 }
 
 function authHeaders(json = false) {
@@ -112,6 +134,12 @@ function fillFormFromDetail() {
     primaryProjectId: detail.value.projects?.find(p => p.isPrimary)?.id != null
       ? String(detail.value.projects.find(p => p.isPrimary).id)
       : ''
+  }
+  recurrence.value = {
+    weekdays: [...(detail.value.recurrenceWeekdays || [])],
+    windowStart: toTimeInput(detail.value.recurrenceWindowStart),
+    windowEnd: toTimeInput(detail.value.recurrenceWindowEnd),
+    horizonWeeks: recurrence.value.horizonWeeks || 4
   }
 }
 
@@ -274,6 +302,61 @@ async function setPrimary(projectId) {
   }
 }
 
+async function applyRecurrence() {
+  if (!recurrence.value.weekdays.length) {
+    error.value = 'Выберите хотя бы один день недели'
+    return
+  }
+  const horizon = Number(recurrence.value.horizonWeeks)
+  if (!Number.isInteger(horizon) || horizon < 1 || horizon > 12) {
+    error.value = 'Горизонт — от 1 до 12 недель'
+    return
+  }
+  const start = recurrence.value.windowStart
+  const end = recurrence.value.windowEnd
+  if ((start && !end) || (!start && end)) {
+    error.value = 'Укажите и начало, и конец окна — или оставьте оба пустыми'
+    return
+  }
+  loading.value = true
+  error.value = ''
+  success.value = ''
+  try {
+    const headers = authHeaders(true)
+    if (!headers) return
+    const payload = {
+      weekdays: recurrence.value.weekdays,
+      horizonWeeks: horizon
+    }
+    if (start && end) {
+      payload.windowStart = start
+      payload.windowEnd = end
+    }
+    const res = await fetch(`${apiBase()}/delos/${deloId.value}/apply-recurrence`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    const result = await res.json()
+    const skipped = []
+    if (result.skippedOccupied) skipped.push(`занятые: ${result.skippedOccupied}`)
+    if (result.skippedPast) skipped.push(`уже прошедшие: ${result.skippedPast}`)
+    success.value = skipped.length
+      ? `Создано ${result.created} запланированных Записей времени (${skipped.join(', ')}).`
+      : `Создано ${result.created} запланированных Записей времени.`
+    await loadDetail()
+    setTimeout(() => { success.value = '' }, 5000)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
 watch(() => route.params.id, () => {
   if (route.params.id) loadAll()
 })
@@ -410,6 +493,52 @@ onMounted(loadAll)
           </div>
         </div>
         <div v-else class="muted-block">Дело без проекта — валидная рутина/личное. Можно прикрепить позже.</div>
+      </section>
+
+      <section class="card" style="margin-bottom: 1.5rem">
+        <div class="projects-toolbar" style="margin-bottom: 1rem">
+          <h2 style="margin: 0">Правило повторения</h2>
+        </div>
+        <p class="recurrence-hint">
+          Дни недели и, по желанию, окно времени. Применение создаёт только будущие запланированные Записи времени
+          на выбранный горизонт. Уже выполненные записи не меняются.
+        </p>
+        <div class="form-group">
+          <span class="label-text">Дни недели</span>
+          <div class="weekday-row" role="group" aria-label="Дни недели">
+            <label v-for="d in weekdayOptions" :key="d.value" class="weekday-chip">
+              <input type="checkbox" :value="d.value" v-model="recurrence.weekdays" :disabled="loading" />
+              {{ d.label }}
+            </label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="recurrence-start">Начало окна</label>
+            <input id="recurrence-start" v-model="recurrence.windowStart" type="time" step="900" class="input" :disabled="loading" />
+          </div>
+          <div class="form-group">
+            <label for="recurrence-end">Конец окна</label>
+            <input id="recurrence-end" v-model="recurrence.windowEnd" type="time" step="900" class="input" :disabled="loading" />
+          </div>
+          <div class="form-group">
+            <label for="recurrence-horizon">Горизонт, недели</label>
+            <input
+              id="recurrence-horizon"
+              v-model.number="recurrence.horizonWeeks"
+              type="number"
+              min="1"
+              max="12"
+              class="input"
+              :disabled="loading"
+            />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" :disabled="loading" @click="applyRecurrence">
+            Применить на горизонт
+          </button>
+        </div>
       </section>
 
       <section class="card">
