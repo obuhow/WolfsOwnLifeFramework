@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import ru.wolf.api.aggregate.FactAggregate;
+import ru.wolf.api.aggregate.FactAggregateService;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.user.User;
@@ -32,6 +34,7 @@ public class DeloController {
     private final DeloProjectRepository deloProjectRepository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
+    private final FactAggregateService factAggregateService;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -316,6 +319,7 @@ public class DeloController {
                 .map(l -> new ProjectLink(l.getProject().getId(), l.getProject().getTitle(), Boolean.TRUE.equals(l.getIsPrimary())))
                 .sorted((a, b) -> a.getTitle().compareToIgnoreCase(b.getTitle()))
                 .toList();
+        FactAggregate aggregates = factAggregateService.forDelo(delo.getUser(), delo.getId());
         return new DeloDetailResponse(
                 delo.getId(),
                 delo.getTitle(),
@@ -323,7 +327,8 @@ public class DeloController {
                 delo.getExecutionMode(),
                 projectLinks,
                 delo.getCreatedAt(),
-                delo.getUpdatedAt()
+                delo.getUpdatedAt(),
+                aggregates
         );
     }
 
@@ -350,6 +355,7 @@ public class DeloController {
         private List<ProjectLink> projects;
         private Instant createdAt;
         private Instant updatedAt;
+        private FactAggregate aggregates;
     }
 
     @Data

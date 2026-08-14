@@ -506,6 +506,63 @@ body {
   padding: 0.75rem 0;
 }
 
+.aggregate-total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.aggregate-total-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2c2a26;
+  font-variant-numeric: tabular-nums;
+}
+
+.aggregate-mode {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.aggregate-table-wrap {
+  overflow-x: auto;
+}
+
+.aggregate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.aggregate-table th,
+.aggregate-table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid #e8e0d4;
+  text-align: left;
+}
+
+.aggregate-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a8278;
+  font-weight: 500;
+}
+
+.aggregate-table td.num,
+.aggregate-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.aggregate-table tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+  padding-top: 0.75rem;
+  color: #2c2a26;
+}
+
 .preserve-lines {
   white-space: pre-wrap;
 }

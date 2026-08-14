@@ -157,7 +157,9 @@ class ProjectApiIT extends ApiIntegrationTest {
         assertThat(detail.getTitle()).isEqualTo("WOLF");
         assertThat(detail.getLifeAreaName()).isEqualTo("Работа");
         assertThat(detail.getDelos()).isEmpty();
-        assertThat(detail.getAggregates()).isNull();
+        assertThat(detail.getAggregates()).isNotNull();
+        assertThat(detail.getAggregates().getTotalFactHours()).isEqualByComparingTo("0.00");
+        assertThat(detail.getAggregates().getByDay()).isEmpty();
     }
 
     @Test
