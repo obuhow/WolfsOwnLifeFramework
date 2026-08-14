@@ -14,6 +14,21 @@ const detail = ref(null)
 const editing = ref(false)
 const selectedProjectId = ref('')
 
+const recurrence = ref({
+  slots: [],
+  horizonWeeks: 4
+})
+
+const weekdayOptions = [
+  { value: 'MONDAY', label: 'Пн' },
+  { value: 'TUESDAY', label: 'Вт' },
+  { value: 'WEDNESDAY', label: 'Ср' },
+  { value: 'THURSDAY', label: 'Чт' },
+  { value: 'FRIDAY', label: 'Пт' },
+  { value: 'SATURDAY', label: 'Сб' },
+  { value: 'SUNDAY', label: 'Вс' }
+]
+
 const form = ref({
   title: '',
   description: '',
@@ -50,6 +65,11 @@ function formatHours(v) {
   const n = Number(v)
   if (Number.isNaN(n)) return String(v)
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
+}
+
+function toTimeInput(v) {
+  if (!v) return ''
+  return String(v).slice(0, 5)
 }
 
 function authHeaders(json = false) {
@@ -112,6 +132,41 @@ function fillFormFromDetail() {
     primaryProjectId: detail.value.projects?.find(p => p.isPrimary)?.id != null
       ? String(detail.value.projects.find(p => p.isPrimary).id)
       : ''
+  }
+  recurrence.value = {
+    slots: slotsFromDetail(detail.value),
+    horizonWeeks: recurrence.value.horizonWeeks || 4
+  }
+}
+
+function emptySlot() {
+  return { weekday: 'MONDAY', windowStart: '09:00', windowEnd: '09:15' }
+}
+
+function slotsFromDetail(d) {
+  const fromApi = d.recurrenceSlots || []
+  if (fromApi.length) {
+    return fromApi.map(s => ({
+      weekday: s.weekday,
+      windowStart: toTimeInput(s.windowStart),
+      windowEnd: toTimeInput(s.windowEnd)
+    }))
+  }
+  const days = d.recurrenceWeekdays || []
+  if (!days.length) return [emptySlot()]
+  const start = toTimeInput(d.recurrenceWindowStart) || '09:00'
+  const end = toTimeInput(d.recurrenceWindowEnd) || '09:15'
+  return days.map(weekday => ({ weekday, windowStart: start, windowEnd: end }))
+}
+
+function addSlot() {
+  recurrence.value.slots.push(emptySlot())
+}
+
+function removeSlot(index) {
+  recurrence.value.slots.splice(index, 1)
+  if (!recurrence.value.slots.length) {
+    recurrence.value.slots.push(emptySlot())
   }
 }
 
@@ -274,6 +329,57 @@ async function setPrimary(projectId) {
   }
 }
 
+async function applyRecurrence() {
+  const slots = recurrence.value.slots.filter(s => s.weekday && s.windowStart && s.windowEnd)
+  if (!slots.length) {
+    error.value = 'Добавьте хотя бы один слот: день и окно времени'
+    return
+  }
+  const incomplete = recurrence.value.slots.some(s => !s.weekday || !s.windowStart || !s.windowEnd)
+  if (incomplete) {
+    error.value = 'У каждого слота укажите день, начало и конец'
+    return
+  }
+  const horizon = Number(recurrence.value.horizonWeeks)
+  if (!Number.isInteger(horizon) || horizon < 1 || horizon > 12) {
+    error.value = 'Горизонт — от 1 до 12 недель'
+    return
+  }
+  loading.value = true
+  error.value = ''
+  success.value = ''
+  try {
+    const headers = authHeaders(true)
+    if (!headers) return
+    const payload = {
+      slots,
+      horizonWeeks: horizon
+    }
+    const res = await fetch(`${apiBase()}/delos/${deloId.value}/apply-recurrence`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    const result = await res.json()
+    const skipped = []
+    if (result.skippedOccupied) skipped.push(`занятые: ${result.skippedOccupied}`)
+    if (result.skippedPast) skipped.push(`уже прошедшие: ${result.skippedPast}`)
+    success.value = skipped.length
+      ? `Создано ${result.created} запланированных Записей времени (${skipped.join(', ')}).`
+      : `Создано ${result.created} запланированных Записей времени.`
+    await loadDetail()
+    setTimeout(() => { success.value = '' }, 5000)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
 watch(() => route.params.id, () => {
   if (route.params.id) loadAll()
 })
@@ -410,6 +516,73 @@ onMounted(loadAll)
           </div>
         </div>
         <div v-else class="muted-block">Дело без проекта — валидная рутина/личное. Можно прикрепить позже.</div>
+      </section>
+
+      <section class="card" style="margin-bottom: 1.5rem">
+        <div class="projects-toolbar" style="margin-bottom: 1rem">
+          <h2 style="margin: 0">Правило повторения</h2>
+        </div>
+        <p class="recurrence-hint">
+          У каждого дня своё окно. Например: вторник 20:00–21:30 и суббота 10:00–11:00.
+          Применение создаёт только будущие запланированные Записи времени. Уже выполненные не меняются.
+        </p>
+        <div class="recurrence-slots">
+          <div v-for="(slot, index) in recurrence.slots" :key="index" class="recurrence-slot-row">
+            <label class="sr-only" :for="`recurrence-day-${index}`">День</label>
+            <select
+              :id="`recurrence-day-${index}`"
+              v-model="slot.weekday"
+              class="input"
+              :disabled="loading"
+            >
+              <option v-for="d in weekdayOptions" :key="d.value" :value="d.value">{{ d.label }}</option>
+            </select>
+            <label class="sr-only" :for="`recurrence-start-${index}`">Начало</label>
+            <input
+              :id="`recurrence-start-${index}`"
+              v-model="slot.windowStart"
+              type="time"
+              step="900"
+              class="input"
+              :disabled="loading"
+            />
+            <span class="recurrence-slot-sep">–</span>
+            <label class="sr-only" :for="`recurrence-end-${index}`">Конец</label>
+            <input
+              :id="`recurrence-end-${index}`"
+              v-model="slot.windowEnd"
+              type="time"
+              step="900"
+              class="input"
+              :disabled="loading"
+            />
+            <button type="button" class="btn btn-ghost" :disabled="loading" @click="removeSlot(index)">
+              Убрать
+            </button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top: 1rem">
+          <div class="form-group">
+            <label for="recurrence-horizon">Горизонт, недели</label>
+            <input
+              id="recurrence-horizon"
+              v-model.number="recurrence.horizonWeeks"
+              type="number"
+              min="1"
+              max="12"
+              class="input"
+              :disabled="loading"
+            />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" :disabled="loading" @click="addSlot">
+            + Слот
+          </button>
+          <button type="button" class="btn btn-primary" :disabled="loading" @click="applyRecurrence">
+            Применить на горизонт
+          </button>
+        </div>
       </section>
 
       <section class="card">

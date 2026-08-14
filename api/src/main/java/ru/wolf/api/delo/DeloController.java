@@ -15,10 +15,13 @@ import ru.wolf.api.aggregate.FactAggregate;
 import ru.wolf.api.aggregate.FactAggregateService;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
+import ru.wolf.api.recurrence.RecurrenceService;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +38,7 @@ public class DeloController {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final FactAggregateService factAggregateService;
+    private final RecurrenceService recurrenceService;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -211,6 +215,36 @@ public class DeloController {
         return ResponseEntity.ok(toResponse(reloaded));
     }
 
+    @PostMapping("/{id}/apply-recurrence")
+    @Transactional
+    public ResponseEntity<ApplyRecurrenceResponse> applyRecurrence(
+            Authentication authentication,
+            @PathVariable Long id,
+            @RequestBody(required = false) ApplyRecurrenceRequest request
+    ) {
+        User user = currentUser(authentication);
+        ApplyRecurrenceRequest body = request != null ? request : new ApplyRecurrenceRequest();
+        RecurrenceService.ApplyResult result = recurrenceService.apply(
+                user,
+                id,
+                new RecurrenceService.ApplyCommand(
+                        body.getWeekdays(),
+                        body.getWindowStart(),
+                        body.getWindowEnd(),
+                        body.getHorizonWeeks(),
+                        toSlots(body.getSlots())
+                )
+        );
+        return ResponseEntity.ok(new ApplyRecurrenceResponse(
+                result.created(),
+                result.skippedOccupied(),
+                result.skippedPast(),
+                result.horizonWeeks(),
+                result.from().toString(),
+                result.toExclusive().toString()
+        ));
+    }
+
     private User currentUser(Authentication authentication) {
         return userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("User not found"));
@@ -328,8 +362,27 @@ public class DeloController {
                 projectLinks,
                 delo.getCreatedAt(),
                 delo.getUpdatedAt(),
-                aggregates
+                aggregates,
+                RecurrenceService.decodeWeekdays(delo.getRecurrenceWeekdays()),
+                delo.getRecurrenceWindowStart(),
+                delo.getRecurrenceWindowEnd(),
+                toSlotDtos(recurrenceService.slotsOf(delo))
         );
+    }
+
+    private List<RecurrenceService.Slot> toSlots(List<RecurrenceSlotDto> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            return List.of();
+        }
+        return dtos.stream()
+                .map(d -> new RecurrenceService.Slot(d.getWeekday(), d.getWindowStart(), d.getWindowEnd()))
+                .toList();
+    }
+
+    private List<RecurrenceSlotDto> toSlotDtos(List<RecurrenceService.Slot> slots) {
+        return slots.stream()
+                .map(s -> new RecurrenceSlotDto(s.weekday(), s.windowStart(), s.windowEnd()))
+                .toList();
     }
 
     @Data
@@ -356,6 +409,42 @@ public class DeloController {
         private Instant createdAt;
         private Instant updatedAt;
         private FactAggregate aggregates;
+        private List<DayOfWeek> recurrenceWeekdays;
+        private LocalTime recurrenceWindowStart;
+        private LocalTime recurrenceWindowEnd;
+        private List<RecurrenceSlotDto> recurrenceSlots;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RecurrenceSlotDto {
+        private DayOfWeek weekday;
+        private LocalTime windowStart;
+        private LocalTime windowEnd;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ApplyRecurrenceRequest {
+        private List<DayOfWeek> weekdays;
+        private LocalTime windowStart;
+        private LocalTime windowEnd;
+        private Integer horizonWeeks;
+        private List<RecurrenceSlotDto> slots;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ApplyRecurrenceResponse {
+        private int created;
+        private int skippedOccupied;
+        private int skippedPast;
+        private int horizonWeeks;
+        private String from;
+        private String toExclusive;
     }
 
     @Data
