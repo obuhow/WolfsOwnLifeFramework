@@ -12,6 +12,10 @@ const error = ref('')
 const success = ref('')
 const showForm = ref(false)
 const editingId = ref(null)
+const importFile = ref(null)
+const addImportedToWeek = ref(true)
+const skipOverlapCheck = ref(false)
+const importing = ref(false)
 
 const form = ref({
   title: '',
@@ -191,6 +195,36 @@ async function deleteDelo(delo) {
   }
 }
 
+async function importCsv() {
+  if (!importFile.value) { error.value = 'Выберите CSV-файл'; return }
+  importing.value = true
+  error.value = ''
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    const data = new FormData()
+    data.append('file', importFile.value)
+    data.append('addToCurrentWeek', String(addImportedToWeek.value))
+    data.append('skipOverlapCheck', String(skipOverlapCheck.value))
+    let res
+    try {
+      res = await fetch(`${apiBase()}/delos/import`, { method: 'POST', headers, body: data })
+    } catch (e) {
+      throw new Error(`Не удалось связаться с API импорта: ${e instanceof Error ? e.message : String(e)}`)
+    }
+    const responseText = await res.text()
+    let responseBody = {}
+    try { responseBody = responseText ? JSON.parse(responseText) : {} } catch { /* plain-text response */ }
+    if (!res.ok) {
+      throw new Error(responseBody.message || responseText || `Импорт: HTTP ${res.status}`)
+    }
+    success.value = `Импортировано Дел: ${responseBody.imported}`
+    importFile.value = null
+    await loadDelos()
+  } catch (e) { error.value = e instanceof Error ? e.message : String(e) }
+  finally { importing.value = false }
+}
+
 function openDelo(delo) {
   router.push(`/delos/${delo.id}`)
 }
@@ -288,10 +322,21 @@ onMounted(loadAll)
       <div class="projects-toolbar">
         <h2 style="margin: 0">Каталог Дел</h2>
         <div class="projects-toolbar-actions">
+          <label class="btn btn-ghost" for="delo-csv-file">Импорт CSV</label>
           <button v-if="!showForm" class="btn btn-primary" :disabled="loading" @click="openCreate">
             + Добавить
           </button>
         </div>
+      </div>
+
+      <div class="csv-import-panel">
+        <input id="delo-csv-file" type="file" accept=".csv,text/csv" :disabled="importing" @change="importFile = $event.target.files[0] || null" />
+        <label><input v-model="addImportedToWeek" type="checkbox" :disabled="importing" /> Добавить в Бэклог текущей недели</label>
+        <label><input v-model="skipOverlapCheck" type="checkbox" :disabled="importing" /> Пропустить проверку пересечений</label>
+        <button class="btn btn-primary" :disabled="importing || !importFile" @click="importCsv">
+          {{ importing ? 'Импорт…' : 'Загрузить' }}
+        </button>
+        <small>Запятые: title, date, startAt, endAt, description, executionMode, projects, lifeArea. Проекты создаются автоматически.</small>
       </div>
 
       <div v-if="loading && delos.length === 0" class="loading">Загрузка…</div>
