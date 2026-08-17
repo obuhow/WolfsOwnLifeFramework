@@ -30,4 +30,10 @@ public interface DeloRepository extends JpaRepository<Delo, Long> {
     Optional<Delo> findByUserAndId(@Param("user") User user, @Param("id") Long id);
 
     Optional<Delo> findFirstByUserAndTitleIgnoreCaseOrderByIdAsc(User user, String title);
+
+    @Query("""
+            SELECT d FROM Delo d
+            WHERE d.user = :user AND LOWER(d.title) IN :lowerTitles
+            """)
+    List<Delo> findByUserAndTitleInIgnoreCase(@Param("user") User user, @Param("lowerTitles") List<String> lowerTitles);
 }

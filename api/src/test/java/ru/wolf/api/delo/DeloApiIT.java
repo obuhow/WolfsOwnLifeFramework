@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.web.reactive.function.BodyInserters;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.project.ProjectController;
@@ -382,6 +384,37 @@ class DeloApiIT extends ApiIntegrationTest {
                 .uri("/api/v1/delos/{id}", adminDelo.getId())
                 .exchange()
                 .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void import_csv_creates_delos_and_adds_them_to_current_week_backlog() {
+        WebTestClient authed = authedAdminClient();
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("file", "title,date,startAt,endAt,description,executionMode,projects,lifeArea\nИмпорт 1,2026-08-15,09:00,10:00,Описание,SELF,Импортированный проект,Работа\nИмпорт 2,2026-08-15,10:15,10:30,,DELEGATABLE,,\n")
+                .filename("delos.csv")
+                .header("Content-Type", "text/csv");
+        body.part("addToCurrentWeek", "true");
+
+        authed.post()
+                .uri("/api/v1/delos/import")
+                .body(BodyInserters.fromMultipartData(body.build()))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(DeloImportController.ImportResponse.class)
+                .value(response -> assertThat(response.getImported()).isEqualTo(2));
+
+        authed.get().uri("/api/v1/delos")
+                .exchange().expectStatus().isOk()
+                .expectBodyList(DeloController.DeloResponse.class)
+                .value(list -> assertThat(list).extracting(DeloController.DeloResponse::getTitle)
+                        .containsExactly("Импорт 1", "Импорт 2"));
+
+        authed.get().uri("/api/v1/backlog/week")
+                .exchange().expectStatus().isOk()
+                .expectBody(ru.wolf.api.backlog.WeekBacklogController.WeekBacklogResponse.class)
+                .value(response -> assertThat(response.getDelos())
+                        .extracting(ru.wolf.api.backlog.WeekBacklogController.DeloResponse::getTitle)
+                        .containsExactly("Импорт 1", "Импорт 2"));
     }
 
     @Test
