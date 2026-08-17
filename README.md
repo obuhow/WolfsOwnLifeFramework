@@ -28,7 +28,7 @@ docker-compose.yml   Postgres + API + web (nginx)
 |--------|-----------|----------------|
 | Postgres | **5434** | 5432 |
 | API | **8082** | 8080 |
-| Web | **5174** | 80 |
+| Web | **80** | 80 |
 
 Порты выбраны так, чтобы не пересекаться с типичным system Postgres `:5432` и другими локальными стеками.
 
@@ -38,7 +38,7 @@ docker-compose.yml   Postgres + API + web (nginx)
 docker compose up --build
 ```
 
-- UI: http://localhost:5174
+- UI: http://localhost
 - API: http://localhost:8082
 - Health: http://localhost:8082/api/v1/health
 - Postgres: `localhost:5434`, db/user/pass `wolf` / `wolf` / `wolf`
