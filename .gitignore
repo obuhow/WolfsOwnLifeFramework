@@ -10,7 +10,6 @@
 **/.gradle/
 **/bin/
 **/node_modules/
-**/dist/
 *.log
 
 # IDE
