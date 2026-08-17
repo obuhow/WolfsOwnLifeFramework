@@ -46,4 +46,12 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             WHERE p.user = :user AND p.id IN :ids
             """)
     List<Project> findByUserAndIdIn(@Param("user") User user, @Param("ids") List<Long> ids);
+
+    @Query("""
+            SELECT p FROM Project p
+            JOIN FETCH p.lifeArea
+            LEFT JOIN FETCH p.parent
+            WHERE p.user = :user AND LOWER(p.title) = LOWER(:title)
+            """)
+    Optional<Project> findByUserAndTitleIgnoreCase(@Param("user") User user, @Param("title") String title);
 }
