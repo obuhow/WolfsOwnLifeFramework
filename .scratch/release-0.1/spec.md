@@ -24,7 +24,7 @@ ADRs: `docs/adr/0001-personal-single-user-data.md`, `0002-stack-spring-vue-postg
 - Экраны: Сегодня, Неделя, Гантт, карточки Проекта и Дела
 - Бэклог недели, ночные часы + авто-Дело «Сон», простое Правило повторения
 - План на неделю и факт-часы на Гантте с Режимом учёта часов
-- One-shot импорт CSV (Дела) и ICS (Записи времени)
+- One-shot импорт CSV (Дела) **(ICS отменён — перенесён в release-cancelled)**
 - Стек: Java 21 + Spring Boot 3 + Gradle, Vue 3, PostgreSQL, JWT, Docker Compose
 - UI на русском; неделя пн–вс; timezone Пользователя (default `Europe/Moscow`)
 
@@ -89,8 +89,8 @@ ADRs: `docs/adr/0001-personal-single-user-data.md`, `0002-stack-spring-vue-postg
 55. As a Пользователь, I want changing recurrence not to rewrite past done entries, so that history stays honest.
 56. As a Пользователь, I want to upload a CSV of tasks once, so that existing task chaos becomes Дела.
 57. As a Пользователь, I want an option to drop imported Дела into the current Бэклог недели, so that import feeds this week’s intent.
-58. As a Пользователь, I want to upload an ICS once, so that existing calendar events become Записи времени.
-59. As a Пользователь, I want long ICS events split/rounded onto 15-minute cells, so that they fit the grid model.
+58. As a Пользователь, I want to upload an ICS once, so that existing calendar events become Записи времени. **(cancelled — moved to release-cancelled)**
+59. As a Пользователь, I want long ICS events split/rounded onto 15-minute cells, so that they fit the grid model. **(cancelled — moved to release-cancelled)**
 60. As a Пользователь, I want the product to feel quiet (no red nagging cult), so that it matches the brand promise.
 61. As a developer, I want Docker Compose to run API + DB (+ frontend serve path), so that local setup is repeatable.
 62. As an implementing agent, I want acceptance behaviour locked at the HTTP API seam, so that UI and backend can evolve without ambiguous “done”.
@@ -111,7 +111,7 @@ ADRs: `docs/adr/0001-personal-single-user-data.md`, `0002-stack-spring-vue-postg
 - **Calendar** — Запись времени, status transitions, confirm-all, night hours settings, sleep autofill, week backlog.
 - **Planning views support** — queries for day/week grids; Gantt aggregates; План на неделю writes.
 - **Recurrence** — simple rule storage + apply-to-horizon command.
-- **Import** — CSV → Дела; ICS → Записи времени (+ Дела by summary when needed); 15-min normalization rules.
+- **Import** — CSV → Дела; **ICS → Записи времени (cancelled, moved to release-cancelled)**; 15-min normalization rules.
 - **Web app** — pages: login, Сегодня, Неделя, Гантт, Проект, Дело, import entry points, user settings (night hours, hour mode, timezone).
 
 ### Domain rules to encode
@@ -127,7 +127,7 @@ ADRs: `docs/adr/0001-personal-single-user-data.md`, `0002-stack-spring-vue-postg
 ### API shape (contract level, not paths carved in stone)
 - Resource-oriented JSON under versioned prefix (e.g. `/api/v1`).
 - Auth endpoints + CRUD for areas/projects/delos/time-entries/backlog/week-plans.
-- Commands: confirm-all, apply-recurrence, import CSV, import ICS.
+- Commands: confirm-all, apply-recurrence, import CSV. **(import ICS cancelled — moved to release-cancelled)**
 - All mutations authenticated; server enforces ownership.
 
 ### Persistence
@@ -159,7 +159,7 @@ ADRs: `docs/adr/0001-personal-single-user-data.md`, `0002-stack-spring-vue-postg
 - Week backlog membership per ISO week.
 - Week plan write/read; fact hour aggregation for both accounting modes; ad-hoc excluded.
 - Recurrence apply horizon and non-rewriting of done history.
-- CSV and ICS import observable results via subsequent GETs.
+- CSV import observable results via subsequent GETs. **(ICS import cancelled — moved to release-cancelled)**
 
 ### Prior art
 - None in-repo yet. Establish one testing style: Spring Boot tests + Testcontainers PostgreSQL + authenticated `MockMvc`/`WebTestClient` (or REST-assured) as the default template for later tickets.
@@ -187,6 +187,6 @@ ADRs: `docs/adr/0001-personal-single-user-data.md`, `0002-stack-spring-vue-postg
 
 - Prior free-form draft lived in this path and is fully replaced by this `to-spec` document.
 - Product tone: warm, quiet, under user control — UX copy and defaults should not shame the user.
-- Import file schemas (exact CSV columns, ICS rounding edge cases) may be fixed during implementation and documented beside import code; behaviour must still meet stories 56–59.
+- Import file schemas (exact CSV columns) may be fixed during implementation and documented beside import code; behaviour must still meet stories 56–57. **(ICS stories 58-59 cancelled — moved to release-cancelled)**
 - After this spec, split work with `to-tickets` into `.scratch/release-0.1/issues/NN-*.md` rather than coding from the whole release at once.
 - Implementation must keep `CONTEXT.md` vocabulary; if a term shifts, update glossary via domain-modeling — do not silently invent synonyms in code/UI.
