@@ -20,6 +20,7 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+      network: host
     container_name: wolf-api
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wolf
@@ -36,6 +37,7 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      network: host
     container_name: wolf-web
     ports:
       - "80:80"
