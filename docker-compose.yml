@@ -18,8 +18,8 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: api/Dockerfile
+      context: ./api
+      dockerfile: Dockerfile
     container_name: wolf-api
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wolf
