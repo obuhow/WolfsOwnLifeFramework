@@ -1162,13 +1162,13 @@ onMounted(loadAll)
 }
 
 .week-day-head.is-today {
-  background: #e0ebe4;
-  box-shadow: inset 0 -3px 0 #3d5a4a;
+  background: #f7f7f5;
+  box-shadow: inset 0 -2px 0 var(--wolf-ink);
 }
 
 .wd-name {
   font-weight: 600;
-  color: #3d5a4a;
+  color: var(--wolf-ink);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 0.72rem;
@@ -1269,23 +1269,23 @@ onMounted(loadAll)
 }
 
 .cell-planned {
-  background: #e8f0ea;
+  background: #f7f8fa;
 }
 
 .cell-planned:hover:not(:disabled) {
-  background: #dce8df;
+  background: #f2f2f2;
 }
 
 .cell-done {
-  background: #e4eef6;
+  background: var(--wolf-done-surface);
 }
 
 .cell-done:hover:not(:disabled) {
-  background: #d5e4f0;
+  background: #e6f0e5;
 }
 
 .cell-now {
-  box-shadow: inset 0 0 0 1.5px #3d5a4a;
+  box-shadow: inset 0 0 0 1.5px var(--wolf-ink);
 }
 
 .cell-night.cell-empty {
@@ -1310,11 +1310,11 @@ onMounted(loadAll)
 }
 
 .legend-swatch.planned {
-  background: #e8f0ea;
+  background: #f7f8fa;
 }
 
 .legend-swatch.done {
-  background: #e4eef6;
+  background: var(--wolf-done-surface);
 }
 
 .panel-card h2 {
@@ -1374,11 +1374,11 @@ onMounted(loadAll)
 }
 
 .meta-planned {
-  color: #3d5a4a;
+  color: var(--wolf-muted);
 }
 
 .meta-done {
-  color: #3a5a7a;
+  color: var(--wolf-done-ink);
 }
 
 .btn-sm {
@@ -1451,10 +1451,32 @@ onMounted(loadAll)
 }
 
 .delo-option.selected {
-  background: #e8f0ea;
+  background: var(--wolf-hover);
 }
 
 .delo-option input {
-  accent-color: #3d5a4a;
+  accent-color: var(--wolf-ink);
 }
+/* Ticket 01: normalize existing weekly-grid and picker presentation without
+   changing the shared time-grid coordinate system. */
+.week-grid-scroll,
+.week-grid-wrap,
+.delo-picker-list { border-color: var(--wolf-rule); border-radius: 0; background: var(--wolf-surface); }
+.week-cell { border-color: var(--wolf-subrule); color: var(--wolf-ink); }
+.week-cell.cell-planned { background: #f7f8fa; }
+.week-cell.cell-done { background: var(--wolf-done-surface); }
+.week-cell:hover:not(:disabled),
+.delo-option:hover,
+.delo-option.selected { background: var(--wolf-hover); }
+.time-cell,
+.time-label,
+.week-day-meta,
+.today-list-time,
+.today-list-meta,
+.backlog-item-meta { color: var(--wolf-muted); }
+.week-day-head { border-color: var(--wolf-rule); background: var(--wolf-surface); }
+.today-list-item,
+.backlog-list-item { border-color: var(--wolf-rule); border-radius: 0; background: transparent; }
+.legend-swatch { border-color: var(--wolf-rule); border-radius: 0; }
+.modal { border-radius: 0; box-shadow: none; }
 </style>

@@ -6,21 +6,7 @@ import { apiBase } from './api'
 const router = useRouter()
 const route = useRoute()
 const token = ref(localStorage.getItem('wolf_token') || '')
-const healthStatus = ref('…')
 const username = ref('')
-
-async function loadHealth() {
-  try {
-    const res = await fetch(`${apiBase()}/health`)
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`)
-    }
-    const body = await res.json()
-    healthStatus.value = body.status ?? JSON.stringify(body)
-  } catch (e) {
-    healthStatus.value = 'недоступен'
-  }
-}
 
 async function loadUser() {
   const t = localStorage.getItem('wolf_token')
@@ -62,7 +48,6 @@ onMounted(async () => {
   if (token.value) {
     await loadUser()
   }
-  await loadHealth()
 })
 </script>
 
@@ -186,16 +171,10 @@ onMounted(async () => {
         <router-view />
       </main>
 
-      <footer class="global-footer">
-        <p>API: <code>{{ apiBase() }}</code> — <strong :class="healthStatus === 'UP' ? 'ok' : 'bad'">{{ healthStatus }}</strong></p>
-      </footer>
     </div>
 
     <div v-else class="app-shell">
       <router-view />
-      <footer class="global-footer">
-        <p>API: <code>{{ apiBase() }}</code> — <strong :class="healthStatus === 'UP' ? 'ok' : 'bad'">{{ healthStatus }}</strong></p>
-      </footer>
     </div>
   </div>
 </template>

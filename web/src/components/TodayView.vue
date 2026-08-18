@@ -1036,23 +1036,23 @@ onMounted(loadAll)
 }
 
 .cell-planned {
-  background: #e8f0ea;
+  background: #f7f8fa;
 }
 
 .cell-planned:hover:not(:disabled) {
-  background: #dce8df;
+  background: #f2f2f2;
 }
 
 .cell-done {
-  background: #e4eef6;
+  background: var(--wolf-done-surface);
 }
 
 .cell-done:hover:not(:disabled) {
-  background: #d5e4f0;
+  background: #e6f0e5;
 }
 
 .cell-now {
-  box-shadow: inset 3px 0 0 #3d5a4a;
+  box-shadow: inset 3px 0 0 var(--wolf-ink);
 }
 
 .cell-night .cell-time {
@@ -1077,11 +1077,11 @@ onMounted(loadAll)
 }
 
 .legend-swatch.planned {
-  background: #e8f0ea;
+  background: #f7f8fa;
 }
 
 .legend-swatch.done {
-  background: #e4eef6;
+  background: var(--wolf-done-surface);
 }
 
 .panel-card h2 {
@@ -1139,11 +1139,11 @@ onMounted(loadAll)
 }
 
 .meta-planned {
-  color: #3d5a4a;
+  color: var(--wolf-muted);
 }
 
 .meta-done {
-  color: #3a5a7a;
+  color: var(--wolf-done-ink);
 }
 
 .btn-sm {
@@ -1290,10 +1290,29 @@ onMounted(loadAll)
 }
 
 .delo-option.selected {
-  background: #e8f0ea;
+  background: var(--wolf-hover);
 }
 
 .delo-option input {
-  accent-color: #3d5a4a;
+  accent-color: var(--wolf-ink);
 }
+/* Ticket 01: normalize existing grid/panel rules without altering TimeEntry geometry. */
+.grid-scroll,
+.delo-picker-list { border-color: var(--wolf-rule); border-radius: 0; background: var(--wolf-surface); }
+.grid-cell { border-bottom-color: var(--wolf-subrule); color: var(--wolf-ink); }
+.grid-cell.cell-planned { background: #f7f8fa; }
+.grid-cell.cell-done { background: var(--wolf-done-surface); }
+.grid-cell:hover:not(:disabled),
+.delo-option:hover,
+.delo-option.selected { background: var(--wolf-hover); }
+.cell-hour { border-top-color: var(--wolf-rule); }
+.cell-time,
+.today-list-time,
+.today-list-meta,
+.backlog-item-meta { color: var(--wolf-muted); }
+.cell-night .cell-time { color: var(--wolf-muted); }
+.today-list-item,
+.backlog-list-item { border-color: var(--wolf-rule); border-radius: 0; background: transparent; }
+.legend-swatch { border-color: var(--wolf-rule); border-radius: 0; }
+.modal { border-radius: 0; box-shadow: none; }
 </style>

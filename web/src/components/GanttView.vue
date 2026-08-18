@@ -472,9 +472,10 @@ onMounted(loadAll)
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid #e0d8cc;
-  background: #fffefb;
+  border: 0;
+  border-bottom: 1px solid var(--wolf-rule);
+  border-radius: 0;
+  background: var(--wolf-surface);
   font-size: 0.85rem;
   cursor: pointer;
   user-select: none;
@@ -886,6 +887,43 @@ onMounted(loadAll)
 .muted {
   color: #8a8278;
 }
+
+/* Ticket 01 override: the existing data geometry stays intact; only the shared
+   register surface, controls and status semantics are normalized here. */
+.gantt-page :is(.gantt-filters, .gantt-scroll, .gantt-header-grid .month-cell, .gantt-header-grid .week-head, .sticky-col, .corner, .project-name, .gantt-cell, .month-row .month-cell, .week-row .week-head) {
+  background: var(--wolf-surface);
+}
+.gantt-page :is(.gantt-scroll, .gantt-header-grid .corner, .gantt-header-grid .month-cell, .gantt-header-grid .week-head, .gantt-project-row > *, .gantt-grid .gantt-cell, .gantt-grid .sticky-col) {
+  border-color: var(--wolf-rule);
+}
+.gantt-page :is(.gantt-grid .sticky-col, .sticky-col, .corner) { box-shadow: 1px 0 0 var(--wolf-rule); }
+.gantt-page :is(.chip, .chip.on) {
+  border: 0;
+  border-bottom: 1px solid var(--wolf-rule);
+  border-radius: 0;
+  background: var(--wolf-surface);
+  color: var(--wolf-ink);
+}
+.gantt-page .chip.on { border-bottom-color: var(--wolf-ink); }
+.gantt-page .chip-dot { border-radius: 0; }
+.gantt-page :is(.gantt-grid .week-head.current, .gantt-grid .gantt-cell.current, .week-head.current, .gantt-cell.current) {
+  background: #f7f7f5;
+  color: var(--wolf-ink);
+}
+.gantt-page :is(.gantt-grid .week-head.current, .week-head.current) { box-shadow: inset 0 -2px 0 var(--wolf-ink); }
+.gantt-page .date-bar { background: var(--wolf-ink); opacity: .35; }
+.gantt-page .strip { border-radius: 0; background: var(--wolf-subrule); }
+.gantt-page .strip .bar { border-radius: 0; }
+.gantt-page .strip.plan .bar { background: var(--wolf-ink); }
+.gantt-page .strip.fact .bar { background: var(--wolf-done-ink); }
+.gantt-page :is(.strip .val, .plan-val) { color: var(--wolf-ink); }
+.gantt-page .fact-val { color: var(--wolf-done-ink); }
+.gantt-page .plan-input { background: var(--wolf-surface); outline-color: var(--wolf-ink); border-radius: 0; }
+.gantt-page .project-link:hover { color: var(--wolf-ink); }
+.gantt-page :is(.w-date, .area-tag, .depth-mark, .muted, .filter-check) { color: var(--wolf-muted); }
+.gantt-page .banner { margin: 0 0 12px; border-radius: 0; background: transparent; }
+.gantt-page .banner.error { color: var(--wolf-ink); border-color: var(--wolf-ink); }
+.gantt-page .banner.ok { color: var(--wolf-done-ink); border-color: var(--wolf-done-ink); }
 
 @media (max-width: 720px) {
   .sticky-col {
