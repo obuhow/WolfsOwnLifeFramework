@@ -8,27 +8,42 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy files via SSH and run Docker Compose
+      - name: Build production images on GitHub runner
+        run: |
+          docker compose build api web
+          docker save wolf-api:latest wolf-web:latest | gzip > wolf-images.tar.gz
+
+      - name: Copy release files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "wolf-images.tar.gz,docker-compose.yml"
+          target: ${{ secrets.DEPLOY_PATH }}
+          overwrite: true
+
+      - name: Load images and restart Compose on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 15m
           script: |
+            set -e
             cd ${{ secrets.DEPLOY_PATH }}
-            git fetch origin
-            git checkout ${{ github.ref_name }}
-            git pull origin ${{ github.ref_name }}
-            cd api
-            ./gradlew bootJar --no-daemon
-            cd ../web
-            npm ci
-            npm run build
-            cd ..
+            gunzip -c wolf-images.tar.gz | docker load
             docker compose down
-            docker compose up -d --build
-            docker system prune -f
+            docker compose up -d --no-build
+            docker compose ps
+            rm -f wolf-images.tar.gz
+            docker image prune -f
+            curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost:8082/actuator/health
+            curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost/
+            echo "Deploy completed"

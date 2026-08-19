@@ -34,13 +34,13 @@ docker-compose.yml   Postgres + API + web (nginx)
 
 ## Быстрый старт
 
-Сначала соберите артефакты на хосте, затем запустите Compose. Dockerfile API намеренно не скачивает Gradle и не собирает Java внутри Docker: это делает раскатку предсказуемой и не зависит от сетевого доступа BuildKit к Gradle/GitHub.
+Для локального запуска Compose собирает API и web-образа внутри Docker:
 
 ```bash
-cd api && ./gradlew bootJar --no-daemon && cd ..
-cd web && npm install && npm run build && cd ..
 docker compose up -d --build
 ```
+
+Production workflow собирает те же образы на GitHub Actions runner, передаёт их на VPS и запускает Compose с `--no-build`. Поэтому на удалённом хосте не требуются Java, Gradle, Node.js или npm.
 
 - UI: http://localhost
 - API: http://localhost:8082
