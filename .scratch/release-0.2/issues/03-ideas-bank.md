@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Справочник Сфер жизни + CRUD Синергии (нужна Синергия).
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Таблица `idea` (id, user_id, title, description, category, status, promoted_project_id, timestamps)
 - [ ] CRUD `/api/v1/ideas` с фильтрами по категории и статусу

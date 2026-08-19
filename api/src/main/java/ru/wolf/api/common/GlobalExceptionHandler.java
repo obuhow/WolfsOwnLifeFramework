@@ -6,6 +6,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.wolf.api.goal.DuplicateGoalPriorityException;
+import ru.wolf.api.idea.IdeaAlreadyPromotedException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,6 +16,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DuplicateGoalPriorityException.class)
     public ResponseEntity<Map<String, String>> handleDuplicateGoalPriority(DuplicateGoalPriorityException ex) {
+        Map<String, String> body = new HashMap<>();
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(IdeaAlreadyPromotedException.class)
+    public ResponseEntity<Map<String, String>> handleIdeaAlreadyPromoted(IdeaAlreadyPromotedException ex) {
         Map<String, String> body = new HashMap<>();
         body.put("message", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
