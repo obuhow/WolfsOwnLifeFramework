@@ -183,4 +183,3 @@ class GoalApiIT extends ApiIntegrationTest {
                 .exchange().expectStatus().isOk();
     }
 }
-
