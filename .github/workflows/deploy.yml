@@ -29,7 +29,7 @@ jobs:
           debug: true
           script: |
             set -euo pipefail
-            cd ${{ secrets.DEPLOY_PATH }}
+            cd ${{ secrets.DEPLOY_PATH }}/WolfsOwnLifeFramework
             git fetch origin
             git checkout main
             git pull --ff-only origin main
