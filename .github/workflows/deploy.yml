@@ -23,7 +23,10 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          timeout: 30s
           command_timeout: 30m
+          debug: true
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
