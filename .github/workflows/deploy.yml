@@ -33,6 +33,10 @@ jobs:
             git fetch origin
             git checkout main
             git pull --ff-only origin main
+            id
+            getent group docker || true
+            newgrp docker <<'DOCKER_DEPLOY'
+            set -euo pipefail
             docker compose --progress=plain build api web
             docker compose down
             docker compose up -d --no-build
@@ -41,3 +45,4 @@ jobs:
             curl --fail --silent --show-error --retry 30 --retry-delay 3 http://localhost:8082/actuator/health
             curl --fail --silent --show-error --retry 30 --retry-delay 3 http://localhost/
             echo "Deploy completed"
+            DOCKER_DEPLOY
