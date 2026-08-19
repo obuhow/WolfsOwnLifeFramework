@@ -4,17 +4,26 @@
 
 **Blocked by:** None — can start immediately (независимо от 01).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Таблицы `goal`, `goal_metric`, `goal_week_budget`, `goal_project`
-- [ ] CRUD `/api/v1/goals` (create/list/get/update/archive)
-- [ ] Приоритет: целое, уникальное в рамках пользователя, drag-n-drop в UI меняет порядок
-- [ ] Недельный бюджет: `POST /goals/{id}/budget {week, hours}`, перезапись без валидаций-штрафов
-- [ ] Метрики: `POST /goals/{id}/metrics {kind, value, at}` + история
-- [ ] Связь Цель ↔ Проект: `POST/DELETE /goals/{id}/projects/{projectId}`
-- [ ] `GET /goals/{id}/fact?week=YYYY-Www` — сумма часов по проектам цели с учётом Режима учёта
-- [ ] UI: страница Целей (список с приоритетами, бюджетами, фактом текущей недели)
-- [ ] UI: страница Цели (метрики, история, связанные проекты)
-- [ ] API test: создать цель, бюджет 10 ч/нед, залогировать 5 ч на связанный проект, факт = 5 ч
-- [ ] API test: приоритеты уникальны (дубликат → 409), re-prioritize меняет порядок
-- [ ] API test: факт считает часы по Режиму учёта пользователя (primary_only не двоит часы)
+## Answer
+
+Реализовано в ветке `feature/02-goals-budgets-metrics` и влито в `develop` коммитом `aec7bde`.
+
+- Backend: CRUD целей, приоритеты/reorder, недельные бюджеты, история метрик, связи с проектами и факт ISO-недели с учётом режима учёта часов.
+- UI: `/goals` и `/goals/:id` со списком, приоритетами, бюджетом, фактом, метриками и связанными проектами.
+- Проверки: `GoalApiIT` (4 теста), frontend build, `docker compose config --quiet`, `git diff --check`.
+- Изолированный Compose stack feature использует web `5175`, API `8084`, PostgreSQL `5436`.
+
+- [x] Таблицы `goal`, `goal_metric`, `goal_week_budget`, `goal_project`
+- [x] CRUD `/api/v1/goals` (create/list/get/update/archive)
+- [x] Приоритет: целое, уникальное в рамках пользователя, drag-n-drop в UI меняет порядок
+- [x] Недельный бюджет: `POST /goals/{id}/budget {week, hours}`, перезапись без валидаций-штрафов
+- [x] Метрики: `POST /goals/{id}/metrics {kind, value, at}` + история
+- [x] Связь Цель ↔ Проект: `POST/DELETE /goals/{id}/projects/{projectId}`
+- [x] `GET /goals/{id}/fact?week=YYYY-Www` — сумма часов по проектам цели с учётом Режима учёта
+- [x] UI: страница Целей (список с приоритетами, бюджетами, фактом текущей недели)
+- [x] UI: страница Цели (метрики, история, связанные проекты)
+- [x] API test: создать цель, бюджет 10 ч/нед, залогировать 5 ч на связанный проект, факт = 5 ч
+- [x] API test: приоритеты уникальны (дубликат → 409), re-prioritize меняет порядок
+- [x] API test: факт считает часы по Режиму учёта пользователя (primary_only не двоит часы)
