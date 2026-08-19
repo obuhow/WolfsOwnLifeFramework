@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -13,22 +17,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build production images on GitHub runner
-        run: |
-          docker compose build api web
-          docker save wolf-api:latest wolf-web:latest | gzip > wolf-images.tar.gz
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
 
-      - name: Copy release files to VPS
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build release artifacts on GitHub runner
+        run: |
+          cd api
+          ./gradlew bootJar --no-daemon
+          cd ../web
+          npm ci
+          npm run build
+          cd ..
+          tar -czf wolf-artifacts.tar.gz api/build/libs web/dist
+          ls -lh wolf-artifacts.tar.gz
+
+      - name: Copy release artifacts to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "wolf-images.tar.gz,docker-compose.yml"
+          source: "wolf-artifacts.tar.gz"
           target: ${{ secrets.DEPLOY_PATH }}
           overwrite: true
+          timeout: 30s
+          command_timeout: 15m
 
-      - name: Load images and restart Compose on VPS
+      - name: Build runtime images and restart Compose on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -36,14 +62,33 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 15m
           script: |
-            set -e
+            set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
-            gunzip -c wolf-images.tar.gz | docker load
+            git fetch origin
+            git checkout main
+            git pull --ff-only origin main
+            tar -xzf wolf-artifacts.tar.gz
+            rm -f wolf-artifacts.tar.gz
             docker compose down
+            docker compose build api web
             docker compose up -d --no-build
             docker compose ps
-            rm -f wolf-images.tar.gz
             docker image prune -f
             curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost:8082/actuator/health
             curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost/
             echo "Deploy completed"
+
+      - name: Clean up local artifact
+        if: always()
+        run: rm -f wolf-artifacts.tar.gz
+
+      - name: Clean up remote artifact
+        if: always()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 1m
+          script: rm -f ${{ secrets.DEPLOY_PATH }}/wolf-artifacts.tar.gz
+          continue-on-error: true

@@ -1,15 +1,6 @@
-# Build stage
-FROM eclipse-temurin:21-jdk-alpine AS builder
-WORKDIR /app
-COPY gradlew .
-COPY gradle gradle
-COPY build.gradle settings.gradle ./
-COPY src src
-RUN chmod +x gradlew && ./gradlew bootJar --no-daemon
-
-# Runtime stage
+# Runtime image; build/libs/*.jar is prepared by CI or the host.
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=builder /app/build/libs/*.jar app.jar
+COPY build/libs/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

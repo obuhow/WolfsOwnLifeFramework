@@ -34,13 +34,16 @@ docker-compose.yml   Postgres + API + web (nginx)
 
 ## Быстрый старт
 
-Для локального запуска Compose собирает API и web-образа внутри Docker:
+Сначала соберите артефакты на хосте, затем соберите runtime-образы и запустите Compose:
 
 ```bash
-docker compose up -d --build
+cd api && ./gradlew bootJar --no-daemon && cd ..
+cd web && npm ci && npm run build && cd ..
+docker compose build api web
+docker compose up -d --no-build
 ```
 
-Production workflow собирает те же образы на GitHub Actions runner, передаёт их на VPS и запускает Compose с `--no-build`. Поэтому на удалённом хосте не требуются Java, Gradle, Node.js или npm.
+Production workflow собирает JAR и frontend на GitHub Actions runner, передаёт только эти артефакты на VPS, а VPS собирает runtime-only образы без Java, Gradle, Node.js и npm.
 
 - UI: http://localhost
 - API: http://localhost:8082
