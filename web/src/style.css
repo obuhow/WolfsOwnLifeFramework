@@ -457,6 +457,30 @@ input[type="radio"] {
 
 .project-link-row { padding: 9px 0; border-radius: 0; background: transparent; border-bottom: 1px solid var(--wolf-rule); }
 
+.notes-panel { margin-top: 24px; }
+.notes-toolbar { margin-bottom: 14px; }
+.notes-alert { margin-bottom: 12px; }
+.notes-form { display: grid; gap: 10px; margin-bottom: 18px; }
+.notes-form-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: end; }
+.notes-filters { display: grid; grid-template-columns: 1.5fr 1fr 180px; gap: 16px; margin-bottom: 12px; }
+.notes-list { border-top: 1px solid var(--wolf-rule); }
+.note-item { padding: 14px 0; border-bottom: 1px solid var(--wolf-rule); }
+.note-agent { padding-left: 12px; border-left: 3px solid var(--wolf-done-ink); background: var(--wolf-done-surface); }
+.note-meta, .note-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.note-meta { margin-bottom: 8px; font-size: 11px; }
+.note-author { color: var(--wolf-ink); font-weight: 600; }
+.note-agent .note-author { color: var(--wolf-done-ink); }
+.note-body { white-space: pre-wrap; color: var(--wolf-ink); line-height: 1.55; }
+.note-footer { margin-top: 10px; }
+.note-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.note-tag { color: var(--wolf-muted); font-size: 12px; }
+.note-actions { display: flex; gap: 12px; }
+
+@media (max-width: 640px) {
+  .notes-form-row, .notes-filters { grid-template-columns: 1fr; }
+  .note-meta, .note-footer { align-items: flex-start; flex-direction: column; }
+}
+
 /* Shared modal shell used by time record pickers */
 .modal-backdrop {
   position: fixed;

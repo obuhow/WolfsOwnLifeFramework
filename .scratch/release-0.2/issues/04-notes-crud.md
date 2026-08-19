@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Таблица `note` (id, user_id, project_id NULL, delo_id NULL, author enum, body, tags[], created_at)
 - [ ] Check constraint: ровно одна из (project_id, delo_id) NOT NULL
