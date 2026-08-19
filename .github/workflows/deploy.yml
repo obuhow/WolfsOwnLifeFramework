@@ -42,61 +42,43 @@ jobs:
           tar -czf wolf-artifacts.tar.gz api/build/libs web/dist
           ls -lh wolf-artifacts.tar.gz
 
-      - name: Upload release artifact
-        id: upload
-        uses: actions/upload-artifact@v4
+      - name: Configure SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          name: wolf-release-${{ github.sha }}
-          path: wolf-artifacts.tar.gz
-          retention-days: 1
-          compression-level: 0
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Download artifact and deploy on VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 15m
-          envs: ARTIFACT_URL,GH_TOKEN
-          script: |
-            set -euo pipefail
-            cd ${{ secrets.DEPLOY_PATH }}
-            rm -f wolf-artifact.zip wolf-artifacts.tar.gz
-            curl --fail --location --silent --show-error --retry 5 --retry-delay 5 \
-              --header "Authorization: Bearer ${GH_TOKEN}" \
-              "${ARTIFACT_URL}" --output wolf-artifact.zip
-            unzip -p wolf-artifact.zip wolf-artifacts.tar.gz > wolf-artifacts.tar.gz
-            rm -f wolf-artifact.zip
-            git fetch origin
-            git checkout main
-            git pull --ff-only origin main
-            tar -xzf wolf-artifacts.tar.gz
-            rm -f wolf-artifacts.tar.gz
-            docker compose down
-            docker compose build api web
-            docker compose up -d --no-build
-            docker compose ps
-            docker image prune -f
-            curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost:8082/actuator/health
-            curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost/
-            echo "Deploy completed"
-
+      - name: Copy artifacts and deploy on VPS
         env:
-          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          timeout 30s ssh-keyscan -T 10 -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          SSH_OPTS="-o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          timeout 15m scp $SSH_OPTS wolf-artifacts.tar.gz \
+            "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/wolf-artifacts.tar.gz"
+          timeout 15m ssh $SSH_OPTS "$SSH_USER@$SSH_HOST" \
+            "bash -s -- $(printf '%q' "$DEPLOY_PATH")" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          DEPLOY_PATH="$1"
+          cd "$DEPLOY_PATH"
+          trap 'rm -f wolf-artifacts.tar.gz' EXIT
+          git fetch origin
+          git checkout main
+          git pull --ff-only origin main
+          tar -xzf wolf-artifacts.tar.gz
+          docker compose down
+          docker compose build api web
+          docker compose up -d --no-build
+          docker compose ps
+          docker image prune -f
+          curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost:8082/actuator/health
+          curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost/
+          echo "Deploy completed"
+          REMOTE_SCRIPT
 
       - name: Clean up local artifact
         if: always()
         run: rm -f wolf-artifacts.tar.gz
-
-      - name: Clean up remote artifact
-        if: always()
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 1m
-          script: rm -f ${{ secrets.DEPLOY_PATH }}/wolf-artifacts.tar.gz ${{ secrets.DEPLOY_PATH }}/wolf-artifact.zip
-          continue-on-error: true
