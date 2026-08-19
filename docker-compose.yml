@@ -1,15 +1,15 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: wolf-db-02-goals
+    container_name: wolf-db
     environment:
       POSTGRES_DB: wolf
       POSTGRES_USER: wolf
       POSTGRES_PASSWORD: wolf
     ports:
-      - "5436:5432"
+      - "5434:5432"
     volumes:
-      - wolf_pgdata_02:/var/lib/postgresql/data
+      - wolf_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wolf -d wolf"]
       interval: 5s
@@ -21,14 +21,14 @@ services:
       context: ./api
       dockerfile: Dockerfile
       network: host
-    container_name: wolf-api-02-goals
+    container_name: wolf-api
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wolf
       SPRING_DATASOURCE_USERNAME: wolf
       SPRING_DATASOURCE_PASSWORD: wolf
       SERVER_PORT: 8080
     ports:
-      - "8084:8080"
+      - "8082:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -38,11 +38,11 @@ services:
       context: ./web
       dockerfile: Dockerfile
       network: host
-    container_name: wolf-web-02-goals
+    container_name: wolf-web
     ports:
-      - "5175:80"
+      - "80:80"
     depends_on:
       - api
 
 volumes:
-  wolf_pgdata_02:
+  wolf_pgdata:

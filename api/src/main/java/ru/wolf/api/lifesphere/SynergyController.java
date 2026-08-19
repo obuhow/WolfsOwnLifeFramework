@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import ru.wolf.api.idea.IdeaRepository;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,6 +23,7 @@ public class SynergyController {
     private final LifeSphereRepository lifeSphereRepository;
     private final ru.wolf.api.project.ProjectRepository projectRepository;
     private final ru.wolf.api.user.UserRepository userRepository;
+    private final IdeaRepository ideaRepository;
 
     @PostMapping
     public ResponseEntity<SynergyResponse> createSynergy(
@@ -41,6 +43,11 @@ public class SynergyController {
         }
 
         Long ideaId = request.getIdeaId();
+
+        if (ideaId != null) {
+            ideaRepository.findByUserAndId(user, ideaId)
+                    .orElseThrow(() -> new IllegalArgumentException("Идея не найдена"));
+        }
 
         // Validate: exactly one of projectId or ideaId must be provided
         if ((project == null && ideaId == null) || (project != null && ideaId != null)) {
@@ -76,12 +83,18 @@ public class SynergyController {
         ru.wolf.api.user.User user = userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("User not found"));
 
+        if (projectId != null && ideaId != null) {
+            throw new IllegalArgumentException("Нельзя одновременно указать projectId и ideaId");
+        }
+
         List<Synergy> synergies;
         if (projectId != null) {
             ru.wolf.api.project.Project project = projectRepository.findByUserAndId(user, projectId)
                     .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
             synergies = synergyRepository.findByUserAndProjectWithSphere(user, project);
         } else if (ideaId != null) {
+            ideaRepository.findByUserAndId(user, ideaId)
+                    .orElseThrow(() -> new IllegalArgumentException("Идея не найдена"));
             synergies = synergyRepository.findByUserAndIdeaIdWithSphere(user, ideaId);
         } else {
             // Return all user's synergies
