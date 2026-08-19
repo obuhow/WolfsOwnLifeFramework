@@ -89,7 +89,9 @@ public class NoteController {
         Parent parent = resolveParent(user, request.getProjectId(), request.getDeloId());
         note.setProject(parent.project());
         note.setDelo(parent.delo());
-        note.setAuthor(request.getAuthor() == null ? Note.Author.USER : request.getAuthor());
+        if (request.getAuthor() != null && request.getAuthor() != note.getAuthor()) {
+            throw new IllegalArgumentException("Автор заметки не изменяется после создания");
+        }
         note.setBody(request.getBody().trim());
         note.setTags(normalizeTags(request.getTags()));
         return ResponseEntity.ok(toResponse(noteRepository.save(note)));

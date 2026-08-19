@@ -97,6 +97,31 @@ class NoteApiIT extends ApiIntegrationTest {
     }
 
     @Test
+    void editing_agent_note_preserves_attribution() {
+        WebTestClient client = authedAdminClient();
+        DeloController.DeloResponse delo = createDelo(client, "Агентская заметка");
+
+        NoteController.NoteRequest create = new NoteController.NoteRequest();
+        create.setDeloId(delo.getId());
+        create.setAuthor(Note.Author.AGENT);
+        create.setBody("Исходная заметка агента");
+        NoteController.NoteResponse note = createNote(client, create);
+
+        NoteController.NoteRequest update = new NoteController.NoteRequest();
+        update.setDeloId(delo.getId());
+        update.setBody("Обновлённая заметка агента");
+        NoteController.NoteResponse updated = client.put()
+                .uri("/api/v1/notes/{id}", note.getId())
+                .bodyValue(update)
+                .exchange().expectStatus().isOk()
+                .expectBody(NoteController.NoteResponse.class)
+                .returnResult().getResponseBody();
+
+        assertThat(updated.getAuthor()).isEqualTo(Note.Author.AGENT);
+        assertThat(updated.getBody()).isEqualTo("Обновлённая заметка агента");
+    }
+
+    @Test
     void note_requires_exactly_one_parent() {
         WebTestClient client = authedAdminClient();
         Long areaId = createLifeArea(client, "Работа");
