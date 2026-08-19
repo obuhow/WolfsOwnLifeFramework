@@ -142,6 +142,13 @@ onMounted(async () => {
               Дела
             </router-link>
             <router-link
+              to="/goals"
+              class="nav-link"
+              :class="{ active: route.path === '/goals' || route.path.startsWith('/goals/') }"
+            >
+              Цели
+            </router-link>
+            <router-link
               to="/settings"
               class="nav-link"
               :class="{ active: route.path === '/settings' }"
