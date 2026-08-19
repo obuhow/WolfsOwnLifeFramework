@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiBase } from '../api'
 
@@ -113,6 +113,18 @@ async function archive() {
   try { await request(`/goals/${selectedId.value}/archive`, { method: 'POST' }); closeDetail(); await loadAll() }
   catch (e) { error.value = e.message }
 }
+
+watch(selectedId, async () => {
+  if (selectedId.value) {
+    try {
+      await loadDetail()
+    } catch (e) {
+      error.value = e.message
+    }
+  } else {
+    selected.value = null
+  }
+})
 
 onMounted(loadAll)
 </script>
