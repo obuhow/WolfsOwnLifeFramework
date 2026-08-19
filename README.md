@@ -43,7 +43,7 @@ docker compose build api web
 docker compose up -d --no-build
 ```
 
-Production workflow собирает JAR и frontend на GitHub Actions runner, передаёт только эти артефакты на VPS, а VPS собирает runtime-only образы без Java, Gradle, Node.js и npm.
+Production workflow собирает production-образы на GitHub Actions runner, публикует их в GHCR, а VPS только выполняет `docker compose pull` и запускает контейнеры. Поэтому на удалённом хосте не требуются Java, Gradle, Node.js или npm.
 
 - UI: http://localhost
 - API: http://localhost:8082

@@ -9,6 +9,10 @@ concurrency:
   group: production-deploy
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -31,7 +35,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Build release artifacts on GitHub runner
+      - name: Build release artifacts
         run: |
           cd api
           ./gradlew bootJar --no-daemon
@@ -39,46 +43,51 @@ jobs:
           npm ci
           npm run build
           cd ..
-          tar -czf wolf-artifacts.tar.gz api/build/libs web/dist
-          ls -lh wolf-artifacts.tar.gz
 
-      - name: Configure SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Copy artifacts and deploy on VPS
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      - name: Build and publish production images
         run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          timeout 30s ssh-keyscan -T 10 -H "$SSH_HOST" >> ~/.ssh/known_hosts
-          SSH_OPTS="-o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
-          timeout 15m scp $SSH_OPTS wolf-artifacts.tar.gz \
-            "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/wolf-artifacts.tar.gz"
-          timeout 15m ssh $SSH_OPTS "$SSH_USER@$SSH_HOST" \
-            "bash -s -- $(printf '%q' "$DEPLOY_PATH")" <<'REMOTE_SCRIPT'
-          set -euo pipefail
-          DEPLOY_PATH="$1"
-          cd "$DEPLOY_PATH"
-          trap 'rm -f wolf-artifacts.tar.gz' EXIT
-          git fetch origin
-          git checkout main
-          git pull --ff-only origin main
-          tar -xzf wolf-artifacts.tar.gz
-          docker compose down
           docker compose build api web
-          docker compose up -d --no-build
-          docker compose ps
-          docker image prune -f
-          curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost:8082/actuator/health
-          curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost/
-          echo "Deploy completed"
-          REMOTE_SCRIPT
+          docker tag ghcr.io/obuhow/wolfsownlifeframework-api:latest ghcr.io/obuhow/wolfsownlifeframework-api:${{ github.sha }}
+          docker tag ghcr.io/obuhow/wolfsownlifeframework-web:latest ghcr.io/obuhow/wolfsownlifeframework-web:${{ github.sha }}
+          docker push ghcr.io/obuhow/wolfsownlifeframework-api:latest
+          docker push ghcr.io/obuhow/wolfsownlifeframework-api:${{ github.sha }}
+          docker push ghcr.io/obuhow/wolfsownlifeframework-web:latest
+          docker push ghcr.io/obuhow/wolfsownlifeframework-web:${{ github.sha }}
 
-      - name: Clean up local artifact
+      - name: Pull images and restart Compose on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 15m
+          envs: GHCR_USER,GHCR_TOKEN
+          script: |
+            set -euo pipefail
+            cd ${{ secrets.DEPLOY_PATH }}
+            git fetch origin
+            git checkout main
+            git pull --ff-only origin main
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+            docker compose pull api web
+            docker compose down
+            docker compose up -d --no-build
+            docker compose ps
+            docker image prune -f
+            curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost:8082/actuator/health
+            curl --fail --silent --show-error --retry 20 --retry-delay 3 http://localhost/
+            echo "Deploy completed"
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove old local images
         if: always()
-        run: rm -f wolf-artifacts.tar.gz
+        run: docker image prune -f
