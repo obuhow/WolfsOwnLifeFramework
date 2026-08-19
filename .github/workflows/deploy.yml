@@ -33,11 +33,11 @@ jobs:
             git fetch origin
             git checkout main
             git pull --ff-only origin main
-            docker compose build --progress=plain api web
-            docker compose down
-            docker compose up -d --no-build
-            docker compose ps
-            docker image prune -f
+            sudo -n docker compose --progress=plain build api web
+            sudo -n docker compose down
+            sudo -n docker compose up -d --no-build
+            sudo -n docker compose ps
+            sudo -n docker image prune -f
             curl --fail --silent --show-error --retry 30 --retry-delay 3 http://localhost:8082/actuator/health
             curl --fail --silent --show-error --retry 30 --retry-delay 3 http://localhost/
             echo "Deploy completed"
