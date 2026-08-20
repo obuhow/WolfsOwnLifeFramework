@@ -40,6 +40,7 @@ public class ProjectController {
     private final UserRepository userRepository;
     private final DeloProjectRepository deloProjectRepository;
     private final FactAggregateService factAggregateService;
+    private final ResourceCascadeService resourceCascadeService;
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(
@@ -160,6 +161,16 @@ public class ProjectController {
             projectRepository.delete(subtree.get(i));
         }
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/plan-shift-preview")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ResourceCascadeService.Preview> planShiftPreview(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody PlanShiftPreviewRequest request
+    ) {
+        return ResponseEntity.ok(resourceCascadeService.preview(currentUser(authentication), id, request.getNewEnd()));
     }
 
     private User currentUser(Authentication authentication) {
@@ -371,5 +382,13 @@ public class ProjectController {
 
         @DecimalMin(value = "0.0", inclusive = true)
         private BigDecimal totalPlanHours;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PlanShiftPreviewRequest {
+        @NotNull
+        private LocalDate newEnd;
     }
 }

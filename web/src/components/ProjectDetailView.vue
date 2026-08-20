@@ -18,6 +18,8 @@ const dependencies = ref({ blockedBy: [], blocks: [] })
 const editing = ref(false)
 const selectedDeloId = ref('')
 const dependencySearch = ref('')
+const cascadePreview = ref(null)
+const pendingProjectPayload = ref(null)
 
 const form = ref({
   lifeAreaId: '',
@@ -215,16 +217,45 @@ async function save() {
     error.value = 'Название обязательно'
     return
   }
-  loading.value = true
   error.value = ''
   success.value = ''
   try {
     const headers = authHeaders(true)
     if (!headers) return
+    const payload = payloadFromForm()
+    if (payload.endDate && payload.endDate !== (detail.value.endDate || '') && payload.endDate > (detail.value.endDate || '')) {
+      const previewRes = await fetch(`${apiBase()}/projects/${projectId.value}/plan-shift-preview`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ newEnd: payload.endDate })
+      })
+      if (!previewRes.ok) {
+        const data = await previewRes.json().catch(() => ({}))
+        throw new Error(data.message || `Preview: HTTP ${previewRes.status}`)
+      }
+      const preview = await previewRes.json()
+      if (preview.totalDeficit > 0) {
+        pendingProjectPayload.value = payload
+        cascadePreview.value = preview
+        return
+      }
+    }
+    await persistProject(payload, headers)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function persistProject(payload, headers = authHeaders(true)) {
+  if (!headers) return
+  loading.value = true
+  try {
     const res = await fetch(`${apiBase()}/projects/${projectId.value}`, {
       method: 'PUT',
       headers,
-      body: JSON.stringify(payloadFromForm())
+      body: JSON.stringify(payload)
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -234,11 +265,27 @@ async function save() {
     editing.value = false
     await loadAll()
     setTimeout(() => { success.value = '' }, 3000)
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
   }
+}
+
+async function confirmCascadeShift() {
+  const payload = pendingProjectPayload.value
+  cascadePreview.value = null
+  pendingProjectPayload.value = null
+  if (!payload) return
+  try {
+    await persistProject(payload)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+function cancelCascadeShift() {
+  cascadePreview.value = null
+  pendingProjectPayload.value = null
+  fillFormFromDetail()
 }
 
 async function addDependency() {
@@ -463,7 +510,34 @@ onMounted(loadAll)
           </div>
         </form>
 
-        <dl v-else class="detail-grid">
+        <div v-if="cascadePreview" class="dialog-backdrop" @click.self="cancelCascadeShift">
+          <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="cascade-title">
+            <div class="dialog-header">
+              <h2 id="cascade-title">Сдвиг требует пересмотра бюджетов</h2>
+              <button type="button" class="icon-button" @click="cancelCascadeShift">×</button>
+            </div>
+            <p>
+              Сдвиг повлияет на {{ cascadePreview.affectedGoals.length }} целей,
+              общий дефицит {{ formatHours(cascadePreview.totalDeficit) }} ч/нед.
+            </p>
+            <p class="muted">Доступно: {{ formatHours(cascadePreview.availableWeeklyHours) }} ч/нед. Бюджеты автоматически не меняются.</p>
+            <ul class="cascade-list">
+              <li v-for="goal in cascadePreview.affectedGoals" :key="goal.goalId">
+                <strong>{{ goal.title }}</strong>
+                <span>{{ formatHours(goal.currentBudget) }} → {{ formatHours(goal.requiredBudget) }} ч/нед · дефицит {{ formatHours(goal.deficit) }} ч</span>
+              </li>
+            </ul>
+            <p v-if="!cascadePreview.affectedGoals.length" class="muted">
+              Связанные с этим Проектом Цели не имеют отдельного бюджета в перегруженной неделе.
+            </p>
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary" @click="confirmCascadeShift">Применить</button>
+              <button type="button" class="btn btn-ghost" @click="cancelCascadeShift">Отмена</button>
+            </div>
+          </section>
+        </div>
+
+        <dl v-else-if="!editing" class="detail-grid">
           <div>
             <dt>Область жизни</dt>
             <dd>{{ detail.lifeAreaName }}</dd>
@@ -641,3 +715,53 @@ onMounted(loadAll)
     </template>
   </div>
 </template>
+
+<style scoped>
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.dialog {
+  width: min(480px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--wolf-surface);
+  border: 1px solid var(--wolf-ink);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cascade-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cascade-list li {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--wolf-rule);
+}
+
+.cascade-list span {
+  color: var(--wolf-muted);
+  font-size: 0.85rem;
+}
+</style>
