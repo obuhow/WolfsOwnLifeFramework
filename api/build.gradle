@@ -33,6 +33,7 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     implementation 'org.flywaydb:flyway-core:11.10.0'
     implementation 'org.flywaydb:flyway-database-postgresql:11.10.0'
+    implementation 'org.apache.poi:poi-ooxml:5.4.1'
     compileOnly 'org.projectlombok:lombok:1.18.36'
     annotationProcessor 'org.projectlombok:lombok:1.18.36'
 

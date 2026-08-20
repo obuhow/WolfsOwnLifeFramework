@@ -161,6 +161,13 @@ onMounted(async () => {
               Рутины
             </router-link>
             <router-link
+              to="/import/xlsx"
+              class="nav-link"
+              :class="{ active: route.path === '/import/xlsx' }"
+            >
+              Импорт XLSX
+            </router-link>
+            <router-link
               to="/ideas"
               class="nav-link"
               :class="{ active: route.path === '/ideas' }"
