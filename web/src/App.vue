@@ -63,6 +63,11 @@ onMounted(async () => {
 
           <nav class="nav" aria-label="Основная навигация">
             <router-link
+              to="/morning"
+              class="nav-link"
+              :class="{ active: route.path === '/morning' }"
+            >Утро</router-link>
+            <router-link
               to="/today"
               class="nav-link"
               :class="{ active: route.path === '/today' }"
