@@ -270,7 +270,26 @@ class ProjectApiIT extends ApiIntegrationTest {
                 .exchange()
                 .expectStatus().isNoContent();
 
-        addDependency(authed, blocker.getId(), blocked.getId());
+        addDependency(authed, blocked.getId(), blocker.getId());
+    }
+
+    @Test
+    void delete_dependency_allows_chain_rewire() {
+        WebTestClient authed = authedAdminClient();
+        Long areaId = createLifeArea(authed, "Работа");
+        ProjectController.ProjectResponse a = createProject(authed, areaId, null, "A");
+        ProjectController.ProjectResponse b = createProject(authed, areaId, null, "B");
+        ProjectController.ProjectResponse c = createProject(authed, areaId, null, "C");
+
+        addDependency(authed, b.getId(), a.getId());
+        addDependency(authed, c.getId(), b.getId());
+
+        authed.delete()
+                .uri("/api/v1/projects/{id}/dependencies/{blockerId}", c.getId(), b.getId())
+                .exchange()
+                .expectStatus().isNoContent();
+
+        addDependency(authed, c.getId(), a.getId());
     }
 
     @Test

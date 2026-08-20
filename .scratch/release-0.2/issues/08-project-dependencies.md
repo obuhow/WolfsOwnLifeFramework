@@ -24,10 +24,10 @@
 
 Verification evidence:
 
-- `./gradlew test --tests '*.ProjectApiIT' --no-daemon` — BUILD SUCCESSFUL; 16 tests passed after adding the direct A→B→A cycle case.
+- `./gradlew test --tests '*.ProjectApiIT' --no-daemon` — BUILD SUCCESSFUL; 17 tests passed, including direct A→B→A, chain cycle, delete/re-add, and chain rewire cases.
 - Sequential API class run: 18/19 classes passed. The only unrelated failure was the pre-existing CSV import assertion in `DeloApiIT#import_csv_creates_delos_and_adds_them_to_current_week_backlog` at line 402; all dependency and project tests passed. The ordinary full run failed earlier because Testcontainers PostgreSQL connections were lost under the long shared-container suite.
 - `./gradlew bootJar --no-daemon` — BUILD SUCCESSFUL.
 - `npm run build` — BUILD SUCCESSFUL; served isolated web container exposed the new hashed JS/CSS assets and the `Зависимости` marker.
 - Isolated Compose stack on ports `18080/18082/15434`: API health returned `{"status":"UP"}` and Flyway applied migration v19.
 - Authenticated API smoke: login succeeded; A→B→C dependency chain, cycle rejection with HTTP 409, delete and re-add all verified.
-- Headless Chrome CDP DOM smoke: authenticated `/projects/1` rendered the `Зависимости` surface, blocker input, and `ЖДЁТ`/`БЛОКИРУЕТ` lists. Desktop Chrome browser harness was unavailable because its remote-debugging permission was not granted; the headless CDP check provided the real browser DOM evidence instead.
+- Headless Chrome CDP DOM smoke: authenticated `/projects/1` rendered the `Зависимости` surface, blocker input, and `ЖДЁТ`/`БЛОКИРУЕТ` lists. The autocomplete now uses `Название (#id)` labels so duplicate project titles remain unambiguous. Desktop Chrome browser harness was unavailable because its remote-debugging permission was not granted; the headless CDP check provided the real browser DOM evidence instead.

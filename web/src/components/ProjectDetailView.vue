@@ -59,6 +59,7 @@ const dependencyOptions = computed(() => {
   return projects.value
     .filter(p => p.id !== projectId.value && !linkedIds.has(p.id))
     .sort((a, b) => a.title.localeCompare(b.title, 'ru'))
+    .map(p => ({ ...p, label: `${p.title} (#${p.id})` }))
 })
 
 const children = computed(() =>
@@ -241,7 +242,7 @@ async function save() {
 }
 
 async function addDependency() {
-  const selected = dependencyOptions.value.find(p => p.title === dependencySearch.value)
+  const selected = dependencyOptions.value.find(p => p.label === dependencySearch.value)
   if (!selected) {
     error.value = 'Выберите существующий Проект из списка'
     return
@@ -520,7 +521,7 @@ onMounted(loadAll)
               aria-label="Проект-блокер"
             />
             <datalist id="dependency-project-options">
-              <option v-for="p in dependencyOptions" :key="p.id" :value="p.title" />
+              <option v-for="p in dependencyOptions" :key="p.id" :value="p.label" />
             </datalist>
             <button class="btn btn-primary" :disabled="loading || !dependencySearch" @click="addDependency">
               Добавить
