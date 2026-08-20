@@ -53,9 +53,13 @@ public class ResourceCascadeService {
                 .map(Goal::getId)
                 .toList();
 
-        LocalDate today = LocalDate.now(ZoneId.of(user.getTimezone()));
-        LocalDate firstMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate firstMonday = project.getEndDate() == null
+                ? LocalDate.now(ZoneId.of(user.getTimezone())).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                : project.getEndDate().plusDays(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate lastMonday = newEnd.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        if (lastMonday.isBefore(firstMonday)) {
+            return emptyPreview(user);
+        }
         List<WeekLoad> loads = new java.util.ArrayList<>();
         for (LocalDate monday = firstMonday; !monday.isAfter(lastMonday); monday = monday.plusWeeks(1)) {
             WeekFields iso = WeekFields.ISO;

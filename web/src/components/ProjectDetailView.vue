@@ -234,7 +234,7 @@ async function save() {
         throw new Error(data.message || `Preview: HTTP ${previewRes.status}`)
       }
       const preview = await previewRes.json()
-      if (preview.affectedGoals?.length) {
+      if (preview.totalDeficit > 0) {
         pendingProjectPayload.value = payload
         cascadePreview.value = preview
         return
@@ -527,6 +527,9 @@ onMounted(loadAll)
                 <span>{{ formatHours(goal.currentBudget) }} → {{ formatHours(goal.requiredBudget) }} ч/нед · дефицит {{ formatHours(goal.deficit) }} ч</span>
               </li>
             </ul>
+            <p v-if="!cascadePreview.affectedGoals.length" class="muted">
+              Связанные с этим Проектом Цели не имеют отдельного бюджета в перегруженной неделе.
+            </p>
             <div class="form-actions">
               <button type="button" class="btn btn-primary" @click="confirmCascadeShift">Применить</button>
               <button type="button" class="btn btn-ghost" @click="cancelCascadeShift">Отмена</button>
@@ -712,3 +715,53 @@ onMounted(loadAll)
     </template>
   </div>
 </template>
+
+<style scoped>
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.dialog {
+  width: min(480px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--wolf-surface);
+  border: 1px solid var(--wolf-ink);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cascade-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cascade-list li {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--wolf-rule);
+}
+
+.cascade-list span {
+  color: var(--wolf-muted);
+  font-size: 0.85rem;
+}
+</style>

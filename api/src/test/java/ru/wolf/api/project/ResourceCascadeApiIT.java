@@ -74,9 +74,10 @@ class ResourceCascadeApiIT extends ApiIntegrationTest {
                 .expectBody(GoalController.GoalResponse.class)
                 .returnResult().getResponseBody();
 
+        LocalDate affectedWeekDate = oldEnd.plusDays(7);
         String week = "%04d-W%02d".formatted(
-                LocalDate.now().get(WeekFields.ISO.weekBasedYear()),
-                LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear()));
+                affectedWeekDate.get(WeekFields.ISO.weekBasedYear()),
+                affectedWeekDate.get(WeekFields.ISO.weekOfWeekBasedYear()));
         client.post().uri("/api/v1/goals/{id}/budget", goal.getId())
                 .bodyValue(new GoalController.BudgetRequest(week, new BigDecimal("20")))
                 .exchange().expectStatus().isOk();
