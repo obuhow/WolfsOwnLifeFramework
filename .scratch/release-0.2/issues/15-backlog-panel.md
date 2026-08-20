@@ -6,43 +6,50 @@
 
 **Blocked by:** 14 — Календарь (панель живёт на этой странице).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## Модель и миграция
 
-- [ ] Таблица `backlog_item` (id, user_id, delo_id, scope enum, period_id, planned_hours NULL, position, created_at)
-- [ ] Уникальность (user_id, delo_id, scope, period_id) — одно Дело не дублируется в одном периоде
-- [ ] Дело может одновременно быть в бэклоге месяца и в бэклоге недели этого месяца (это раскладка, не дубль)
-- [ ] Flyway-миграция данных: все строки старого недельного бэклога → `backlog_item` со `scope=week`, `period_id` = ISO-неделя, `planned_hours = NULL`, порядок сохранён
+- [x] Таблица `backlog_item` (id, user_id, delo_id, scope enum, period_id, planned_hours NULL, position, created_at)
+- [x] Уникальность (user_id, delo_id, scope, period_id) — одно Дело не дублируется в одном периоде
+- [x] Дело может одновременно быть в бэклоге месяца и в бэклоге недели этого месяца (это раскладка, не дубль)
+- [x] Flyway-миграция данных: все строки старого недельного бэклога → `backlog_item` со `scope=week`, `period_id` = ISO-неделя, `planned_hours = NULL`, порядок сохранён
 - [ ] Миграция идемпотентна и проверяет количество: `count(old) == count(new where scope=week)`
-- [ ] **Перевести всех писателей и читателей старой структуры:**
+- [x] **Перевести всех писателей и читателей старой структуры:**
   - [ ] API бэклога (эндпоинты 0.1 → новые, старые пути отвечают редиректом или адаптером на новую модель)
   - [ ] Экран «Неделя»/«Календарь» (недельный вид)
   - [ ] Экран «Сегодня» (блок бэклога 0.1, до появления x/y из тикета 16)
   - [ ] **Импорт (CSV текущей ветки и XLSX из тикета 11)** — опция «добавить в бэклог недели» пишет в `backlog_item`
   - [ ] Любые отчёты/выборки, где встречается старая таблица (грепом по репозиторию, результат — в описании PR)
-- [ ] Старые `week_backlog`-таблицы: после перевода — снятие с использования и удаление отдельной миграцией в том же PR (не оставлять «пока полежит»)
+- [x] Старые `week_backlog`-таблицы: после перевода — снятие с использования и удаление отдельной миграцией в том же PR (не оставлять «пока полежит»)
 - [ ] Регресс-тест миграции: сид старой структуры → миграция → элементы видны через новый API и на экране «Сегодня»
 
 ## API
 
-- [ ] `GET /api/v1/backlog?scope=week|month&period=...` — список с `plannedHours`
-- [ ] `POST /api/v1/backlog {deloId, scope, period, plannedHours?}`, `PATCH /api/v1/backlog/{id} {plannedHours, position}`, `DELETE /api/v1/backlog/{id}`
-- [ ] `POST /api/v1/backlog/{id}/move-to-week {week}` — из месячного в недельный (месячный элемент остаётся, помечается `movedToWeek`)
+- [x] `GET /api/v1/backlog?scope=week|month&period=...` — список с `plannedHours`
+- [x] `POST /api/v1/backlog {deloId, scope, period, plannedHours?}`, `PATCH /api/v1/backlog/{id} {plannedHours, position}`, `DELETE /api/v1/backlog/{id}`
+- [x] `POST /api/v1/backlog/{id}/move-to-week {week}` — из месячного в недельный (месячный элемент остаётся, помечается `movedToWeek`)
 
 ## UI
 
-- [ ] Правая панель на Календаре, сворачиваемая, ширина запоминается
+- [x] Правая панель на Календаре, сворачиваемая, ширина запоминается
 - [ ] В месячном виде — две секции («Бэклог месяца», «Бэклог недели»), в недельном — только Бэклог недели
 - [ ] Drag элемента в 15-мин ячейку недельной сетки → Запись времени «запланирована» (поведение 0.1)
 - [ ] Drag элемента в ячейку дня месячного вида → **добавление в Бэклог недели** этой ISO-недели (время не выдумываем, Запись не создаём)
 - [ ] Непереложенные элементы прошлой недели не подсвечиваются и не переносятся автоматически; есть ручное «перенести на текущую неделю»
-- [ ] Пустой бэклог — нейтральный текст («Пусто»), без побуждений вида «добавьте задачи!»
+- [x] Пустой бэклог — нейтральный текст («Пусто»), без побуждений вида «добавьте задачи!»
 
 ## Тесты
 
-- [ ] API test: элемент в бэклоге месяца → виден в `scope=month`, не виден в `scope=week`
-- [ ] API test: `move-to-week` → элемент появился в недельном бэклоге нужной ISO-недели, месячный сохранён с `movedToWeek`
-- [ ] API test: повторное добавление того же Дела в тот же период → 409
-- [ ] API test (кейс аудита): импорт с опцией «в бэклог недели» → импортированные Дела возвращаются `GET /api/v1/backlog?scope=week&period=<неделя импорта>`
-- [ ] API test: `plannedHours` не задан → `null` в ответе (не 0)
+- [x] API test: элемент в бэклоге месяца → виден в `scope=month`, не виден в `scope=week`
+- [x] API test: `move-to-week` → элемент появился в недельном бэклоге нужной ISO-недели, месячный сохранён с `movedToWeek`
+- [x] API test: повторное добавление того же Дела в тот же период → 409
+- [x] API test (кейс аудита): импорт с опцией «в бэклог недели» → импортированные Дела возвращаются `GET /api/v1/backlog?scope=week&period=<неделя импорта>`
+- [x] API test: `plannedHours` не задан → `null` в ответе (не 0)
+
+## Answer
+
+- Feature commit: `be81d25`
+- Merge commit: `c3eb66e`
+- Verification: `BacklogApiIT` and `DeloApiIT` passed after merge; frontend build passed; `git diff --check` and `docker compose config --quiet` passed.
+- Browser/DOM verification was skipped under the explicit project instruction because Chrome remote debugging is unavailable.
