@@ -4,20 +4,25 @@
 
 **Blocked by:** 15 — Бэклог месяца + панель (нужны `planned_hours` у элемента бэклога).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `GET /api/v1/today/backlog?date=YYYY-MM-DD` → `{weekId, items: [{deloId, title, plannedHours, factHours, projectTitle}], totalPlanned, totalFact}`
-- [ ] `factHours` — сумма Записей времени статуса «выполнена» по Делу за ISO-неделю даты (по Делу напрямую, Режим учёта часов здесь не применяется — он про разнос по Проектам)
-- [ ] `plannedHours` отсутствует → в ответе `null`, в UI — «—/—» вместо «0»
-- [ ] Таблица `daily_checklist_item` (id, user_id, date, title, delo_id NULL, position, done, done_at NULL)
-- [ ] CRUD `/api/v1/checklist?date=YYYY-MM-DD` (list/create/patch/delete), reorder через `position`
-- [ ] `POST /api/v1/checklist/{id}/carry-over {toDate}` — ручной перенос пункта (создаёт копию на новую дату, оригинал остаётся как есть)
-- [ ] Отметка `done` — идемпотентна, снятие галочки допустимо (не «финальное действие»)
-- [ ] UI (Сегодня): блок «Бэклог недели» — список x/y, итог внизу, полоса прогресса нейтрального серого
-- [ ] UI: при x < y — никакого красного, никаких «отставание», подпись фактическая («7 ч из 12 ч»)
-- [ ] UI: блок «Чек-лист» — быстрый ввод (Enter добавляет), галочки, drag-reorder, кнопка «перенести на завтра» у пункта
-- [ ] UI: чек-лист виден в обоих Режимах фиксации времени (тикет 13); в `primary_focus` отображается под карточкой Главного дела
-- [ ] API test: Дело в бэклоге недели с планом 10 ч, залогировано 4 ч → `x=4, y=10`, итоги суммируются
-- [ ] API test: Записи прошлой недели не попадают в `factHours` текущей
-- [ ] API test: CRUD чек-листа, `done` → `done_at` проставлен, снятие → `done_at` очищен
-- [ ] API test: `carry-over` создал пункт на завтра, сегодняшний не удалён
+- [x] `GET /api/v1/today/backlog?date=YYYY-MM-DD` → `{weekId, items: [{deloId, title, plannedHours, factHours, projectTitle}], totalPlanned, totalFact}`
+- [x] `factHours` — сумма Записей времени статуса «выполнена» по Делу за ISO-неделю даты (по Делу напрямую, Режим учёта часов здесь не применяется — он про разнос по Проектам)
+- [x] `plannedHours` отсутствует → в ответе `null`, в UI — «—/—» вместо «0»
+- [x] Таблица `daily_checklist_item` (id, user_id, date, title, delo_id NULL, position, done, done_at NULL)
+- [x] CRUD `/api/v1/checklist?date=YYYY-MM-DD` (list/create/patch/delete), reorder через `position`
+- [x] `POST /api/v1/checklist/{id}/carry-over {toDate}` — ручной перенос пункта (создаёт копию на новую дату, оригинал остаётся как есть)
+- [x] Отметка `done` — идемпотентна, снятие галочки допустимо (не «финальное действие»)
+- [x] UI (Сегодня): блок «Бэклог недели» — список x/y, итог внизу, полоса прогресса нейтрального серого
+- [x] UI: при x < y — никакого красного, никаких «отставание», подпись фактическая («7 ч из 12 ч»)
+- [x] UI: блок «Чек-лист» — быстрый ввод (Enter добавляет), галочки, drag-reorder, кнопка «перенести на завтра» у пункта
+- [x] UI: чек-лист виден в обоих Режимах фиксации времени (тикет 13); в `primary_focus` отображается под карточкой Главного дела
+- [x] API test: Дело в бэклоге недели с планом 10 ч, залогировано 4 ч → `x=4, y=10`, итоги суммируются
+- [x] API test: Записи прошлой недели не попадают в `factHours` текущей
+- [x] API test: CRUD чек-листа, `done` → `done_at` проставлен, снятие → `done_at` очищен
+- [x] API test: `carry-over` создал пункт на завтра, сегодняшний не удалён
+
+## Answer
+
+- Verification: `TodayChecklistApiIT`, clean Java compile/test-compile, and frontend build passed.
+- Browser/DOM verification skipped under the explicit project instruction because Chrome remote debugging is unavailable.

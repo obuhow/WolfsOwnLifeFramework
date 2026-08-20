@@ -21,6 +21,9 @@ const showNightHours = ref(false)
 
 // Week backlog state
 const weekBacklog = ref([])
+const todayBacklog = ref(null)
+const checklist = ref([])
+const checklistTitle = ref('')
 const backlogLoading = ref(false)
 const backlogError = ref('')
 // Execution mode filter for panels: 'SELF' | 'DELEGATABLE' | 'AUTOMATABLE' | 'ALL'
@@ -264,6 +267,57 @@ const filteredWeekBacklog = computed(() => {
   return weekBacklog.value.filter(d => d.executionMode === executionModeFilter.value)
 })
 
+const backlogFactLabel = computed(() => `${formatHours(todayBacklog.value?.totalFact || 0)} ч из ${formatHours(todayBacklog.value?.totalPlanned || 0)} ч`)
+const progressPercent = computed(() => { const plan = Number(todayBacklog.value?.totalPlanned || 0); return plan ? Math.min(100, Number(todayBacklog.value?.totalFact || 0) / plan * 100) : 0 })
+function formatHours(value) {
+  const n = Number(value || 0)
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
+}
+
+async function loadTodayExtras() {
+  const headers = authHeaders()
+  if (!headers || !selectedDate.value) return
+  const [backlogRes, checklistRes] = await Promise.all([
+    fetch(`${apiBase()}/today/backlog?date=${selectedDate.value}`, { headers }),
+    fetch(`${apiBase()}/checklist?date=${selectedDate.value}`, { headers })
+  ])
+  if (backlogRes.ok) todayBacklog.value = await backlogRes.json()
+  if (checklistRes.ok) checklist.value = await checklistRes.json()
+}
+
+async function addChecklistItem() {
+  const title = checklistTitle.value.trim()
+  if (!title || !selectedDate.value) return
+  const res = await fetch(`${apiBase()}/checklist`, { method: 'POST', headers: authHeaders(true), body: JSON.stringify({ date: selectedDate.value, title }) })
+  if (res.ok) { checklist.value.push(await res.json()); checklistTitle.value = '' }
+}
+
+async function toggleChecklist(item) {
+  const res = await fetch(`${apiBase()}/checklist/${item.id}`, { method: 'PATCH', headers: authHeaders(true), body: JSON.stringify({ done: !item.done }) })
+  if (res.ok) Object.assign(item, await res.json())
+}
+
+async function deleteChecklistItem(item) {
+  const res = await fetch(`${apiBase()}/checklist/${item.id}`, { method: 'DELETE', headers: authHeaders(true) })
+  if (res.ok) checklist.value = checklist.value.filter(x => x.id !== item.id)
+}
+
+async function carryChecklistItem(item) {
+  const d = new Date(`${selectedDate.value}T00:00:00`); d.setDate(d.getDate() + 1)
+  await fetch(`${apiBase()}/checklist/${item.id}/carry-over`, { method: 'POST', headers: authHeaders(true), body: JSON.stringify({ toDate: d.toISOString().slice(0, 10) }) })
+}
+
+async function reorderChecklist(event, target) {
+  const sourceId = Number(event.dataTransfer.getData('text/plain'))
+  if (!sourceId || sourceId === target.id) return
+  const sourceIndex = checklist.value.findIndex(x => x.id === sourceId)
+  const targetIndex = checklist.value.findIndex(x => x.id === target.id)
+  if (sourceIndex < 0 || targetIndex < 0) return
+  const [moved] = checklist.value.splice(sourceIndex, 1)
+  checklist.value.splice(targetIndex, 0, moved)
+  await Promise.all(checklist.value.map((item, position) => fetch(`${apiBase()}/checklist/${item.id}`, { method: 'PATCH', headers: authHeaders(true), body: JSON.stringify({ position }) })))
+}
+
 async function loadProjects() {
   const headers = authHeaders()
   if (!headers) return
@@ -374,6 +428,7 @@ async function loadAll() {
     await Promise.all([loadProjects(), loadDelos(), loadSettings()])
     await loadToday({ ensureSleep: true })
     await loadWeekBacklog()
+    await loadTodayExtras()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -442,6 +497,7 @@ watch(selectedDate, async (val, old) => {
   try {
     await loadToday({ ensureSleep: true })
     await loadWeekBacklog()
+    await loadTodayExtras()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -669,6 +725,7 @@ async function removeFromBacklog(deloId) {
     if (handleAuthFailure(res)) return
     if (!res.ok) throw new Error(`Удаление из бэклога: HTTP ${res.status}`)
     await loadWeekBacklog()
+    await loadTodayExtras()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -852,6 +909,28 @@ onMounted(loadAll)
           Неделя: {{ weekLabel }}
         </p>
       </aside>
+
+      <aside class="card panel-card" aria-label="Чек-лист дня">
+        <div class="panel-header"><h2>Чек-лист дня</h2></div>
+        <form class="checklist-add" @submit.prevent="addChecklistItem">
+          <input v-model="checklistTitle" class="input" maxlength="500" placeholder="Быстрый пункт…" aria-label="Новый пункт чек-листа" />
+          <button class="btn btn-primary btn-sm" type="submit">Добавить</button>
+        </form>
+        <ul v-if="checklist.length" class="checklist-list">
+          <li v-for="item in checklist" :key="item.id" class="checklist-item" draggable="true" @dragstart="event => event.dataTransfer.setData('text/plain', String(item.id))" @dragover.prevent @drop="event => reorderChecklist(event, item)">
+            <label><input type="checkbox" :checked="item.done" @change="toggleChecklist(item)" /><span :class="{ done: item.done }">{{ item.title }}</span></label>
+            <div><button class="btn btn-ghost btn-sm" type="button" title="Перенести на завтра" @click="carryChecklistItem(item)">→</button><button class="btn btn-ghost btn-sm" type="button" title="Удалить" @click="deleteChecklistItem(item)">×</button></div>
+          </li>
+        </ul>
+        <p v-else class="hint">Пусто</p>
+      </aside>
+
+      <aside class="card panel-card" aria-label="План и факт бэклога недели">
+        <div class="panel-header"><h2>План и факт недели</h2><span class="backlog-total">{{ backlogFactLabel }}</span></div>
+        <div class="progress-track"><span class="progress-fill" :style="{ width: `${progressPercent}%` }"></span></div>
+        <ul v-if="todayBacklog?.items?.length" class="checklist-list"><li v-for="item in todayBacklog.items" :key="item.deloId" class="backlog-row"><span>{{ item.title }}</span><span>{{ item.plannedHours == null ? '—/—' : `${formatHours(item.factHours)} / ${formatHours(item.plannedHours)} ч` }}</span></li></ul>
+        <p v-else class="hint">Пусто</p>
+      </aside>
     </div>
 
     <!-- Picker modal -->
@@ -960,6 +1039,16 @@ onMounted(loadAll)
     grid-template-columns: 1fr;
   }
 }
+
+.checklist-add { display: flex; gap: .5rem; margin-bottom: .8rem; }
+.checklist-add .input { min-width: 0; flex: 1; }
+.checklist-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem; }
+.checklist-item, .backlog-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid var(--wolf-rule); }
+.checklist-item label { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.checklist-item .done { text-decoration: line-through; color: var(--wolf-muted); }
+.backlog-total { color: var(--wolf-muted); font-size: .8rem; }
+.progress-track { height: 6px; margin: .5rem 0 .75rem; background: #e7e2db; border-radius: 99px; overflow: hidden; }
+.progress-fill { display: block; height: 100%; background: #9aa3ad; }
 
 .grid-card {
   padding: 1rem 1rem 0.75rem;
