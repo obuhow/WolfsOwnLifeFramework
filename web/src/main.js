@@ -11,6 +11,7 @@ import DelosView from './components/DelosView.vue'
 import DeloDetailView from './components/DeloDetailView.vue'
 import TodayView from './components/TodayView.vue'
 import WeekView from './components/WeekView.vue'
+import CalendarView from './components/CalendarView.vue'
 import GanttView from './components/GanttView.vue'
 import PlanningView from './components/PlanningView.vue'
 import GoalsView from './components/GoalsView.vue'
@@ -26,7 +27,8 @@ const routes = [
   { path: '/login', component: LoginView, meta: { public: true } },
   { path: '/today', component: TodayView, meta: { requiresAuth: true } },
   { path: '/morning', component: MorningView, meta: { requiresAuth: true } },
-  { path: '/week', component: WeekView, meta: { requiresAuth: true } },
+  { path: '/week', redirect: '/calendar' },
+  { path: '/calendar', component: CalendarView, meta: { requiresAuth: true } },
   { path: '/gantt', redirect: '/planning' },
   { path: '/planning', component: PlanningView, meta: { requiresAuth: true } },
   { path: '/goals', component: GoalsView, meta: { requiresAuth: true } },
