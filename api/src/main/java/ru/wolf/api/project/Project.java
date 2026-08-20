@@ -39,6 +39,11 @@ public class Project {
     @Column(nullable = false, length = 200)
     private String title;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private Status status = Status.IN_PROGRESS;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -58,4 +63,9 @@ public class Project {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    public enum Status {
+        IN_PROGRESS,
+        ARCHIVED
+    }
 }

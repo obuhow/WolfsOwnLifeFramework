@@ -8,6 +8,7 @@ import ru.wolf.api.user.User;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
 
 @Repository
 public interface NoteRepository extends JpaRepository<Note, Long> {
@@ -41,4 +42,35 @@ public interface NoteRepository extends JpaRepository<Note, Long> {
             WHERE n.user = :user AND n.id = :id
             """)
     Optional<Note> findByUserAndId(@Param("user") User user, @Param("id") Long id);
+
+    @Query("""
+            SELECT n FROM Note n
+            WHERE n.user = :user AND n.project.id = :projectId
+            ORDER BY n.createdAt DESC, n.id DESC
+            """)
+    List<Note> findByUserAndProjectIdOrderByCreatedAtDesc(
+            @Param("user") User user,
+            @Param("projectId") Long projectId,
+            org.springframework.data.domain.Pageable pageable
+    );
+
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM note n
+                WHERE n.user_id = :#{#user.id}
+                  AND n.project_id = :projectId
+                  AND n.author = :author
+                  AND :tag = ANY(n.tags)
+                  AND n.created_at >= :from
+                  AND n.created_at < :to
+            )
+            """, nativeQuery = true)
+    boolean existsByUserAndProjectIdAndAuthorAndTagAndCreatedAtBetween(
+            @Param("user") User user,
+            @Param("projectId") Long projectId,
+            @Param("author") String author,
+            @Param("tag") String tag,
+            @Param("from") Instant from,
+            @Param("to") Instant to
+    );
 }

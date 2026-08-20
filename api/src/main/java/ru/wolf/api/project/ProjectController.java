@@ -87,6 +87,7 @@ public class ProjectController {
                 .lifeArea(lifeArea)
                 .parent(parent)
                 .title(request.getTitle().trim())
+                .status(request.getStatus() == null ? Project.Status.IN_PROGRESS : request.getStatus())
                 .description(normalizeDescription(request.getDescription()))
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
@@ -128,6 +129,9 @@ public class ProjectController {
         project.setLifeArea(lifeArea);
         project.setParent(parent);
         project.setTitle(request.getTitle().trim());
+        if (request.getStatus() != null) {
+            project.setStatus(request.getStatus());
+        }
         project.setDescription(normalizeDescription(request.getDescription()));
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
@@ -239,6 +243,7 @@ public class ProjectController {
                 project.getLifeArea().getId(),
                 project.getParent() != null ? project.getParent().getId() : null,
                 project.getTitle(),
+                project.getStatus(),
                 project.getDescription(),
                 project.getStartDate(),
                 project.getEndDate(),
@@ -263,6 +268,7 @@ public class ProjectController {
                 project.getParent() != null ? project.getParent().getId() : null,
                 project.getParent() != null ? project.getParent().getTitle() : null,
                 project.getTitle(),
+                project.getStatus(),
                 project.getDescription(),
                 project.getStartDate(),
                 project.getEndDate(),
@@ -280,6 +286,7 @@ public class ProjectController {
         private Long lifeAreaId;
         private Long parentId;
         private String title;
+        private Project.Status status;
         private String description;
         private LocalDate startDate;
         private LocalDate endDate;
@@ -296,6 +303,7 @@ public class ProjectController {
         private Long parentId;
         private String parentTitle;
         private String title;
+        private Project.Status status;
         private String description;
         private LocalDate startDate;
         private LocalDate endDate;
@@ -326,6 +334,8 @@ public class ProjectController {
         @Size(max = 200)
         private String title;
 
+        private Project.Status status;
+
         @Size(max = 10000)
         private String description;
 
@@ -348,6 +358,8 @@ public class ProjectController {
         @NotBlank
         @Size(max = 200)
         private String title;
+
+        private Project.Status status;
 
         @Size(max = 10000)
         private String description;
