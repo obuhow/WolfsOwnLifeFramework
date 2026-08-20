@@ -14,8 +14,10 @@ const areas = ref([])
 const projects = ref([])
 const delos = ref([])
 const detail = ref(null)
+const dependencies = ref({ blockedBy: [], blocks: [] })
 const editing = ref(false)
 const selectedDeloId = ref('')
+const dependencySearch = ref('')
 
 const form = ref({
   lifeAreaId: '',
@@ -46,6 +48,16 @@ const availableDelos = computed(() => {
   return delos.value
     .filter(d => !linkedIds.has(d.id))
     .slice()
+    .sort((a, b) => a.title.localeCompare(b.title, 'ru'))
+})
+
+const dependencyOptions = computed(() => {
+  const linkedIds = new Set([
+    ...(dependencies.value.blockedBy || []).map(p => p.id),
+    ...(dependencies.value.blocks || []).map(p => p.id)
+  ])
+  return projects.value
+    .filter(p => p.id !== projectId.value && !linkedIds.has(p.id))
     .sort((a, b) => a.title.localeCompare(b.title, 'ru'))
 })
 
@@ -146,12 +158,23 @@ async function loadDetail() {
   fillFormFromDetail()
 }
 
+async function loadDependencies() {
+  const headers = authHeaders()
+  if (!headers) return
+  const res = await fetch(`${apiBase()}/projects/${projectId.value}/dependencies`, { headers })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.message || `Зависимости: HTTP ${res.status}`)
+  }
+  dependencies.value = await res.json()
+}
+
 async function loadAll() {
   loading.value = true
   error.value = ''
   try {
     await Promise.all([loadAreas(), loadProjects(), loadDelos()])
-    await loadDetail()
+    await Promise.all([loadDetail(), loadDependencies()])
     editing.value = false
     selectedDeloId.value = ''
   } catch (e) {
@@ -210,6 +233,57 @@ async function save() {
     editing.value = false
     await loadAll()
     setTimeout(() => { success.value = '' }, 3000)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function addDependency() {
+  const selected = dependencyOptions.value.find(p => p.title === dependencySearch.value)
+  if (!selected) {
+    error.value = 'Выберите существующий Проект из списка'
+    return
+  }
+  loading.value = true
+  error.value = ''
+  try {
+    const headers = authHeaders(true)
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/projects/${projectId.value}/dependencies`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ blockerId: selected.id })
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    dependencies.value = await res.json()
+    dependencySearch.value = ''
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function removeDependency(blockerId) {
+  loading.value = true
+  error.value = ''
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/projects/${projectId.value}/dependencies/${blockerId}`, {
+      method: 'DELETE',
+      headers
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    await loadDependencies()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -431,6 +505,49 @@ onMounted(loadAll)
             <router-link :to="`/projects/${c.id}`">{{ c.title }}</router-link>
           </li>
         </ul>
+      </section>
+
+      <section class="card" style="margin-bottom: 1.5rem">
+        <div class="projects-toolbar" style="margin-bottom: 1rem">
+          <h2 style="margin: 0">Зависимости</h2>
+          <div class="projects-toolbar-actions">
+            <input
+              v-model="dependencySearch"
+              class="input dependency-input"
+              list="dependency-project-options"
+              placeholder="Проект, который блокирует…"
+              :disabled="loading || dependencyOptions.length === 0"
+              aria-label="Проект-блокер"
+            />
+            <datalist id="dependency-project-options">
+              <option v-for="p in dependencyOptions" :key="p.id" :value="p.title" />
+            </datalist>
+            <button class="btn btn-primary" :disabled="loading || !dependencySearch" @click="addDependency">
+              Добавить
+            </button>
+          </div>
+        </div>
+        <div class="dependency-columns">
+          <div>
+            <h3>Ждёт</h3>
+            <div v-if="dependencies.blockedBy.length" class="link-list">
+              <div v-for="p in dependencies.blockedBy" :key="p.id" class="project-link-row">
+                <router-link :to="`/projects/${p.id}`">{{ p.title }}</router-link>
+                <button class="btn btn-ghost" :disabled="loading" @click="removeDependency(p.id)">Убрать</button>
+              </div>
+            </div>
+            <p v-else class="muted-block">Проект ни от кого не ждёт.</p>
+          </div>
+          <div>
+            <h3>Блокирует</h3>
+            <div v-if="dependencies.blocks.length" class="link-list">
+              <div v-for="p in dependencies.blocks" :key="p.id" class="project-link-row">
+                <router-link :to="`/projects/${p.id}`">{{ p.title }}</router-link>
+              </div>
+            </div>
+            <p v-else class="muted-block">Пока ничего не блокирует.</p>
+          </div>
+        </div>
       </section>
 
       <section class="card" style="margin-bottom: 1.5rem">

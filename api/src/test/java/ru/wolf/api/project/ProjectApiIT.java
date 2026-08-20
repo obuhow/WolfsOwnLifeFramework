@@ -32,6 +32,9 @@ class ProjectApiIT extends ApiIntegrationTest {
     DeloProjectRepository deloProjectRepository;
 
     @Autowired
+    ProjectDependencyRepository projectDependencyRepository;
+
+    @Autowired
     LifeAreaRepository lifeAreaRepository;
 
     @Autowired
@@ -42,6 +45,7 @@ class ProjectApiIT extends ApiIntegrationTest {
 
     @BeforeEach
     void cleanup() {
+        projectDependencyRepository.deleteAll();
         deloProjectRepository.deleteAll();
         deloRepository.deleteAll();
         projectRepository.deleteAll();
@@ -233,6 +237,68 @@ class ProjectApiIT extends ApiIntegrationTest {
     }
 
     @Test
+    void project_dependencies_list_add_and_delete() {
+        WebTestClient authed = authedAdminClient();
+        Long areaId = createLifeArea(authed, "Работа");
+        ProjectController.ProjectResponse blocker = createProject(authed, areaId, null, "Блокер");
+        ProjectController.ProjectResponse blocked = createProject(authed, areaId, null, "Зависимый");
+
+        ProjectDependencyController.DependenciesResponse response = authed.post()
+                .uri("/api/v1/projects/{id}/dependencies", blocked.getId())
+                .bodyValue(new ProjectDependencyController.AddDependencyRequest(blocker.getId()))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(ProjectDependencyController.DependenciesResponse.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(response.blockedBy()).extracting(ProjectDependencyController.ProjectSummary::title)
+                .containsExactly("Блокер");
+        assertThat(response.blocks()).isEmpty();
+
+        authed.get()
+                .uri("/api/v1/projects/{id}/dependencies", blocker.getId())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(ProjectDependencyController.DependenciesResponse.class)
+                .value(body -> assertThat(body.blocks())
+                        .extracting(ProjectDependencyController.ProjectSummary::title)
+                        .containsExactly("Зависимый"));
+
+        authed.delete()
+                .uri("/api/v1/projects/{id}/dependencies/{blockerId}", blocked.getId(), blocker.getId())
+                .exchange()
+                .expectStatus().isNoContent();
+
+        addDependency(authed, blocker.getId(), blocked.getId());
+    }
+
+    @Test
+    void reject_dependency_cycle_with_path() {
+        WebTestClient authed = authedAdminClient();
+        Long areaId = createLifeArea(authed, "Работа");
+        ProjectController.ProjectResponse a = createProject(authed, areaId, null, "A");
+        ProjectController.ProjectResponse b = createProject(authed, areaId, null, "B");
+        ProjectController.ProjectResponse c = createProject(authed, areaId, null, "C");
+
+        addDependency(authed, b.getId(), a.getId());
+        addDependency(authed, c.getId(), b.getId());
+
+        String message = authed.post()
+                .uri("/api/v1/projects/{id}/dependencies", a.getId())
+                .bodyValue(new ProjectDependencyController.AddDependencyRequest(c.getId()))
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody(Map.class)
+                .returnResult()
+                .getResponseBody()
+                .get("message")
+                .toString();
+
+        assertThat(message).contains("Цикл зависимостей", "C", "A", "B", "C");
+    }
+
+    @Test
     void reject_end_before_start() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
@@ -403,5 +469,13 @@ class ProjectApiIT extends ApiIntegrationTest {
                 .expectBody(ProjectController.ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
+    }
+
+    private void addDependency(WebTestClient client, Long blockedId, Long blockerId) {
+        client.post()
+                .uri("/api/v1/projects/{id}/dependencies", blockedId)
+                .bodyValue(new ProjectDependencyController.AddDependencyRequest(blockerId))
+                .exchange()
+                .expectStatus().isOk();
     }
 }

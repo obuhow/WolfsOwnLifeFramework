@@ -4,7 +4,9 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** claimed
+
+**Implementation frontier:** ticket 08 — backend `project_dependency` graph/API and the «Зависимости» block on the Project detail page. Forecast/cascade behavior from tickets 09–10 is deferred.
 
 - [ ] Таблица `project_dependency` (blocker_id, blocked_id, user_id) + уникальный индекс
 - [ ] `POST /api/v1/projects/{id}/dependencies {blockerId}` — добавить "blockerId блокирует id"

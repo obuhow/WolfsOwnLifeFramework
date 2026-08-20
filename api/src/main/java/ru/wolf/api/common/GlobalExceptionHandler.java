@@ -8,12 +8,20 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.wolf.api.goal.DuplicateGoalPriorityException;
 import ru.wolf.api.idea.IdeaAlreadyPromotedException;
 import ru.wolf.api.note.assistant.NotesAssistantController;
+import ru.wolf.api.project.ProjectDependencyCycleException;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ProjectDependencyCycleException.class)
+    public ResponseEntity<Map<String, String>> handleProjectDependencyCycle(ProjectDependencyCycleException ex) {
+        Map<String, String> body = new HashMap<>();
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
 
     @ExceptionHandler(NotesAssistantController.LlmDisabledException.class)
     public ResponseEntity<Map<String, String>> handleLlmDisabled(NotesAssistantController.LlmDisabledException ex) {
