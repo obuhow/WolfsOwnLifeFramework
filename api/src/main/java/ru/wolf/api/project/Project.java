@@ -56,6 +56,11 @@ public class Project {
     @Column(name = "total_plan_hours", precision = 10, scale = 2)
     private BigDecimal totalPlanHours;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "plan_distribution", nullable = false, length = 20)
+    @Builder.Default
+    private PlanDistribution planDistribution = PlanDistribution.NONE;
+
     @Column(name = "plan_frozen_at")
     private LocalDate planFrozenAt;
 
@@ -70,5 +75,11 @@ public class Project {
     public enum Status {
         IN_PROGRESS,
         ARCHIVED
+    }
+
+    public enum PlanDistribution {
+        NONE,
+        EVEN_ALL_DAYS,
+        EVEN_WEEKDAYS
     }
 }

@@ -435,6 +435,7 @@ public class GanttController {
                 p.getStartDate() != null ? p.getStartDate().toString() : null,
                 p.getEndDate() != null ? p.getEndDate().toString() : null,
                 p.getTotalPlanHours(),
+                p.getPlanDistribution(),
                 depth,
                 cells
         );
@@ -530,6 +531,7 @@ public class GanttController {
         private String startDate;
         private String endDate;
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
         private int depth;
         private List<CellHours> cells;
     }

@@ -213,6 +213,15 @@ function formatHours(v) {
   return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, '')
 }
 
+function projectPlanTotal(project) {
+  if (project.totalPlanHours != null) return project.totalPlanHours
+  return project.cells.reduce((sum, cell) => sum + (Number(cell.planHours) || 0), 0)
+}
+
+function projectFactTotal(project) {
+  return project.cells.reduce((sum, cell) => sum + (Number(cell.factHours) || 0), 0)
+}
+
 function planBarWidth(hours) {
   const n = Number(hours) || 0
   // 40h/week ≈ full strip
@@ -279,7 +288,7 @@ onMounted(loadAll)
   <div class="gantt-page">
     <header class="page-header gantt-header">
       <div>
-        <h1>Гантт</h1>
+        <h1>Планирование</h1>
         <p class="eyebrow">План и факт по Проектам · {{ MODE_LABEL[hourAccountingMode] || hourAccountingMode }}</p>
       </div>
       <div class="gantt-toolbar">
@@ -375,6 +384,7 @@ onMounted(loadAll)
               {{ p.title }}
             </router-link>
             <span class="area-tag" :title="p.lifeAreaName">{{ p.lifeAreaName }}</span>
+            <span class="project-hours">план {{ formatHours(projectPlanTotal(p)) }} ч · факт {{ formatHours(projectFactTotal(p)) }} ч</span>
           </div>
           <div
             v-for="c in p.cells"
@@ -797,6 +807,14 @@ onMounted(loadAll)
   color: #9a9288;
   font-weight: 400;
   margin-top: 0.1rem;
+}
+
+.project-hours {
+  display: block;
+  font-size: 0.68rem;
+  color: #7a7268;
+  font-weight: 400;
+  margin-top: 0.12rem;
 }
 
 .gantt-cell {

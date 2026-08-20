@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.wolf.api.routine.Routine;
 import ru.wolf.api.routine.RoutineRepository;
+import ru.wolf.api.gantt.WeekPlan;
+import ru.wolf.api.gantt.WeekPlanRepository;
+import ru.wolf.api.project.Project;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
@@ -30,6 +33,7 @@ public class PlanningCapacityController {
 
     private final RoutineRepository routineRepository;
     private final UserRepository userRepository;
+    private final WeekPlanRepository weekPlanRepository;
 
     @GetMapping("/capacity")
     @Transactional(readOnly = true)
@@ -49,13 +53,25 @@ public class PlanningCapacityController {
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal available = user.getAvailableWeeklyHours().setScale(2, RoundingMode.HALF_UP);
+        List<WeekPlan> projectPlans = weekPlanRepository.findInWeekRange(user,
+                monday.get(java.time.temporal.WeekFields.ISO.weekBasedYear()), monday.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear()),
+                lastMonday.get(java.time.temporal.WeekFields.ISO.weekBasedYear()), lastMonday.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear()));
 
         List<CapacityResponse> response = new ArrayList<>();
         for (LocalDate week = monday; !week.isAfter(lastMonday); week = week.plusWeeks(1)) {
-            BigDecimal planned = routineHours;
+            int isoYear = week.get(java.time.temporal.WeekFields.ISO.weekBasedYear());
+            int isoWeek = week.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear());
+            String weekId = "%d-W%02d".formatted(
+                    isoYear, isoWeek);
+            BigDecimal projectHours = projectPlans.stream()
+                    .filter(plan -> plan.getIsoYear() == isoYear
+                            && plan.getIsoWeek() == isoWeek
+                            && plan.getProject().getStatus() == Project.Status.IN_PROGRESS)
+                    .map(WeekPlan::getPlanHours)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal planned = routineHours.add(projectHours).setScale(2, RoundingMode.HALF_UP);
             response.add(new CapacityResponse(
-                    "%d-W%02d".formatted(week.get(java.time.temporal.WeekFields.ISO.weekBasedYear()),
-                            week.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear())),
+                    weekId,
                     planned,
                     routineHours,
                     available,

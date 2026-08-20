@@ -21,7 +21,8 @@ const form = ref({
   description: '',
   startDate: '',
   endDate: '',
-  totalPlanHours: ''
+  totalPlanHours: '',
+  planDistribution: 'NONE'
 })
 
 const filteredProjects = computed(() => {
@@ -164,7 +165,8 @@ function openCreate(parent = null) {
     description: '',
     startDate: '',
     endDate: '',
-    totalPlanHours: ''
+    totalPlanHours: '',
+    planDistribution: 'NONE'
   }
   showForm.value = true
 }
@@ -178,7 +180,8 @@ function openEdit(project) {
     description: project.description || '',
     startDate: project.startDate || '',
     endDate: project.endDate || '',
-    totalPlanHours: project.totalPlanHours != null ? String(project.totalPlanHours) : ''
+    totalPlanHours: project.totalPlanHours != null ? String(project.totalPlanHours) : '',
+    planDistribution: project.planDistribution || 'NONE'
   }
   showForm.value = true
 }
@@ -197,7 +200,8 @@ function payloadFromForm() {
     description: form.value.description.trim() || null,
     startDate: form.value.startDate || null,
     endDate: form.value.endDate || null,
-    totalPlanHours: hoursRaw === '' ? null : Number(hoursRaw)
+    totalPlanHours: hoursRaw === '' ? null : Number(hoursRaw),
+    planDistribution: form.value.planDistribution
   }
 }
 
@@ -229,6 +233,18 @@ async function saveProject() {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    const savedProject = await res.json()
+    if (form.value.planDistribution !== 'NONE' && savedProject.id) {
+      const distributionRes = await fetch(`${apiBase()}/projects/${savedProject.id}/plan-distribution`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ mode: form.value.planDistribution })
+      })
+      if (!distributionRes.ok) {
+        const data = await distributionRes.json().catch(() => ({}))
+        throw new Error(data.message || `Распределение: HTTP ${distributionRes.status}`)
+      }
     }
     success.value = isEdit ? 'Проект обновлён' : 'Проект создан'
     cancelForm()
@@ -350,6 +366,13 @@ onMounted(loadAll)
             />
           </div>
         </div>
+
+        <fieldset class="distribution-options">
+          <legend>Распределение времени</legend>
+          <label><input v-model="form.planDistribution" value="EVEN_ALL_DAYS" type="radio" :disabled="!form.startDate || !form.endDate || !form.totalPlanHours" /> Равномерно по дням</label>
+          <label><input v-model="form.planDistribution" value="EVEN_WEEKDAYS" type="radio" :disabled="!form.startDate || !form.endDate || !form.totalPlanHours" /> Равномерно по будням</label>
+          <small v-if="!form.startDate || !form.endDate || !form.totalPlanHours" class="muted">Нужны даты и плановые часы</small>
+        </fieldset>
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" :disabled="loading">

@@ -41,6 +41,7 @@ public class ProjectController {
     private final DeloProjectRepository deloProjectRepository;
     private final FactAggregateService factAggregateService;
     private final ResourceCascadeService resourceCascadeService;
+    private final PlanDistributionService planDistributionService;
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(
@@ -94,6 +95,7 @@ public class ProjectController {
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .totalPlanHours(request.getTotalPlanHours())
+                .planDistribution(request.getPlanDistribution() == null ? Project.PlanDistribution.NONE : request.getPlanDistribution())
                 .planFrozenAt(LocalDate.now().with(TemporalAdjusters.firstDayOfMonth()))
                 .build();
 
@@ -139,6 +141,9 @@ public class ProjectController {
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
         project.setTotalPlanHours(request.getTotalPlanHours());
+        if (request.getPlanDistribution() != null) {
+            project.setPlanDistribution(request.getPlanDistribution());
+        }
 
         Project saved = projectRepository.save(project);
         return ResponseEntity.ok(toResponse(saved));
@@ -171,6 +176,26 @@ public class ProjectController {
             @Valid @RequestBody PlanShiftPreviewRequest request
     ) {
         return ResponseEntity.ok(resourceCascadeService.preview(currentUser(authentication), id, request.getNewEnd()));
+    }
+
+    @PostMapping("/{id}/plan-distribution")
+    @Transactional
+    public ResponseEntity<PlanDistributionService.DistributionResult> applyPlanDistribution(
+            Authentication authentication,
+            @PathVariable Long id,
+            @RequestBody PlanDistributionRequest request) {
+        User user = currentUser(authentication);
+        Project project = projectRepository.findByUserAndId(user, id)
+                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
+        Project.PlanDistribution mode;
+        try {
+            mode = Project.PlanDistribution.valueOf(request.getMode().toUpperCase());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Неизвестный режим распределения: " + request.getMode());
+        }
+        project.setPlanDistribution(mode);
+        projectRepository.save(project);
+        return ResponseEntity.ok(planDistributionService.apply(user, project, mode));
     }
 
     private User currentUser(Authentication authentication) {
@@ -260,7 +285,8 @@ public class ProjectController {
                 project.getDescription(),
                 project.getStartDate(),
                 project.getEndDate(),
-                project.getTotalPlanHours()
+                project.getTotalPlanHours(),
+                project.getPlanDistribution()
         );
     }
 
@@ -286,6 +312,7 @@ public class ProjectController {
                 project.getStartDate(),
                 project.getEndDate(),
                 project.getTotalPlanHours(),
+                project.getPlanDistribution(),
                 deloLinks,
                 aggregates
         );
@@ -304,6 +331,7 @@ public class ProjectController {
         private LocalDate startDate;
         private LocalDate endDate;
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
     }
 
     @Data
@@ -321,6 +349,7 @@ public class ProjectController {
         private LocalDate startDate;
         private LocalDate endDate;
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
         private List<DeloLink> delos;
         private FactAggregate aggregates;
     }
@@ -357,6 +386,7 @@ public class ProjectController {
 
         @DecimalMin(value = "0.0", inclusive = true)
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
     }
 
     @Data
@@ -382,6 +412,13 @@ public class ProjectController {
 
         @DecimalMin(value = "0.0", inclusive = true)
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
+
+        public UpdateProjectRequest(Long lifeAreaId, Long parentId, String title, Project.Status status,
+                                    String description, LocalDate startDate, LocalDate endDate,
+                                    BigDecimal totalPlanHours) {
+            this(lifeAreaId, parentId, title, status, description, startDate, endDate, totalPlanHours, null);
+        }
     }
 
     @Data
@@ -390,5 +427,12 @@ public class ProjectController {
     public static class PlanShiftPreviewRequest {
         @NotNull
         private LocalDate newEnd;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PlanDistributionRequest {
+        private String mode;
     }
 }
