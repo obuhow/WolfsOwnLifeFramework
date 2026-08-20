@@ -33,6 +33,10 @@ public class Synergy {
     @Column(name = "idea_id")
     private Long ideaId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "routine_id")
+    private ru.wolf.api.routine.Routine routine;
+
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "sphere_id", nullable = false)
     private LifeSphere sphere;
