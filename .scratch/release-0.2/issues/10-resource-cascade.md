@@ -4,7 +4,7 @@
 
 **Blocked by:** 09 — Честный прогноз Gantt (нужны прогнозы для каскада).
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Настройка пользователя `available_weekly_hours` (default 30)
 - [ ] `POST /api/v1/projects/{id}/plan-shift-preview {newEnd}` — dry-run без сохранения

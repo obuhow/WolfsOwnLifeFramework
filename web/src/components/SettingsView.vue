@@ -8,7 +8,8 @@ const settings = ref({
   nightEnd: '07:00',
   dayEnd: '02:00',
   defaultSleepEnd: '09:00',
-  hourAccountingMode: 'PRIMARY_ONLY'
+  hourAccountingMode: 'PRIMARY_ONLY',
+  availableWeeklyHours: 30
 })
 
 const loading = ref(false)
@@ -60,7 +61,8 @@ async function loadSettings() {
       nightEnd: data.nightEnd?.slice(0, 5) || '07:00',
       dayEnd: data.dayEnd?.slice(0, 5) || '02:00',
       defaultSleepEnd: data.defaultSleepEnd?.slice(0, 5) || '09:00',
-      hourAccountingMode: data.hourAccountingMode
+      hourAccountingMode: data.hourAccountingMode,
+      availableWeeklyHours: data.availableWeeklyHours ?? 30
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -194,6 +196,12 @@ onMounted(loadSettings)
             <strong>Только основной проект:</strong> часы засчитываются только в Основной проект Дела (по умолчанию).<br>
             <strong>Все проекты:</strong> часы засчитываются во все привязанные проекты Дела.
           </p>
+        </div>
+
+        <div class="form-group">
+          <label for="availableWeeklyHours">Доступно часов в неделю</label>
+          <input id="availableWeeklyHours" v-model.number="settings.availableWeeklyHours" type="number" min="0" step="0.25" :disabled="loading" class="input" />
+          <p class="hint">Используется для нейтрального показа недельной нагрузки и влияния сдвига Проектов на Цели. По умолчанию — 30 ч.</p>
         </div>
 
         <div class="form-actions">

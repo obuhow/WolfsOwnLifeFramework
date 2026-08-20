@@ -1,8 +1,8 @@
 package ru.wolf.api.user;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalTime;
 
 @RestController
@@ -46,6 +47,9 @@ public class UserSettingsController {
             user.setDefaultSleepEnd(LocalTime.parse(request.getDefaultSleepEnd()));
         }
         user.setHourAccountingMode(request.getHourAccountingMode());
+        if (request.getAvailableWeeklyHours() != null) {
+            user.setAvailableWeeklyHours(request.getAvailableWeeklyHours());
+        }
 
         userRepository.save(user);
 
@@ -59,7 +63,8 @@ public class UserSettingsController {
                 user.getNightEnd(),
                 user.getDayEnd(),
                 user.getDefaultSleepEnd(),
-                user.getHourAccountingMode()
+                user.getHourAccountingMode(),
+                user.getAvailableWeeklyHours()
         );
     }
 
@@ -75,6 +80,7 @@ public class UserSettingsController {
         /** Конец интервала авто-Сна, e.g. 09:00 */
         private LocalTime defaultSleepEnd;
         private String hourAccountingMode;
+        private BigDecimal availableWeeklyHours;
     }
 
     @Data
@@ -97,5 +103,8 @@ public class UserSettingsController {
 
         @NotBlank
         private String hourAccountingMode;
+
+        @DecimalMin(value = "0.0", inclusive = true)
+        private BigDecimal availableWeeklyHours;
     }
 }
