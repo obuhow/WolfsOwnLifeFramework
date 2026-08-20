@@ -7,7 +7,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
-import ru.wolf.api.backlog.WeekBacklogRepository;
+import ru.wolf.api.backlog.BacklogItemRepository;
 import ru.wolf.api.goal.GoalController;
 import ru.wolf.api.goal.GoalProjectRepository;
 import ru.wolf.api.goal.GoalRepository;
@@ -41,7 +41,7 @@ class MorningDigestApiIT extends ApiIntegrationTest {
     @Autowired NoteRepository noteRepository;
     @Autowired DeloProjectRepository deloProjectRepository;
     @Autowired DeloRepository deloRepository;
-    @Autowired WeekBacklogRepository weekBacklogRepository;
+    @Autowired BacklogItemRepository backlogItemRepository;
     @Autowired ProjectRepository projectRepository;
     @Autowired LifeAreaRepository lifeAreaRepository;
     @Autowired IdeaRepository ideaRepository;
@@ -56,7 +56,7 @@ class MorningDigestApiIT extends ApiIntegrationTest {
         goalWeekBudgetRepository.deleteAll();
         goalProjectRepository.deleteAll();
         goalRepository.deleteAll();
-        weekBacklogRepository.deleteAll();
+        backlogItemRepository.deleteAll();
         deloProjectRepository.deleteAll();
         timeEntryRepository.deleteAll();
         deloRepository.deleteAll();

@@ -11,9 +11,11 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.web.reactive.function.BodyInserters;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
+import ru.wolf.api.backlog.BacklogItemRepository;
 import ru.wolf.api.project.ProjectController;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
+import ru.wolf.api.timeentry.TimeEntryRepository;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
@@ -35,6 +37,12 @@ class DeloApiIT extends ApiIntegrationTest {
     LifeAreaRepository lifeAreaRepository;
 
     @Autowired
+    BacklogItemRepository backlogItemRepository;
+
+    @Autowired
+    TimeEntryRepository timeEntryRepository;
+
+    @Autowired
     UserRepository userRepository;
 
     @Autowired
@@ -42,7 +50,9 @@ class DeloApiIT extends ApiIntegrationTest {
 
     @BeforeEach
     void cleanup() {
+        backlogItemRepository.deleteAll();
         deloProjectRepository.deleteAll();
+        timeEntryRepository.deleteAll();
         deloRepository.deleteAll();
         projectRepository.deleteAll();
         lifeAreaRepository.deleteAll();
@@ -390,7 +400,7 @@ class DeloApiIT extends ApiIntegrationTest {
     void import_csv_creates_delos_and_adds_them_to_current_week_backlog() {
         WebTestClient authed = authedAdminClient();
         MultipartBodyBuilder body = new MultipartBodyBuilder();
-        body.part("file", "title,date,startAt,endAt,description,executionMode,projects,lifeArea\nИмпорт 1,2026-08-15,09:00,10:00,Описание,SELF,Импортированный проект,Работа\nИмпорт 2,2026-08-15,10:15,10:30,,DELEGATABLE,,\n")
+        body.part("file", "title,date,startAt,endAt,description,executionMode,projects,lifeArea\nИмпорт 1,2026-08-15,09:00,10:00,Описание,SELF,\nИмпорт 2,2026-08-15,10:15,10:30,,DELEGATABLE,,\n")
                 .filename("delos.csv")
                 .header("Content-Type", "text/csv");
         body.part("addToCurrentWeek", "true");

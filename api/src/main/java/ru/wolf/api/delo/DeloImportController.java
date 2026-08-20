@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import ru.wolf.api.auth.JwtUtil;
-import ru.wolf.api.backlog.WeekBacklog;
-import ru.wolf.api.backlog.WeekBacklogRepository;
+import ru.wolf.api.backlog.BacklogItem;
+import ru.wolf.api.backlog.BacklogItemRepository;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.lifearea.LifeArea;
@@ -36,7 +36,7 @@ import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,7 +54,7 @@ public class DeloImportController {
     private final ProjectRepository projectRepository;
     private final TimeEntryRepository timeEntryRepository;
     private final LifeAreaRepository lifeAreaRepository;
-    private final WeekBacklogRepository weekBacklogRepository;
+    private final BacklogItemRepository backlogItemRepository;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
@@ -161,12 +161,13 @@ public class DeloImportController {
             WeekFields fields = WeekFields.ISO;
             int year = today.get(fields.weekBasedYear());
             int week = today.get(fields.weekOfWeekBasedYear());
-            WeekBacklog backlog = weekBacklogRepository
-                    .findByUserAndIsoYearAndIsoWeek(user, year, week)
-                    .orElseGet(() -> emptyBacklog(user, year, week));
-            // Use distinct Delos for backlog
-            new HashSet<>(saved).forEach(backlog::addDelo);
-            weekBacklogRepository.save(backlog);
+            String period = "%d-W%02d".formatted(year, week);
+            int position = 0;
+            for (Delo delo : new LinkedHashSet<>(saved)) {
+                if (backlogItemRepository.findByUserAndDeloIdAndScopeAndPeriodId(user, delo.getId(), BacklogItem.Scope.WEEK, period).isEmpty()) {
+                    backlogItemRepository.save(BacklogItem.builder().user(user).delo(delo).scope(BacklogItem.Scope.WEEK).periodId(period).position(position++).build());
+                }
+            }
         }
 
         // Count unique Delos created (not rows)
@@ -348,14 +349,7 @@ public class DeloImportController {
         return values;
     }
 
-    private WeekBacklog emptyBacklog(User user, int year, int week) {
-        WeekBacklog backlog = new WeekBacklog();
-        backlog.setUser(user);
-        backlog.setIsoYear(year);
-        backlog.setIsoWeek(week);
-        backlog.setDelos(new HashSet<>());
-        return backlog;
-    }
+
 
     private User currentUser(Authentication authentication) {
         return userRepository.findByUsername(authentication.getName())
