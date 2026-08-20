@@ -63,6 +63,7 @@ public class GanttController {
     private final TimeEntryRepository timeEntryRepository;
     private final DeloProjectRepository deloProjectRepository;
     private final UserRepository userRepository;
+    private final GanttForecastService ganttForecastService;
 
     /**
      * Aggregate Gantt payload.
@@ -119,6 +120,12 @@ public class GanttController {
                 weekColumns,
                 rows
         ));
+    }
+
+    @GetMapping("/forecast")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<ForecastResponse>> getForecast(Authentication authentication) {
+        return ResponseEntity.ok(ganttForecastService.forecast(currentUser(authentication)));
     }
 
     /**
@@ -563,5 +570,16 @@ public class GanttController {
         private Integer isoYear;
         private Integer isoWeek;
         private BigDecimal planHours;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ForecastResponse {
+        private Long projectId;
+        private LocalDate planEnd;
+        private LocalDate forecastEnd;
+        private BigDecimal weeklyAvg;
+        private BigDecimal remaining;
     }
 }
