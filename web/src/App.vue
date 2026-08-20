@@ -174,6 +174,7 @@ onMounted(async () => {
             >
               Волна
             </router-link>
+            <router-link to="/reports/checklist" class="nav-link" :class="{ active: route.path === '/reports/checklist' }">Отчёт чек-лист</router-link>
             <router-link
               to="/ideas"
               class="nav-link"

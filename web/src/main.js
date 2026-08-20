@@ -21,6 +21,7 @@ import MorningView from './components/MorningView.vue'
 import RoutinesView from './components/RoutinesView.vue'
 import XlsxImportView from './components/XlsxImportView.vue'
 import WaveStatsView from './components/WaveStatsView.vue'
+import ChecklistReportView from './components/ChecklistReportView.vue'
 
 const routes = [
   { path: '/', redirect: '/today' },
@@ -44,6 +45,7 @@ const routes = [
   { path: '/routines', component: RoutinesView, meta: { requiresAuth: true } },
   { path: '/import/xlsx', component: XlsxImportView, meta: { requiresAuth: true } },
   { path: '/stats', component: WaveStatsView, meta: { requiresAuth: true } },
+  { path: '/reports/checklist', component: ChecklistReportView, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({
