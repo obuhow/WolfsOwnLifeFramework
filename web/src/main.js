@@ -19,6 +19,7 @@ import IdeaDetailView from './components/IdeaDetailView.vue'
 import MorningView from './components/MorningView.vue'
 import RoutinesView from './components/RoutinesView.vue'
 import XlsxImportView from './components/XlsxImportView.vue'
+import WaveStatsView from './components/WaveStatsView.vue'
 
 const routes = [
   { path: '/', redirect: '/today' },
@@ -40,6 +41,7 @@ const routes = [
   { path: '/delos/:id', component: DeloDetailView, meta: { requiresAuth: true } },
   { path: '/routines', component: RoutinesView, meta: { requiresAuth: true } },
   { path: '/import/xlsx', component: XlsxImportView, meta: { requiresAuth: true } },
+  { path: '/stats', component: WaveStatsView, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

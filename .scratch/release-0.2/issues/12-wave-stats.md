@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — Цели (нужны фактические часы по неделям).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] `GET /api/v1/stats/wave?weeks=N` — массив {goalId, title, weeks: [{weekId, factHours}], avg, median, max, min}
 - [ ] Расчёт статистик в query service (не domain entity)
