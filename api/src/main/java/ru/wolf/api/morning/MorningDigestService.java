@@ -6,8 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.delo.DeloProject;
 import ru.wolf.api.delo.DeloProjectRepository;
-import ru.wolf.api.backlog.WeekBacklog;
-import ru.wolf.api.backlog.WeekBacklogRepository;
+import ru.wolf.api.backlog.BacklogItem;
+import ru.wolf.api.backlog.BacklogItemRepository;
 import ru.wolf.api.goal.Goal;
 import ru.wolf.api.goal.GoalFactService;
 import ru.wolf.api.goal.GoalWeekBudget;
@@ -45,7 +45,7 @@ public class MorningDigestService {
     private final ProjectRepository projectRepository;
     private final NoteRepository noteRepository;
     private final DeloProjectRepository deloProjectRepository;
-    private final WeekBacklogRepository weekBacklogRepository;
+    private final BacklogItemRepository backlogItemRepository;
     private final IdeaRepository ideaRepository;
     private final GoalRepository goalRepository;
     private final GoalWeekBudgetRepository goalWeekBudgetRepository;
@@ -77,12 +77,9 @@ public class MorningDigestService {
                         note.getCreatedAt(), note.getUpdatedAt()))
                 .toList();
 
-        WeekBacklog backlog = weekBacklogRepository
-                .findByUserAndIsoYearAndIsoWeek(user, week.year(), week.week())
-                .orElse(null);
-        Set<Long> queuedDeloIds = backlog == null ? Set.of() : backlog.getDelos().stream()
-                .map(delo -> delo.getId())
-                .collect(Collectors.toSet());
+        String period = "%d-W%02d".formatted(week.year(), week.week());
+        Set<Long> queuedDeloIds = backlogItemRepository.findPeriod(user, BacklogItem.Scope.WEEK, period).stream()
+                .map(item -> item.getDelo().getId()).collect(Collectors.toSet());
 
         List<MorningDigestController.DeloDigest> delos = deloProjectRepository.findByProjectId(project.getId()).stream()
                 .map(DeloProject::getDelo)
