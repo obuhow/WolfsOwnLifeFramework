@@ -8,9 +8,12 @@ import ru.wolf.api.user.User;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, Long> {
+
+    List<Project> findByPlanFrozenAtBeforeOrPlanFrozenAtIsNull(LocalDate date);
 
     @Query("""
             SELECT DISTINCT p FROM Project p

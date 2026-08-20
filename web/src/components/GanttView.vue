@@ -11,6 +11,7 @@ const hourAccountingMode = ref('PRIMARY_ONLY')
 const timezone = ref('Europe/Moscow')
 const weeks = ref([])
 const projects = ref([])
+const forecasts = ref([])
 const areas = ref([])
 
 const weekCount = ref(16)
@@ -65,6 +66,14 @@ async function loadGantt() {
     timezone.value = body.timezone || timezone.value
     weeks.value = body.weeks || []
     projects.value = body.projects || []
+
+    const forecastRes = await fetch(`${apiBase()}/gantt/forecast`, { headers })
+    if (handleAuthFailure(forecastRes)) return
+    if (!forecastRes.ok) {
+      const err = await forecastRes.json().catch(() => ({}))
+      throw new Error(err.message || `Прогноз: HTTP ${forecastRes.status}`)
+    }
+    forecasts.value = await forecastRes.json()
     if (!rangeFrom.value && body.rangeStart) {
       rangeFrom.value = body.rangeStart
     }
@@ -213,6 +222,28 @@ function planBarWidth(hours) {
 function factBarWidth(hours) {
   const n = Number(hours) || 0
   return Math.min(100, Math.round((n / 40) * 100))
+}
+
+function forecastFor(projectId) {
+  return forecasts.value.find(item => item.projectId === projectId) || null
+}
+
+function forecastBarWidth(project, week) {
+  const forecast = forecastFor(project.id)
+  if (!forecast || !forecast.forecastEnd) return 0
+  const start = weeks.value.find(item => item.current)?.weekStart || week.weekStart
+  if (start >= week.weekEndExclusive || forecast.forecastEnd <= week.weekStart) return 0
+  const weekStartMs = Date.parse(week.weekStart)
+  const weekEndMs = Date.parse(week.weekEndExclusive)
+  const overlapStart = Math.max(Date.parse(start), weekStartMs)
+  const overlapEnd = Math.min(Date.parse(forecast.forecastEnd), weekEndMs)
+  return Math.max(0, Math.min(100, Math.round(((overlapEnd - overlapStart) / (weekEndMs - weekStartMs)) * 100)))
+}
+
+function forecastTitle(project) {
+  const forecast = forecastFor(project.id)
+  if (!forecast || !forecast.forecastEnd) return 'Данных для прогноза пока мало'
+  return `Прогноз: ${forecast.forecastEnd} · среднее ${formatHours(forecast.weeklyAvg)} ч/нед · осталось ${formatHours(forecast.remaining)} ч`
 }
 
 function hasDateStrip(project, week) {
@@ -382,9 +413,14 @@ onMounted(loadAll)
                   </template>
                 </span>
               </div>
-              <div class="strip fact" :title="`Факт: ${formatHours(c.factHours)} ч`">
-                <div class="bar" :style="{ width: factBarWidth(c.factHours) + '%' }"></div>
-                <span class="val fact-val">{{ formatHours(c.factHours) }}</span>
+              <div class="strip forecast" :title="forecastTitle(p)">
+                <div
+                  class="bar"
+                  :style="{ width: forecastBarWidth(p, weeks.find(w => w.isoYear === c.isoYear && w.isoWeek === c.isoWeek) || {}) + '%' }"
+                ></div>
+                <span class="val forecast-val">
+                  {{ forecastFor(p.id)?.forecastEnd && weeks.find(w => w.weekStart <= forecastFor(p.id).forecastEnd && forecastFor(p.id).forecastEnd < w.weekEndExclusive)?.weekStart === (weeks.find(w => w.isoYear === c.isoYear && w.isoWeek === c.isoWeek)?.weekStart) ? forecastFor(p.id).forecastEnd : '' }}
+                </span>
               </div>
             </div>
           </div>
@@ -393,8 +429,8 @@ onMounted(loadAll)
     </div>
 
     <p class="legend muted">
-      Верхняя полоска — <strong>план</strong> (клик / двойной клик — правка часов), нижняя — <strong>факт</strong> из выполненных Записей времени.
-      Ad-hoc не входит в факт. Режим учёта: {{ MODE_LABEL[hourAccountingMode] }}.
+      Верхняя полоска — <strong>план</strong> (клик / двойной клик — правка часов), нижняя — <strong>прогноз</strong>.
+      Наведите на прогноз, чтобы увидеть среднее за 4 недели и остаток. Если данных мало, отображается нейтральное пояснение.
     </p>
   </div>
 </template>
@@ -916,8 +952,10 @@ onMounted(loadAll)
 .gantt-page .strip .bar { border-radius: 0; }
 .gantt-page .strip.plan .bar { background: var(--wolf-ink); }
 .gantt-page .strip.fact .bar { background: var(--wolf-done-ink); }
+.gantt-page .strip.forecast .bar { background: var(--wolf-muted); }
 .gantt-page :is(.strip .val, .plan-val) { color: var(--wolf-ink); }
 .gantt-page .fact-val { color: var(--wolf-done-ink); }
+.gantt-page .forecast-val { color: var(--wolf-muted); font-size: 0.58rem; }
 .gantt-page .plan-input { background: var(--wolf-surface); outline-color: var(--wolf-ink); border-radius: 0; }
 .gantt-page .project-link:hover { color: var(--wolf-ink); }
 .gantt-page :is(.w-date, .area-tag, .depth-mark, .muted, .filter-check) { color: var(--wolf-muted); }

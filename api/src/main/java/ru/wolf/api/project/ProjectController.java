@@ -23,6 +23,7 @@ import ru.wolf.api.user.UserRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -92,6 +93,7 @@ public class ProjectController {
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .totalPlanHours(request.getTotalPlanHours())
+                .planFrozenAt(LocalDate.now().with(TemporalAdjusters.firstDayOfMonth()))
                 .build();
 
         Project saved = projectRepository.save(project);

@@ -56,6 +56,9 @@ public class Project {
     @Column(name = "total_plan_hours", precision = 10, scale = 2)
     private BigDecimal totalPlanHours;
 
+    @Column(name = "plan_frozen_at")
+    private LocalDate planFrozenAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
