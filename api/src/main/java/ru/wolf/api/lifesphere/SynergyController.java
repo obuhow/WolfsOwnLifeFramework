@@ -24,6 +24,7 @@ public class SynergyController {
     private final ru.wolf.api.project.ProjectRepository projectRepository;
     private final ru.wolf.api.user.UserRepository userRepository;
     private final IdeaRepository ideaRepository;
+    private final ru.wolf.api.routine.RoutineRepository routineRepository;
 
     @PostMapping
     public ResponseEntity<SynergyResponse> createSynergy(
@@ -43,15 +44,21 @@ public class SynergyController {
         }
 
         Long ideaId = request.getIdeaId();
+        ru.wolf.api.routine.Routine routine = null;
+        if (request.getRoutineId() != null) {
+            routine = routineRepository.findByUserAndId(user, request.getRoutineId())
+                    .orElseThrow(() -> new IllegalArgumentException("Рутина не найдена"));
+        }
 
         if (ideaId != null) {
             ideaRepository.findByUserAndId(user, ideaId)
                     .orElseThrow(() -> new IllegalArgumentException("Идея не найдена"));
         }
 
-        // Validate: exactly one of projectId or ideaId must be provided
-        if ((project == null && ideaId == null) || (project != null && ideaId != null)) {
-            throw new IllegalArgumentException("Должен быть указан ровно один из: projectId или ideaId");
+        // Validate: exactly one owner must be provided
+        int targetCount = (project == null ? 0 : 1) + (ideaId == null ? 0 : 1) + (routine == null ? 0 : 1);
+        if (targetCount != 1) {
+            throw new IllegalArgumentException("Должен быть указан ровно один из: projectId, ideaId или routineId");
         }
 
         // Check uniqueness
@@ -61,11 +68,15 @@ public class SynergyController {
         if (ideaId != null && synergyRepository.existsByUserAndIdeaIdAndSphere(user, ideaId, sphere)) {
             throw new IllegalArgumentException("Связь между этой идеей и сферой уже существует");
         }
+        if (routine != null && synergyRepository.existsByUserAndRoutineAndSphere(user, routine, sphere)) {
+            throw new IllegalArgumentException("Связь между этой рутиной и сферой уже существует");
+        }
 
         Synergy synergy = Synergy.builder()
                 .user(user)
                 .project(project)
                 .ideaId(ideaId)
+                .routine(routine)
                 .sphere(sphere)
                 .impact(request.getImpact())
                 .build();
@@ -78,13 +89,14 @@ public class SynergyController {
     public ResponseEntity<List<SynergyResponse>> getSynergies(
             Authentication authentication,
             @RequestParam(required = false) Long projectId,
-            @RequestParam(required = false) Long ideaId
+            @RequestParam(required = false) Long ideaId,
+            @RequestParam(required = false) Long routineId
     ) {
         ru.wolf.api.user.User user = userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        if (projectId != null && ideaId != null) {
-            throw new IllegalArgumentException("Нельзя одновременно указать projectId и ideaId");
+        if ((projectId != null ? 1 : 0) + (ideaId != null ? 1 : 0) + (routineId != null ? 1 : 0) > 1) {
+            throw new IllegalArgumentException("Нельзя одновременно указать несколько владельцев синергии");
         }
 
         List<Synergy> synergies;
@@ -96,6 +108,12 @@ public class SynergyController {
             ideaRepository.findByUserAndId(user, ideaId)
                     .orElseThrow(() -> new IllegalArgumentException("Идея не найдена"));
             synergies = synergyRepository.findByUserAndIdeaIdWithSphere(user, ideaId);
+        } else if (routineId != null) {
+            ru.wolf.api.routine.Routine routine = routineRepository.findByUserAndId(user, routineId)
+                    .orElseThrow(() -> new IllegalArgumentException("Рутина не найдена"));
+            synergies = synergyRepository.findByUserWithSphere(user).stream()
+                    .filter(s -> s.getRoutine() != null && s.getRoutine().getId().equals(routine.getId()))
+                    .toList();
         } else {
             // Return all user's synergies
             synergies = synergyRepository.findByUserWithSphere(user);
@@ -156,6 +174,7 @@ public class SynergyController {
                 synergy.getId(),
                 synergy.getProject() != null ? synergy.getProject().getId() : null,
                 synergy.getIdeaId(),
+                synergy.getRoutine() != null ? synergy.getRoutine().getId() : null,
                 synergy.getSphere().getId(),
                 synergy.getSphere().getName(),
                 synergy.getSphere().getColor(),
@@ -170,6 +189,7 @@ public class SynergyController {
         private Long id;
         private Long projectId;
         private Long ideaId;
+        private Long routineId;
         private Long sphereId;
         private String sphereName;
         private String sphereColor;
@@ -185,6 +205,7 @@ public class SynergyController {
 
         private Long projectId;
         private Long ideaId;
+        private Long routineId;
 
         @NotNull
         private Synergy.Impact impact;

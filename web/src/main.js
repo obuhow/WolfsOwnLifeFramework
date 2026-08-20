@@ -16,6 +16,7 @@ import GoalsView from './components/GoalsView.vue'
 import IdeasView from './components/IdeasView.vue'
 import IdeaDetailView from './components/IdeaDetailView.vue'
 import MorningView from './components/MorningView.vue'
+import RoutinesView from './components/RoutinesView.vue'
 
 const routes = [
   { path: '/', redirect: '/today' },
@@ -34,6 +35,7 @@ const routes = [
   { path: '/projects/:id', component: ProjectDetailView, meta: { requiresAuth: true } },
   { path: '/delos', component: DelosView, meta: { requiresAuth: true } },
   { path: '/delos/:id', component: DeloDetailView, meta: { requiresAuth: true } },
+  { path: '/routines', component: RoutinesView, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

@@ -154,6 +154,13 @@ onMounted(async () => {
               Цели
             </router-link>
             <router-link
+              to="/routines"
+              class="nav-link"
+              :class="{ active: route.path === '/routines' }"
+            >
+              Рутины
+            </router-link>
+            <router-link
               to="/ideas"
               class="nav-link"
               :class="{ active: route.path === '/ideas' }"
