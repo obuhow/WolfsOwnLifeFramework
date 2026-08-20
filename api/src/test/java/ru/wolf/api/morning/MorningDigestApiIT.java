@@ -7,6 +7,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
+import ru.wolf.api.backlog.WeekBacklogRepository;
 import ru.wolf.api.goal.GoalController;
 import ru.wolf.api.goal.GoalProjectRepository;
 import ru.wolf.api.goal.GoalRepository;
@@ -40,6 +41,7 @@ class MorningDigestApiIT extends ApiIntegrationTest {
     @Autowired NoteRepository noteRepository;
     @Autowired DeloProjectRepository deloProjectRepository;
     @Autowired DeloRepository deloRepository;
+    @Autowired WeekBacklogRepository weekBacklogRepository;
     @Autowired ProjectRepository projectRepository;
     @Autowired LifeAreaRepository lifeAreaRepository;
     @Autowired IdeaRepository ideaRepository;
@@ -54,6 +56,7 @@ class MorningDigestApiIT extends ApiIntegrationTest {
         goalWeekBudgetRepository.deleteAll();
         goalProjectRepository.deleteAll();
         goalRepository.deleteAll();
+        weekBacklogRepository.deleteAll();
         deloProjectRepository.deleteAll();
         timeEntryRepository.deleteAll();
         deloRepository.deleteAll();
@@ -72,6 +75,11 @@ class MorningDigestApiIT extends ApiIntegrationTest {
         List<Long> deloIds = new ArrayList<>();
         for (int i = 1; i <= 3; i++) {
             deloIds.add(createDelo(client, "Дело " + i, List.of(project.getId())));
+        }
+        for (Long deloId : deloIds) {
+            client.post().uri(uri -> uri.path("/api/v1/backlog/week/{year}/{week}/delos/{deloId}")
+                            .build(Integer.parseInt(week.substring(0, 4)), Integer.parseInt(week.substring(6)), deloId))
+                    .exchange().expectStatus().isOk();
         }
         for (int i = 1; i <= 5; i++) {
             NoteController.NoteRequest request = new NoteController.NoteRequest();

@@ -95,7 +95,7 @@ onMounted(load)
         <h2>Идеи для всплытия</h2>
         <div v-if="!digest.ideas.length" class="muted-block">В банке пока нет идей.</div>
         <div v-else class="morning-idea-grid">
-          <router-link v-for="idea in digest.ideas" :key="idea.id" to="/ideas" class="morning-idea">
+          <router-link v-for="idea in digest.ideas" :key="idea.id" :to="`/ideas/${idea.id}`" class="morning-idea">
             <strong>{{ idea.title }}</strong>
             <span>{{ categoryLabel(idea.category) }}</span>
             <p v-if="idea.description">{{ idea.description }}</p>
