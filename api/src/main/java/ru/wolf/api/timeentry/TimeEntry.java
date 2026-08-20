@@ -62,7 +62,9 @@ public class TimeEntry {
         /** запланирована */
         PLANNED,
         /** выполнена */
-        DONE
+        DONE,
+        /** ячейка импорта не содержит распознанного дела */
+        UNKNOWN
     }
 
     public boolean isAdHoc() {

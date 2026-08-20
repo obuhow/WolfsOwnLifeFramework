@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Таблица `activity_mapping` (user_id, activity_text, delo_id) + уникальный индекс (user_id, activity_text)
 - [ ] Таблица `xlsx_import_run` (id, user_id, filename, status, total_cells, mapped, unknown, pending_questions, created_at)
