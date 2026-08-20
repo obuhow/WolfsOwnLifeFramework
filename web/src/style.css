@@ -456,6 +456,10 @@ input[type="radio"] {
 .primary-badge { border-bottom-color: var(--wolf-ink); background: transparent; color: var(--wolf-ink); }
 
 .project-link-row { padding: 9px 0; border-radius: 0; background: transparent; border-bottom: 1px solid var(--wolf-rule); }
+.dependency-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.dependency-columns h3 { margin: 0 0 8px; color: var(--wolf-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.dependency-columns .project-link-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dependency-input { min-width: min(280px, 40vw); }
 
 .notes-panel { margin-top: 24px; }
 .notes-toolbar { margin-bottom: 14px; }
@@ -479,6 +483,8 @@ input[type="radio"] {
 @media (max-width: 640px) {
   .notes-form-row, .notes-filters { grid-template-columns: 1fr; }
   .note-meta, .note-footer { align-items: flex-start; flex-direction: column; }
+  .dependency-columns { grid-template-columns: 1fr; }
+  .dependency-input { min-width: 0; width: 100%; }
 }
 
 /* Shared modal shell used by time record pickers */
