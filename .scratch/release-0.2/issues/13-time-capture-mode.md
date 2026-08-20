@@ -8,7 +8,7 @@
 
 **Blocked by:** None — can start immediately (расширяет 0.1).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## Настройка и сессии
 
