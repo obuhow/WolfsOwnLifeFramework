@@ -274,6 +274,29 @@ class ProjectApiIT extends ApiIntegrationTest {
     }
 
     @Test
+    void reject_direct_dependency_cycle_with_path() {
+        WebTestClient authed = authedAdminClient();
+        Long areaId = createLifeArea(authed, "Работа");
+        ProjectController.ProjectResponse a = createProject(authed, areaId, null, "A");
+        ProjectController.ProjectResponse b = createProject(authed, areaId, null, "B");
+
+        addDependency(authed, b.getId(), a.getId());
+
+        String message = authed.post()
+                .uri("/api/v1/projects/{id}/dependencies", a.getId())
+                .bodyValue(new ProjectDependencyController.AddDependencyRequest(b.getId()))
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody(Map.class)
+                .returnResult()
+                .getResponseBody()
+                .get("message")
+                .toString();
+
+        assertThat(message).contains("Цикл зависимостей", "B", "A", "B");
+    }
+
+    @Test
     void reject_dependency_cycle_with_path() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
