@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.delo.DeloProject;
 import ru.wolf.api.delo.DeloProjectRepository;
+import ru.wolf.api.backlog.WeekBacklog;
+import ru.wolf.api.backlog.WeekBacklogRepository;
 import ru.wolf.api.goal.Goal;
 import ru.wolf.api.goal.GoalFactService;
 import ru.wolf.api.goal.GoalWeekBudget;
@@ -43,6 +45,7 @@ public class MorningDigestService {
     private final ProjectRepository projectRepository;
     private final NoteRepository noteRepository;
     private final DeloProjectRepository deloProjectRepository;
+    private final WeekBacklogRepository weekBacklogRepository;
     private final IdeaRepository ideaRepository;
     private final GoalRepository goalRepository;
     private final GoalWeekBudgetRepository goalWeekBudgetRepository;
@@ -57,14 +60,15 @@ public class MorningDigestService {
 
         List<MorningDigestController.ProjectDigest> projects = projectRepository.findByUserOrderByTitleAsc(user).stream()
                 .filter(project -> project.getStatus() == Project.Status.IN_PROGRESS)
-                .map(this::projectDigest)
+                .map(project -> projectDigest(project, user, week))
                 .toList();
 
         return new MorningDigestController.MorningDigestResponse(
                 weekId, projects, selectIdeas(user), goalFactDigest(user, weekId, week));
     }
 
-    private MorningDigestController.ProjectDigest projectDigest(Project project) {
+    private MorningDigestController.ProjectDigest projectDigest(
+            Project project, User user, GoalFactService.IsoWeek week) {
         List<Note> notes = noteRepository.findByUserAndProjectIdOrderByCreatedAtDesc(
                 project.getUser(), project.getId(), PageRequest.of(0, 5));
         List<MorningDigestController.NoteDigest> noteResponses = notes.stream()
@@ -73,8 +77,16 @@ public class MorningDigestService {
                         note.getCreatedAt(), note.getUpdatedAt()))
                 .toList();
 
+        WeekBacklog backlog = weekBacklogRepository
+                .findByUserAndIsoYearAndIsoWeek(user, week.year(), week.week())
+                .orElse(null);
+        Set<Long> queuedDeloIds = backlog == null ? Set.of() : backlog.getDelos().stream()
+                .map(delo -> delo.getId())
+                .collect(Collectors.toSet());
+
         List<MorningDigestController.DeloDigest> delos = deloProjectRepository.findByProjectId(project.getId()).stream()
                 .map(DeloProject::getDelo)
+                .filter(delo -> queuedDeloIds.contains(delo.getId()))
                 .collect(Collectors.toMap(
                         delo -> delo.getId(), Function.identity(), (first, ignored) -> first))
                 .values().stream()

@@ -14,6 +14,7 @@ import WeekView from './components/WeekView.vue'
 import GanttView from './components/GanttView.vue'
 import GoalsView from './components/GoalsView.vue'
 import IdeasView from './components/IdeasView.vue'
+import IdeaDetailView from './components/IdeaDetailView.vue'
 import MorningView from './components/MorningView.vue'
 
 const routes = [
@@ -26,6 +27,7 @@ const routes = [
   { path: '/goals', component: GoalsView, meta: { requiresAuth: true } },
   { path: '/goals/:id', component: GoalsView, meta: { requiresAuth: true } },
   { path: '/ideas', component: IdeasView, meta: { requiresAuth: true } },
+  { path: '/ideas/:id', component: IdeaDetailView, meta: { requiresAuth: true } },
   { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
   { path: '/life-areas', component: LifeAreasView, meta: { requiresAuth: true } },
   { path: '/projects', component: ProjectsView, meta: { requiresAuth: true } },
