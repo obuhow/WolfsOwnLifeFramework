@@ -14,11 +14,13 @@ import WeekView from './components/WeekView.vue'
 import GanttView from './components/GanttView.vue'
 import GoalsView from './components/GoalsView.vue'
 import IdeasView from './components/IdeasView.vue'
+import MorningView from './components/MorningView.vue'
 
 const routes = [
   { path: '/', redirect: '/today' },
   { path: '/login', component: LoginView, meta: { public: true } },
   { path: '/today', component: TodayView, meta: { requiresAuth: true } },
+  { path: '/morning', component: MorningView, meta: { requiresAuth: true } },
   { path: '/week', component: WeekView, meta: { requiresAuth: true } },
   { path: '/gantt', component: GanttView, meta: { requiresAuth: true } },
   { path: '/goals', component: GoalsView, meta: { requiresAuth: true } },
