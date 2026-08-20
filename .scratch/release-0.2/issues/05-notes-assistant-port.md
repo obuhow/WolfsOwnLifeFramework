@@ -4,15 +4,19 @@
 
 **Blocked by:** 04 — Заметки (нужна модель Заметок).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Interface `NotesAssistant` в domain layer (не инфраструктура)
-- [ ] `FakeNotesAssistant` с конфигурируемыми ответами для тестов
-- [ ] `HttpNotesAssistant` за feature flag, конфиг через application.yml (url, api-key, model)
-- [ ] `POST /api/v1/notes/audio` (multipart) → сохранение файла в volume → транскрипт через порт → Заметка с body=транскрипт и audio_ref
-- [ ] `GET /api/v1/projects/{id}/resume?limit=10` — LLM-сводка последних заметок
-- [ ] Аудио-файлы: локальный volume или S3-compatible, путь в `note_attachment`
-- [ ] Feature flag: при `wolf.llm.enabled=false` endpoints транскрипта и резюме → 503 с пояснением
-- [ ] API test: загрузить аудио → заметка создана с транскриптом от fake
-- [ ] API test: 3 заметки к проекту → `/resume` возвращает сводку fake, содержащую ключевые слова заметок
-- [ ] API test: при выключенном флаге → 503
+- [x] Interface `NotesAssistant` в domain layer (не инфраструктура)
+- [x] `FakeNotesAssistant` с конфигурируемыми ответами для тестов
+- [x] `HttpNotesAssistant` за feature flag, конфиг через application.yml (url, api-key, model)
+- [x] `POST /api/v1/notes/audio` (multipart) → сохранение файла в volume → транскрипт через порт → Заметка с body=транскрипт и audio_ref
+- [x] `GET /api/v1/projects/{id}/resume?limit=10` — LLM-сводка последних заметок
+- [x] Аудио-файлы: локальный volume или S3-compatible, путь в `note_attachment`
+- [x] Feature flag: при `wolf.llm.enabled=false` endpoints транскрипта и резюме → 503 с пояснением
+- [x] API test: загрузить аудио → заметка создана с транскриптом от fake
+- [x] API test: 3 заметки к проекту → `/resume` возвращает сводку fake, содержащую ключевые слова заметок
+- [x] API test: при выключенном флаге → 503
+
+## Answer
+
+Реализовано в ветке `feature/05-notes-assistant-port`. Проверены API-тесты аудиозаметки, сводки и выключенного feature flag.

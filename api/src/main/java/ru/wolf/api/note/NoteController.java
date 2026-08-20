@@ -154,6 +154,7 @@ public class NoteController {
                 note.getAuthor(),
                 note.getBody(),
                 Arrays.asList(note.getTags()),
+                note.getAudioAttachment() == null ? null : note.getAudioAttachment().getAudioRef(),
                 note.getCreatedAt(),
                 note.getUpdatedAt()
         );
@@ -189,6 +190,7 @@ public class NoteController {
         private Note.Author author;
         private String body;
         private List<String> tags;
+        private String audioRef;
         private java.time.Instant createdAt;
         private java.time.Instant updatedAt;
     }

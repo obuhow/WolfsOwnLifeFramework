@@ -52,6 +52,9 @@ public class Note {
     @Builder.Default
     private String[] tags = new String[0];
 
+    @OneToOne(mappedBy = "note", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private NoteAttachment audioAttachment;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

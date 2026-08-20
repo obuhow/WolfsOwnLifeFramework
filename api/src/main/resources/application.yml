@@ -21,6 +21,16 @@ spring:
     init:
       mode: never
 
+wolf:
+  agent:
+    cron: ${WOLF_AGENT_CRON:0 0 4 * * *}
+  llm:
+    enabled: ${WOLF_LLM_ENABLED:false}
+    url: ${WOLF_LLM_URL:https://api.x.ai/v1}
+    api-key: ${WOLF_LLM_API_KEY:}
+    model: ${WOLF_LLM_MODEL:grok-3-mini}
+    audio-directory: ${WOLF_AUDIO_DIRECTORY:${user.home}/.wolf/audio}
+
 server:
   port: ${SERVER_PORT:8082}
 
