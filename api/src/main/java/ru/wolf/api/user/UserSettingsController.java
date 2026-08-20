@@ -47,6 +47,13 @@ public class UserSettingsController {
             user.setDefaultSleepEnd(LocalTime.parse(request.getDefaultSleepEnd()));
         }
         user.setHourAccountingMode(request.getHourAccountingMode());
+        if (request.getTimeCaptureMode() != null && !request.getTimeCaptureMode().isBlank()) {
+            String mode = request.getTimeCaptureMode().toUpperCase();
+            if (!mode.equals("PARALLEL_SLOTS") && !mode.equals("PRIMARY_FOCUS")) {
+                throw new IllegalArgumentException("Неизвестный режим фиксации времени");
+            }
+            user.setTimeCaptureMode(mode);
+        }
         if (request.getAvailableWeeklyHours() != null) {
             user.setAvailableWeeklyHours(request.getAvailableWeeklyHours());
         }
@@ -64,13 +71,13 @@ public class UserSettingsController {
                 user.getDayEnd(),
                 user.getDefaultSleepEnd(),
                 user.getHourAccountingMode(),
+                user.getTimeCaptureMode(),
                 user.getAvailableWeeklyHours()
         );
     }
 
     @Data
     @NoArgsConstructor
-    @AllArgsConstructor
     public static class UserSettingsResponse {
         private String timezone;
         private LocalTime nightStart;
@@ -80,7 +87,22 @@ public class UserSettingsController {
         /** Конец интервала авто-Сна, e.g. 09:00 */
         private LocalTime defaultSleepEnd;
         private String hourAccountingMode;
+        private String timeCaptureMode;
         private BigDecimal availableWeeklyHours;
+
+        public UserSettingsResponse(String timezone, LocalTime nightStart, LocalTime nightEnd,
+                                    LocalTime dayEnd, LocalTime defaultSleepEnd,
+                                    String hourAccountingMode, String timeCaptureMode,
+                                    BigDecimal availableWeeklyHours) {
+            this.timezone = timezone;
+            this.nightStart = nightStart;
+            this.nightEnd = nightEnd;
+            this.dayEnd = dayEnd;
+            this.defaultSleepEnd = defaultSleepEnd;
+            this.hourAccountingMode = hourAccountingMode;
+            this.timeCaptureMode = timeCaptureMode;
+            this.availableWeeklyHours = availableWeeklyHours;
+        }
     }
 
     @Data
@@ -103,6 +125,8 @@ public class UserSettingsController {
 
         @NotBlank
         private String hourAccountingMode;
+
+        private String timeCaptureMode;
 
         @DecimalMin(value = "0.0", inclusive = true)
         private BigDecimal availableWeeklyHours;

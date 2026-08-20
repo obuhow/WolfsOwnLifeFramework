@@ -9,6 +9,7 @@ const settings = ref({
   dayEnd: '02:00',
   defaultSleepEnd: '09:00',
   hourAccountingMode: 'PRIMARY_ONLY',
+  timeCaptureMode: 'PARALLEL_SLOTS',
   availableWeeklyHours: 30
 })
 
@@ -62,6 +63,7 @@ async function loadSettings() {
       dayEnd: data.dayEnd?.slice(0, 5) || '02:00',
       defaultSleepEnd: data.defaultSleepEnd?.slice(0, 5) || '09:00',
       hourAccountingMode: data.hourAccountingMode,
+      timeCaptureMode: data.timeCaptureMode || 'PARALLEL_SLOTS',
       availableWeeklyHours: data.availableWeeklyHours ?? 30
     }
   } catch (e) {
@@ -196,6 +198,15 @@ onMounted(loadSettings)
             <strong>Только основной проект:</strong> часы засчитываются только в Основной проект Дела (по умолчанию).<br>
             <strong>Все проекты:</strong> часы засчитываются во все привязанные проекты Дела.
           </p>
+        </div>
+
+        <div class="form-group">
+          <label for="timeCaptureMode">Режим фиксации времени</label>
+          <select id="timeCaptureMode" v-model="settings.timeCaptureMode" :disabled="loading" class="input">
+            <option value="PARALLEL_SLOTS">Параллельные слоты</option>
+            <option value="PRIMARY_FOCUS">Фокус-сессия</option>
+          </select>
+          <p class="hint">Как удобнее вводить факт сегодня: вручную по 15-минутным слотам или одной Фокус-сессией с отметками переключений.</p>
         </div>
 
         <div class="form-group">

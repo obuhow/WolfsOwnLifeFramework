@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase, authHeaders, handleAuthFailure } from '../api'
+import FocusPanel from './FocusPanel.vue'
 
 const loading = ref(false)
 const error = ref('')
@@ -14,6 +15,7 @@ const delos = ref([])
 const projects = ref([])
 const nightStart = ref('23:00')
 const nightEnd = ref('07:00')
+const timeCaptureMode = ref('PARALLEL_SLOTS')
 // Default hidden per glossary / US-17
 const showNightHours = ref(false)
 
@@ -291,6 +293,7 @@ async function loadSettings() {
   nightStart.value = (data.nightStart || '23:00:00').slice(0, 5)
   nightEnd.value = (data.nightEnd || '07:00:00').slice(0, 5)
   dayEndSetting.value = (data.dayEnd || '02:00:00').slice(0, 5)
+  timeCaptureMode.value = data.timeCaptureMode || 'PARALLEL_SLOTS'
 }
 
 function dayBounds(dateStr) {
@@ -678,6 +681,7 @@ onMounted(loadAll)
 
 <template>
   <div class="today-page">
+    <FocusPanel v-if="timeCaptureMode === 'PRIMARY_FOCUS'" />
     <header class="page-header today-header">
       <div>
         <h1>Сегодня</h1>
