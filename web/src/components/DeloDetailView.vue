@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiBase } from '../api'
+import NotesPanel from './NotesPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -624,6 +625,8 @@ onMounted(loadAll)
           Пока нет учтённых часов по этому Делу.
         </div>
       </section>
+
+      <NotesPanel :delo-id="deloId" />
     </template>
   </div>
 </template>
