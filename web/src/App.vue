@@ -81,9 +81,9 @@ onMounted(async () => {
               Сегодня
             </router-link>
             <router-link
-              to="/week"
+              to="/calendar"
               class="nav-link"
-              :class="{ active: route.path === '/week' }"
+              :class="{ active: route.path === '/calendar' }"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -96,7 +96,7 @@ onMounted(async () => {
                 <line x1="8" y1="18" x2="8" y2="18.01"></line>
                 <line x1="12" y1="18" x2="12" y2="18.01"></line>
               </svg>
-              Неделя
+              Календарь
             </router-link>
             <router-link
               to="/planning"

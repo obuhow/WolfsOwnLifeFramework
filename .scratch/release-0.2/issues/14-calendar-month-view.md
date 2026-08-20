@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Роут `/calendar`, редирект с `/week`, пункт меню «Календарь» (RU-копирайтинг во всех местах, включая заголовки и хлебные крошки)
 - [ ] Переключатель `Неделя | Месяц`, состояние в query-параметрах (`view`, `date`), сохранение последнего выбранного вида в localStorage
