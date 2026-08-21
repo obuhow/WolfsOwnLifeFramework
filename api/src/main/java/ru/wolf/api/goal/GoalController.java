@@ -158,6 +158,7 @@ public class GoalController {
                 .goal(goal)
                 .kind(request.getKind().trim())
                 .value(request.getValue())
+                .targetValue(request.getTargetValue())
                 .at(request.getAt() == null ? LocalDateTime.now() : request.getAt())
                 .build();
         return ResponseEntity.ok(toMetricResponse(metricRepository.save(metric)));
@@ -170,6 +171,19 @@ public class GoalController {
         findGoal(user, id);
         return ResponseEntity.ok(metricRepository.findByGoalIdOrderByAtDesc(id).stream()
                 .map(this::toMetricResponse).toList());
+    }
+
+    @PatchMapping("/{id}/metrics/{metricId}/increment")
+    @Transactional
+    public ResponseEntity<MetricResponse> incrementMetric(Authentication authentication, @PathVariable Long id, @PathVariable Long metricId, @Valid @RequestBody IncrementRequest request) {
+        Goal goal = findGoal(currentUser(authentication), id);
+        GoalMetric metric = metricRepository.findById(metricId).filter(item -> item.getGoal().getId().equals(goal.getId())).orElseThrow(() -> new IllegalArgumentException("Метрика не найдена"));
+        BigDecimal next = metric.getValue().add(request.getAmount());
+        if (next.compareTo(BigDecimal.ZERO) < 0) throw new IllegalArgumentException("Значение метрики не может быть ниже нуля");
+        if (metric.getTargetValue() != null && next.compareTo(metric.getTargetValue()) > 0) throw new IllegalArgumentException("Значение метрики не может превышать цель");
+        metric.setValue(next);
+        metric.setAt(LocalDateTime.now());
+        return ResponseEntity.ok(toMetricResponse(metricRepository.saveAndFlush(metric)));
     }
 
     @GetMapping("/{id}/projects")
@@ -258,7 +272,7 @@ public class GoalController {
     }
 
     private BudgetResponse toBudgetResponse(GoalWeekBudget b) { return new BudgetResponse(b.getId(), "%04d-W%02d".formatted(b.getIsoYear(), b.getIsoWeek()), b.getHours()); }
-    private MetricResponse toMetricResponse(GoalMetric m) { return new MetricResponse(m.getId(), m.getKind(), m.getValue(), m.getAt()); }
+    private MetricResponse toMetricResponse(GoalMetric m) { return new MetricResponse(m.getId(), m.getKind(), m.getValue(), m.getTargetValue(), m.getAt()); }
     private String normalize(String value) { return value == null || value.trim().isEmpty() ? null : value.trim(); }
     private String currentIsoWeek() { java.time.LocalDate now = java.time.LocalDate.now(); return "%04d-W%02d".formatted(now.get(java.time.temporal.WeekFields.ISO.weekBasedYear()), now.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear())); }
 
@@ -266,12 +280,13 @@ public class GoalController {
     @Data @NoArgsConstructor @AllArgsConstructor public static class GoalDetailResponse { private GoalResponse goal; private List<ProjectResponse> projects; private List<MetricResponse> metrics; private BudgetResponse budget; private FactResponse fact; }
     @Data @NoArgsConstructor @AllArgsConstructor public static class ProjectResponse { private Long id; private String title; }
     @Data @NoArgsConstructor @AllArgsConstructor public static class BudgetResponse { private Long id; private String week; private BigDecimal hours; }
-    @Data @NoArgsConstructor @AllArgsConstructor public static class MetricResponse { private Long id; private String kind; private BigDecimal value; private LocalDateTime at; }
+    @Data @NoArgsConstructor @AllArgsConstructor public static class MetricResponse { private Long id; private String kind; private BigDecimal value; private BigDecimal targetValue; private LocalDateTime at; }
     @Data @NoArgsConstructor @AllArgsConstructor public static class FactResponse { private String week; private BigDecimal hours; }
     @Data @NoArgsConstructor @AllArgsConstructor public static class CreateGoalRequest { @NotBlank @Size(max = 200) private String title; @Size(max = 10000) private String description; @Positive private Integer priority; }
     @Data @NoArgsConstructor @AllArgsConstructor public static class UpdateGoalRequest { @NotBlank @Size(max = 200) private String title; @Size(max = 10000) private String description; @Positive private Integer priority; }
     @Data @NoArgsConstructor @AllArgsConstructor public static class PriorityRequest { @NotNull @Positive private Integer priority; }
     @Data @NoArgsConstructor @AllArgsConstructor public static class BudgetRequest { @NotBlank private String week; @NotNull @DecimalMin(value = "0.0", inclusive = true) private BigDecimal hours; }
-    @Data @NoArgsConstructor @AllArgsConstructor public static class MetricRequest { @NotBlank @Size(max = 100) private String kind; @NotNull private BigDecimal value; private LocalDateTime at; }
+    @Data @NoArgsConstructor @AllArgsConstructor public static class MetricRequest { @NotBlank @Size(max = 100) private String kind; @NotNull private BigDecimal value; private BigDecimal targetValue; private LocalDateTime at; public MetricRequest(String kind, BigDecimal value, LocalDateTime at) { this(kind, value, null, at); } }
+    @Data @NoArgsConstructor @AllArgsConstructor public static class IncrementRequest { @NotNull private BigDecimal amount; }
 
 }
