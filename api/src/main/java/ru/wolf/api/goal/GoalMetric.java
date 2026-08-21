@@ -30,6 +30,9 @@ public class GoalMetric {
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal value;
 
+    @Column(name = "target_value", precision = 19, scale = 4)
+    private BigDecimal targetValue;
+
     @Column(name = "measured_at", nullable = false)
     private LocalDateTime at;
 
