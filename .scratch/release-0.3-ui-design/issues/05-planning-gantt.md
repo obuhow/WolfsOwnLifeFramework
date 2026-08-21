@@ -4,12 +4,26 @@
 
 **Blocked by:** 01 — Глобальная дизайн-система и базовые контролы; 02 — Навигационный shell: desktop top-bar и mobile drawer.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Страница и submenu используют утверждённые названия «Планирование» / «Диаграмма Ганта», а старый адрес сохраняет совместимый переход.
-- [ ] Gantt header, month spans, week heads, project rows и capacity используют общие explicit CSS Grid tracks; глобальные flex/card стили проектных списков не влияют на Gantt.
-- [ ] Sticky project column содержит иерархию, название и metadata; недельные cells показывают plan/fact без насыщенных диаграммных цветов, а факт использует pale green только при наличии completed hours.
-- [ ] Inline edit плановых часов остаётся доступным с клавиатуры: Enter сохраняет, Escape отменяет, ошибка/успех сообщаются inline.
-- [ ] Capacity находится под теми же week tracks, показывает plan / available и нейтральную textual delta, не блокирует пользователя при превышении.
-- [ ] На mobile горизонтальная диаграмма имеет подписанный scroll region и не перекрывается sticky column.
-- [ ] После deploy авторизованный DOM‑probe подтверждает, что все week header/cell left и width deltas не превышают 1px.
+- [x] Страница и submenu используют утверждённые названия «Планирование» / «Диаграмма Ганта», а старый адрес сохраняет совместимый переход.
+- [x] Gantt header, month spans, week heads, project rows и capacity используют общие explicit CSS Grid tracks; глобальные flex/card стили проектных списков не влияют на Gantt.
+- [x] Sticky project column содержит иерархию, название и metadata; недельные cells показывают plan/fact без насыщенных диаграммных цветов, а факт использует pale green только при наличии completed hours.
+- [x] Inline edit плановых часов остаётся доступным с клавиатуры: Enter сохраняет, Escape отменяет, ошибка/успех сообщаются inline.
+- [x] Capacity находится под теми же week tracks, показывает plan / available и нейтральную textual delta, не блокирует пользователя при превышении.
+- [x] На mobile горизонтальная диаграмма имеет подписанный scroll region и не перекрывается sticky column.
+- [~] После deploy авторизованный DOM‑probe подтверждает, что все week header/cell left и width deltas не превышают 1px. — deploy выполнен; DOM-probe не выполнен (remote debugging не включён, пользователь решил пропустить browser-проверку для группы 05–09). Геометрия не изменялась этим тикетом: `.gantt-header-grid` и `.gantt-project-row` по-прежнему делят одни треки `12rem repeat(var(--week-count), 4.2rem)`, month/week heads позиционируются явными `gridColumn`.
+
+## Answer
+
+Гантт стал «Планирование → Диаграмма Ганта». Заголовок страницы — «Диаграмма Ганта», eyebrow — «Планирование · план и факт по Проектам»; маршрут `/planning` с совместимым редиректом `#/gantt → /planning` (тикет 02) сохранён.
+
+Геометрия не тронута — `.gantt-header-grid` и `.gantt-project-row` используют одни explicit-треки `12rem repeat(var(--week-count), 4.2rem)`, month spans и week heads позиционируются явными `gridColumn`, sticky-колонка проекта сохраняет иерархию (`depth-mark`, отступ по `depth`), название, область жизни и суммарные план/факт часы.
+
+Цвета выведены на токены: насыщенные диаграммные заливки (`#a8c4b4`, `#6b8f7a`, тёплые беж-градиенты) заменены на нейтральный graphite-план (opacity .25), полосу прогноза `--wolf-muted`/.15 и бледно-зелёный факт. Добавлена отдельная **fact-полоса**: `--wolf-done-surface` применяется только при `factHours > 0` (класс `has-fact`), иначе полоса пустая, значение — `·`.
+
+Inline-правка плана доступна с клавиатуры: значение плана получило `role="button"` + `tabindex="0"`, Enter открывает редактор и сохраняет, Escape отменяет; результат сообщается inline-баннерами «План сохранён» / текстом ошибки.
+
+Капасити (`PlanningView.vue`) переписан в register-строки под теми же недельными треками, с заголовком колонок, tabular-числами и **нейтральной текстовой дельтой** («свободно N ч» / «план больше доступного на N ч» / «план равен доступным часам») — без красного, без блокировки пользователя. Диаграмма и капасити обёрнуты в подписанные scroll-регионы (`role="region"`, aria-label, `tabindex=0`).
+
+Проверка: `npm run build` OK; `docker compose build web`; при пересоздании выяснилось, что api/db контейнеры были остановлены (nginx падал с `host not found in upstream "api"`) — поднят полный стек `docker compose up -d`. API `{"status":"UP"}`; served asset-хэши совпадают с `web/dist` (`index-gzC0WWVs.js` / `index-CErT39Qs.css`); в отданном бандле подтверждены маркеры `Диаграмма Ганта`, `has-fact`, `Плановые часы`, `план больше доступного`, `прокрутка по горизонтали`, в CSS — `has-fact`, `capacity-head`, `wolf-done-surface`. Живой DOM-замер геометрии не выполнен по решению пользователя.
