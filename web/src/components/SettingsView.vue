@@ -120,6 +120,8 @@ onMounted(loadSettings)
       <div v-if="loading" class="loading">Загрузка…</div>
 
       <div v-else class="settings-form">
+        <fieldset class="settings-fieldset">
+        <legend>Время и границы суток</legend>
         <div class="form-group">
           <label for="timezone">Часовой пояс</label>
           <select
@@ -183,7 +185,10 @@ onMounted(loadSettings)
             <p class="hint">До этого времени строки скрыты (не включительно)</p>
           </div>
         </div>
+        </fieldset>
 
+        <fieldset class="settings-fieldset">
+        <legend>Учёт часов и нагрузка</legend>
         <div class="form-group">
           <label for="hourAccountingMode">Режим учёта часов</label>
           <select
@@ -214,6 +219,7 @@ onMounted(loadSettings)
           <input id="availableWeeklyHours" v-model.number="settings.availableWeeklyHours" type="number" min="0" step="0.25" :disabled="loading" class="input" />
           <p class="hint">Используется для нейтрального показа недельной нагрузки и влияния сдвига Проектов на Цели. По умолчанию — 30 ч.</p>
         </div>
+        </fieldset>
 
         <div class="form-actions">
           <button

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiBase } from '../api'
 import NotesPanel from './NotesPanel.vue'
+import ConfirmInline from './ConfirmInline.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -341,7 +342,6 @@ async function removeDependency(blockerId) {
 
 async function remove() {
   if (!detail.value) return
-  if (!confirm(`Удалить проект «${detail.value.title}» и все подпроекты?`)) return
   loading.value = true
   error.value = ''
   try {
@@ -458,7 +458,7 @@ onMounted(loadAll)
           <h2 style="margin: 0">Карточка</h2>
           <div class="projects-toolbar-actions">
             <button v-if="!editing" class="btn btn-primary" :disabled="loading" @click="startEdit">Изменить</button>
-            <button v-if="!editing" class="btn btn-ghost" :disabled="loading" style="color: #8a3a3a" @click="remove">Удалить</button>
+            <ConfirmInline v-if="!editing" label="Удалить" :question="`Удалить проект «${detail.title}» и все подпроекты?`" confirm-label="Да, удалить" :disabled="loading" @confirm="remove" />
           </div>
         </div>
 
