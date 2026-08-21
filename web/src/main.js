@@ -23,6 +23,7 @@ import XlsxImportView from './components/XlsxImportView.vue'
 import WaveStatsView from './components/WaveStatsView.vue'
 import ChecklistReportView from './components/ChecklistReportView.vue'
 import DataSyncView from './components/DataSyncView.vue'
+import BacklogView from './components/BacklogView.vue'
 import PlaceholderView from './components/PlaceholderView.vue'
 
 const routes = [
@@ -33,19 +34,11 @@ const routes = [
   // Календарь
   { path: '/week', redirect: '/calendar' },
   { path: '/calendar', component: CalendarView, meta: { requiresAuth: true } },
-  { path: '/calendar/month', component: PlaceholderView, meta: { requiresAuth: true, title: 'Месяц', note: 'Календарь · спокойная сетка месяца', owner: '08', sections: [
-    { title: 'Сетка месяца', description: 'Семь колонок «Пн–Вс», номер дня и компактные фактические подписи записей. Не является редактором слотов — постановка времени остаётся в «Неделе» и «Сегодня».', fields: ['Номер дня и признак «вне месяца»', 'Компактные подписи записей времени', 'Переход к дню открывает Неделю'], empty: 'Сетка появится вместе с месячным контрактом (тикет 08).' }
-  ], asides: [
-    { title: 'Бэклог недели', description: 'Сгруппированный по Проектам реестр с «x / y ч».', empty: 'Данные подключаются в тикете 08.' },
-    { title: 'Бэклог месяца', description: 'Тот же групповой реестр в месячном периоде.', empty: 'Данные подключаются в тикете 08.' }
-  ] } },
+  { path: '/calendar/month', redirect: { path: '/calendar', query: { view: 'month' } } },
   // Планирование
   { path: '/gantt', redirect: '/planning' },
   { path: '/planning', component: PlanningView, meta: { requiresAuth: true } },
-  { path: '/planning/backlog', component: PlaceholderView, meta: { requiresAuth: true, title: 'Бэклог', note: 'Планирование · полностраничный бэклог периода', owner: '08', sections: [
-    { title: 'Период', description: 'Переключатель охвата «Неделя» / «Месяц» и навигация по периодам.', fields: ['Охват: Неделя / Месяц', 'Навигация по периодам', 'Текущий период как метаданные'], empty: 'Контролы периода подключаются в тикете 08.' },
-    { title: 'Группы по Проектам', description: 'Тот же групповой реестр, что в «Сегодня» и «Неделе»: заголовок Проекта и «x / y ч», Дела без Проекта — в группе «Без проекта».', fields: ['Заголовок Проекта и «x / y ч»', 'Дела периода внутри группы', 'Явное текстовое действие «Перенести в неделю»'], empty: 'Группы появятся в тикете 08.' }
-  ] } },
+  { path: '/planning/backlog', component: BacklogView, meta: { requiresAuth: true } },
   // Управление проектами
   { path: '/life-areas', component: LifeAreasView, meta: { requiresAuth: true } },
   { path: '/projects', component: ProjectsView, meta: { requiresAuth: true } },
