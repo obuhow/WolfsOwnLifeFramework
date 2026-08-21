@@ -18,6 +18,14 @@ class DataSyncValidationTest {
     }
 
     @Test
+    void contract_keeps_promoted_project_after_status_column() {
+        assertThat(DataSyncContract.manifest().sheets().stream()
+                .filter(sheet -> sheet.name().equals("ideas"))
+                .findFirst().orElseThrow().columns())
+                .containsExactly("externalId", "title", "description", "category", "status", "promotedProjectExternalId");
+    }
+
+    @Test
     void contract_uses_zero_based_column_positions_for_project_dates() {
         assertThat(DataSyncContract.manifest().sheets().stream()
                 .filter(sheet -> sheet.name().equals("projects"))
