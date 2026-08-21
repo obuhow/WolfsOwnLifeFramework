@@ -9,6 +9,8 @@ const distractionText = ref('')
 const loading = ref(false)
 const error = ref('')
 const notice = ref('')
+const review = ref(null)
+const reviewAllocations = ref([])
 
 async function load() {
   const headers = authHeaders()
@@ -51,8 +53,25 @@ async function stop() {
     const result = await response.json()
     session.value = result.session || result
     notice.value = 'Сессия сохранена. Свободные 15-минутные ячейки добавлены в факт.'
+    await openReview(session.value.id)
   } catch (e) { error.value = e.message } finally { loading.value = false }
 }
+
+async function openReview(id) {
+  const response = await fetch(`${apiBase()}/focus/${id}/review`, { headers: authHeaders() })
+  if (!response.ok) return
+  review.value = await response.json()
+  reviewAllocations.value = review.value.distractions.map(item => ({ distractionId: item.id, deloId: item.deloId || '', minutes: item.suggestedMinutes || '' }))
+}
+
+async function applyReview() {
+  if (!review.value) return
+  const response = await fetch(`${apiBase()}/focus/${review.value.sessionId}/review/apply`, { method: 'POST', headers: authHeaders(true), body: JSON.stringify({ allocations: reviewAllocations.value.filter(item => item.minutes).map(item => ({ ...item, minutes: Number(item.minutes), deloId: Number(item.deloId) })) }) })
+  if (!response.ok) { error.value = `Разбор: HTTP ${response.status}`; return }
+  review.value = null; notice.value = 'Разбор применён. Часы переразнесены по выбранным Делам.'
+}
+
+function keepAsIs() { review.value = null; notice.value = 'Переключения оставлены как отметки; часы не переразносились.' }
 
 async function addDistraction() {
   const text = distractionText.value.trim()
@@ -95,6 +114,15 @@ onMounted(load)
     </div>
     <p v-if="notice" class="hint focus-notice">{{ notice }}</p>
     <p v-if="error" class="alert alert-error">{{ error }}</p>
+    <div v-if="review" class="review-box" aria-label="Разбор переключений">
+      <h3>Разбор переключений</h3><p class="hint">Можно указать минуты или оставить отметку как есть.</p>
+      <div v-for="(item, index) in review.distractions" :key="item.id" class="review-row">
+        <span>переключение на {{ item.deloTitle || item.text || 'текст' }}</span>
+        <input v-model="reviewAllocations[index].minutes" class="input input-sm" type="number" min="15" step="15" placeholder="минуты" />
+        <select v-if="item.deloId === null" v-model="reviewAllocations[index].deloId" class="input input-sm"><option value="">Дело</option><option v-for="delo in delos" :key="delo.id" :value="delo.id">{{ delo.title }}</option></select>
+      </div>
+      <div class="review-actions"><button class="btn btn-primary" @click="applyReview">Применить</button><button class="btn btn-ghost" @click="keepAsIs">Оставить как есть</button></div>
+    </div>
   </section>
 </template>
 
@@ -108,4 +136,9 @@ onMounted(load)
 .focus-actions { flex: 1 1 28rem; justify-content: flex-end; }
 .focus-actions .input { min-width: 16rem; flex: 1; }
 .focus-notice { margin-bottom: 0; }
+.review-box { margin-top: 1rem; border-top: 1px solid var(--wolf-rule); padding-top: 1rem; }
+.review-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .35rem 0; }
+.review-row > span { flex: 1; }
+.review-row .input { width: 7rem; }
+.review-actions { display: flex; gap: .5rem; margin-top: .75rem; }
 </style>
