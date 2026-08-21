@@ -76,6 +76,9 @@ async function applyPreview() {
         <div class="summary-grid">
           <div v-for="(count, sheet) in preview.counts" :key="sheet"><strong>{{ sheet }}</strong><span>{{ count }} строк</span></div>
         </div>
+        <div v-if="preview.plan" class="summary-grid" data-testid="sync-plan">
+          <div v-for="(change, sheet) in preview.plan" :key="`plan-${sheet}`"><strong>{{ sheet }}</strong><span>+{{ change.create }} / ↻{{ change.update }} / ={{ change.skip }} / −{{ change.delete }}</span></div>
+        </div>
         <div v-if="preview.errors?.length" class="alert alert-error">
           <strong>Ошибки: {{ preview.errors.length }}</strong>
           <table><thead><tr><th>Лист</th><th>Строка</th><th>Поле</th><th>Сообщение</th></tr></thead>

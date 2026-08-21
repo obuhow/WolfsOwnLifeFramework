@@ -26,6 +26,8 @@ public class SyncImportPreview {
     private String summaryJson;
     @Column(name = "errors_json", nullable = false, columnDefinition = "TEXT")
     private String errorsJson;
+    @Column(name = "plan_json", nullable = false, columnDefinition = "TEXT")
+    private String planJson;
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
     @Column(name = "expires_at", nullable = false)

@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: wolf-db
+
     environment:
       POSTGRES_DB: wolf
       POSTGRES_USER: wolf
@@ -21,7 +21,7 @@ services:
       context: ./api
       dockerfile: Dockerfile
       network: host
-    container_name: wolf-api
+
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wolf
       SPRING_DATASOURCE_USERNAME: wolf
@@ -38,7 +38,7 @@ services:
       context: ./web
       dockerfile: Dockerfile
       network: host
-    container_name: wolf-web
+
     ports:
       - "80:80"
     depends_on:

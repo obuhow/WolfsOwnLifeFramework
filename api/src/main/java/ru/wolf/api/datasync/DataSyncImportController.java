@@ -50,4 +50,10 @@ public class DataSyncImportController {
     }
 
     public record ApplyRequest(String checksum, boolean deleteMissing, java.util.List<String> scopes) { }
+
+    @GetMapping("/{id}/plan")
+    public ResponseEntity<DataSyncImportService.PreviewResponse> plan(
+            Authentication authentication, @PathVariable Long id) throws Exception {
+        return ResponseEntity.ok(importService.get(currentUser(authentication), id));
+    }
 }

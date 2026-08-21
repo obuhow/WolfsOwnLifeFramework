@@ -101,7 +101,7 @@ public class DataSyncExportService {
                 "ideaExternalId", x.getIdeaId() == null ? null : xid(user, "idea", x.getIdeaId()), "routineExternalId", x.getRoutine() == null ? null : xid(user, "routine", x.getRoutine().getId()),
                 "sphereExternalId", xid(user, "life_sphere", x.getSphere().getId()), "impact", x.getImpact())).toList());
         rows.put("project_dependencies", dependencies.stream().map(x -> map(
-                "externalId", x.getBlocker().getId() + "->" + x.getBlocked().getId(), "blockerExternalId", xid(user, "project", x.getBlocker().getId()), "blockedExternalId", xid(user, "project", x.getBlocked().getId()))).toList());
+                "externalId", dependencyXid(user, x.getBlocker().getId(), x.getBlocked().getId()), "blockerExternalId", xid(user, "project", x.getBlocker().getId()), "blockedExternalId", xid(user, "project", x.getBlocked().getId()))).toList());
         rows.put("backlog_items", backlog.stream().map(x -> map(
                 "externalId", xid(user, "backlog_item", x.getId()), "deloExternalId", xid(user, "delo", x.getDelo().getId()), "scope", x.getScope(),
                 "periodId", x.getPeriodId(), "plannedHours", x.getPlannedHours(), "position", x.getPosition(), "movedToWeek", x.getMovedToWeek())).toList());
@@ -119,6 +119,10 @@ public class DataSyncExportService {
 
     private String xid(User user, String type, Long id) {
         return externalIds.externalId(user, type, id);
+    }
+
+    private String dependencyXid(User user, Long blockerId, Long blockedId) {
+        return "project-dependency-" + xid(user, "project", blockerId) + "-" + xid(user, "project", blockedId);
     }
 
     private static Map<String, Object> map(Object... values) {
