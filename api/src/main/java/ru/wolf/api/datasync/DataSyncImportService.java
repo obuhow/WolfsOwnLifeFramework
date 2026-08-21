@@ -79,7 +79,7 @@ public class DataSyncImportService {
             var sheet = workbook.getSheet(definition.name());
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 String xid = text(sheet.getRow(i), 0); if (!seen.add(xid)) continue;
-                if (externalIds.findByUserAndEntityTypeAndExternalId(user, type, xid).isPresent()) update++; else create++;
+                if (externalIds.findByUserAndEntityTypeAndExternalId(user, type, xid).isPresent()) skip++; else create++;
             }
             int delete = 0;
             result.put(definition.name(), new ChangeSummary(create, update, skip, delete));

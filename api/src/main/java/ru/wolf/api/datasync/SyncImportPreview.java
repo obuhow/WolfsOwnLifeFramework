@@ -2,6 +2,8 @@ package ru.wolf.api.datasync;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import ru.wolf.api.user.User;
 
 import java.time.Instant;
@@ -18,7 +20,8 @@ public class SyncImportPreview {
     private User user;
     @Column(nullable = false, length = 128)
     private String checksum;
-    @Lob @Column(name = "workbook_data", nullable = false)
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(name = "workbook_data", nullable = false, columnDefinition = "bytea")
     private byte[] workbookData;
     @Column(nullable = false, length = 20)
     private String status;

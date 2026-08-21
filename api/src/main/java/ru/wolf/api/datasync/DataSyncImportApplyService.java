@@ -341,6 +341,11 @@ public class DataSyncImportApplyService {
             ProjectDependency dependency = projectDependencies.findById(new ProjectDependencyId(blocker.getId(), blocked.getId())).filter(x -> x.getUser().getId().equals(user.getId())).orElse(null); boolean isNew = dependency == null;
             if (isNew) dependency = ProjectDependency.builder().blocker(blocker).blocked(blocked).user(user).build();
             projectDependencies.save(dependency);
+            String dependencyType = "project_dependency:" + text(row, 1) + ":" + text(row, 2);
+            Long blockerId = blocker.getId();
+            SyncExternalId identity = externalIds.findByUserAndEntityTypeAndExternalId(user, dependencyType, xid).orElse(null);
+            if (identity == null) externalIds.save(SyncExternalId.builder().user(user).entityType(dependencyType).entityId(blockerId).externalId(xid).build());
+            else identity.setEntityId(blockerId);
             count(isNew, "project_dependencies", created, updated);
         }
     }
