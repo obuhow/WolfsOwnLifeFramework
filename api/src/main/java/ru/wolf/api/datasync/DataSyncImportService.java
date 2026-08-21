@@ -36,7 +36,8 @@ public class DataSyncImportService {
 
     @Transactional
     public PreviewResponse preview(User user, MultipartFile file) throws Exception {
-        byte[] bytes = file.getBytes();
+        byte[] uploaded = file.getBytes();
+        byte[] bytes = canonicalize(uploaded);
         String checksum = sha256(bytes);
         List<ImportError> errors = new ArrayList<>();
         Map<String, Integer> counts = new LinkedHashMap<>();
@@ -54,6 +55,24 @@ public class DataSyncImportService {
                 .errorsJson(objectMapper.writeValueAsString(errors))
                 .planJson(objectMapper.writeValueAsString(plan)).build());
         return response(saved, counts, errors, plan);
+    }
+
+    /**
+     * Rewrites any supported workbook (exporter output or legacy human-authored file)
+     * into the canonical {@link DataSyncContract} column layout, so the rest of the
+     * pipeline only ever deals with one shape. If the workbook cannot be parsed as an
+     * XLSX at all, the original bytes are returned so the normal validation path can
+     * report a proper workbook error.
+     */
+    private byte[] canonicalize(byte[] uploaded) {
+        try (Workbook source = new XSSFWorkbook(new ByteArrayInputStream(uploaded));
+             Workbook normalized = LegacyWorkbookNormalizer.normalize(source);
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            normalized.write(out);
+            return out.toByteArray();
+        } catch (Exception ex) {
+            return uploaded;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -194,7 +213,7 @@ public class DataSyncImportService {
     private static String text(Row row, int col) { return row == null || row.getCell(col) == null ? "" : new DataFormatter().formatCellValue(row.getCell(col)).trim(); }
     private static String sha256(byte[] bytes) throws Exception { return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
     private static String safeMessage(Exception ex) { return ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage(); }
-    private static String entityType(String sheet) { return switch (sheet) { case "life_areas" -> "life_area"; case "life_spheres" -> "life_sphere"; case "routine_schedules" -> "routine_schedule"; case "time_entries" -> "time_entry"; case "goal_metrics" -> "goal_metric"; case "goal_week_budgets" -> "goal_week_budget"; case "project_dependencies" -> "project_dependency"; case "backlog_items" -> "backlog_item"; case "checklist_items" -> "checklist_item"; case "activity_mappings" -> "activity_mapping"; case "delos" -> "delo"; case "notes" -> "note"; default -> sheet.substring(0, sheet.length() - 1); }; }
+    private static String entityType(String sheet) { return switch (sheet) { case "life_areas" -> "life_area"; case "life_spheres" -> "life_sphere"; case "routine_schedules" -> "routine_schedule"; case "time_entries" -> "time_entry"; case "goal_metrics" -> "goal_metric"; case "goal_week_budgets" -> "goal_week_budget"; case "project_dependencies" -> "project_dependency"; case "backlog_items" -> "backlog_item"; case "checklist_items" -> "checklist_item"; case "activity_mappings" -> "activity_mapping"; case "delos" -> "delo"; case "notes" -> "note"; case "synergies" -> "synergy"; default -> sheet.substring(0, sheet.length() - 1); }; }
     private enum ValueType { DATE, DATETIME, TIME, DECIMAL }
     private static final class ProjectEnums { static final Set<String> STATUS = Set.of("IN_PROGRESS", "ARCHIVED"); static final Set<String> PLAN = Set.of("NONE", "EVEN_ALL_DAYS", "EVEN_WEEKDAYS"); static final Set<String> EXECUTION = Set.of("SELF", "DELEGATABLE", "AUTOMATABLE"); static final Set<String> TIME_STATUS = Set.of("PLANNED", "DONE", "UNKNOWN"); static final Set<String> DAY_OF_WEEK = Set.of("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"); static final Set<String> BACKLOG_SCOPE = Set.of("WEEK", "MONTH"); static final Set<String> NOTE_AUTHOR = Set.of("USER", "AGENT"); static final Set<String> IMPACT = Set.of("POSITIVE", "NEGATIVE", "NEUTRAL"); }
 

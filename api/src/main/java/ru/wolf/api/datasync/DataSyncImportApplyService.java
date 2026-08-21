@@ -122,6 +122,8 @@ public class DataSyncImportApplyService {
             Map<String, Project> projectMap = applyProjects(user, workbook, areaMap, created, updated);
             Map<String, Routine> routineMap = applyRoutines(user, workbook, created, updated);
             Map<String, Goal> goalMap = applyGoals(user, workbook, created, updated);
+            applyGoalProjects(user, workbook, goalMap, projectMap);
+            applyRoutineGoals(user, workbook, routineMap, goalMap);
             Map<String, Delo> deloMap = applyDelos(user, workbook, projectMap, created, updated);
             Map<String, Idea> ideaMap = applyIdeas(user, workbook, projectMap, created, updated);
             applyRoutineSchedules(user, workbook, routineMap, created, updated);
@@ -166,9 +168,15 @@ public class DataSyncImportApplyService {
         for (int i = 1; i <= lastRow(workbook, "life_spheres"); i++) {
             Row row = row(workbook, "life_spheres", i); String xid = text(row, 0);
             LifeSphere sphere = existing(user, "life_sphere", xid, id -> lifeSpheres.findByUserAndId(user, id).orElseThrow());
+            String name = required(row, 1, "life_spheres", i);
+            // Reuse a sphere seeded by migration (matched on the natural key name)
+            // when this external id has not been bound yet, so importing into a
+            // freshly-seeded workspace updates the defaults instead of colliding
+            // with the UNIQUE(user_id, name) constraint.
+            if (sphere == null) sphere = lifeSpheres.findByUserAndName(user, name).orElse(null);
             boolean isNew = sphere == null;
             if (isNew) sphere = LifeSphere.builder().user(user).build();
-            sphere.setName(required(row, 1, "life_spheres", i)); sphere.setSortOrder(integer(row, 2, 0));
+            sphere.setName(name); sphere.setSortOrder(integer(row, 2, 0));
             sphere.setColor(nullable(row, 3)); sphere.setArchived(bool(row, 4, false));
             sphere = lifeSpheres.save(sphere); bind(user, "life_sphere", sphere.getId(), xid);
             result.put(xid, sphere); count(isNew, "life_spheres", created, updated);
@@ -223,6 +231,36 @@ public class DataSyncImportApplyService {
             goal = goals.save(goal); bind(user, "goal", goal.getId(), xid); result.put(xid, goal); count(isNew, "goals", created, updated);
         }
         return result;
+    }
+
+    private void applyGoalProjects(User user, Workbook workbook, Map<String, Goal> goals, Map<String, Project> projects) {
+        for (int i = 1; i <= lastRow(workbook, "goals"); i++) {
+            Row row = row(workbook, "goals", i);
+            Goal goal = require(goals, text(row, 0), "Неизвестная Goal: " + text(row, 0));
+            Set<Long> incoming = new HashSet<>();
+            for (String projectId : pipe(row, 6)) {
+                Project project = require(projects, projectId, "Неизвестный projectExternalId: " + projectId);
+                incoming.add(project.getId());
+                GoalProjectId id = new GoalProjectId(goal.getId(), project.getId());
+                if (!goalProjects.existsById(id)) goalProjects.save(GoalProject.builder().id(id).goal(goal).project(project).build());
+            }
+            for (GoalProject link : goalProjects.findLinks(goal.getId())) if (!incoming.contains(link.getProject().getId())) goalProjects.delete(link);
+        }
+    }
+
+    private void applyRoutineGoals(User user, Workbook workbook, Map<String, Routine> routines, Map<String, Goal> goals) {
+        for (int i = 1; i <= lastRow(workbook, "routines"); i++) {
+            Row row = row(workbook, "routines", i);
+            Routine routine = require(routines, text(row, 0), "Неизвестная Routine: " + text(row, 0));
+            Set<Long> incoming = new HashSet<>();
+            for (String goalId : pipe(row, 7)) {
+                Goal goal = require(goals, goalId, "Неизвестная Goal: " + goalId);
+                incoming.add(goal.getId());
+                RoutineGoalId id = new RoutineGoalId(routine.getId(), goal.getId());
+                if (!routineGoals.existsById(id)) routineGoals.save(RoutineGoal.builder().id(id).routine(routine).goal(goal).build());
+            }
+            for (RoutineGoal link : routineGoals.findByRoutineId(routine.getId())) if (!incoming.contains(link.getGoal().getId())) routineGoals.delete(link);
+        }
     }
 
     private Map<String, Delo> applyDelos(User user, Workbook workbook, Map<String, Project> projects, Map<String, Integer> created, Map<String, Integer> updated) {

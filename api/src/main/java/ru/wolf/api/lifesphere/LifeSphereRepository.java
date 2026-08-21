@@ -20,4 +20,6 @@ public interface LifeSphereRepository extends JpaRepository<LifeSphere, Long> {
     int findMaxSortOrderByUser(@Param("user") User user);
 
     boolean existsByUserAndName(User user, String name);
+
+    Optional<LifeSphere> findByUserAndName(User user, String name);
 }

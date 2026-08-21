@@ -10,6 +10,7 @@ import ru.wolf.api.delo.Delo;
 import ru.wolf.api.delo.DeloProject;
 import ru.wolf.api.goal.Goal;
 import ru.wolf.api.goal.GoalMetric;
+import ru.wolf.api.goal.GoalProject;
 import ru.wolf.api.goal.GoalWeekBudget;
 import ru.wolf.api.idea.Idea;
 import ru.wolf.api.importxlsx.ActivityMapping;
@@ -20,6 +21,7 @@ import ru.wolf.api.note.Note;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectDependency;
 import ru.wolf.api.routine.Routine;
+import ru.wolf.api.routine.RoutineGoal;
 import ru.wolf.api.routine.RoutineSchedule;
 import ru.wolf.api.timeentry.TimeEntry;
 import ru.wolf.api.user.User;
@@ -48,6 +50,8 @@ public class DataSyncExportService {
         List<Routine> routines = query("from Routine x where x.user = :user order by x.id", Routine.class, user);
         List<Delo> delos = query("select distinct x from Delo x left join fetch x.deloProjects dp left join fetch dp.project where x.user = :user order by x.id", Delo.class, user);
         List<Goal> goals = query("from Goal x where x.user = :user order by x.id", Goal.class, user);
+        List<GoalProject> goalProjects = query("from GoalProject x join fetch x.goal join fetch x.project where x.goal.user = :user", GoalProject.class, user);
+        List<RoutineGoal> routineGoals = query("from RoutineGoal x join fetch x.routine join fetch x.goal where x.routine.user = :user", RoutineGoal.class, user);
         List<Idea> ideas = query("from Idea x left join fetch x.promotedProject where x.user = :user order by x.id", Idea.class, user);
         List<Note> notes = query("from Note x left join fetch x.project left join fetch x.delo where x.user = :user order by x.id", Note.class, user);
         List<Synergy> synergies = query("from Synergy x join fetch x.sphere left join fetch x.project left join fetch x.routine where x.user = :user order by x.id", Synergy.class, user);
@@ -66,9 +70,12 @@ public class DataSyncExportService {
                 "parentExternalId", x.getParent() == null ? null : xid(user, "project", x.getParent().getId()), "title", x.getTitle(),
                 "status", x.getStatus(), "description", x.getDescription(), "startDate", x.getStartDate(), "endDate", x.getEndDate(),
                 "totalPlanHours", x.getTotalPlanHours(), "planDistribution", x.getPlanDistribution(), "planFrozenAt", x.getPlanFrozenAt())).toList());
+        Map<Long, List<String>> goalsByRoutine = new HashMap<>();
+        routineGoals.forEach(link -> goalsByRoutine.computeIfAbsent(link.getRoutine().getId(), ignored -> new ArrayList<>()).add(xid(user, "goal", link.getGoal().getId())));
         rows.put("routines", routines.stream().map(x -> map(
                 "externalId", xid(user, "routine", x.getId()), "title", x.getTitle(), "description", x.getDescription(),
-                "weeklyHours", x.getWeeklyHours(), "color", x.getColor(), "icon", x.getIcon(), "archived", x.isArchived())).toList());
+                "weeklyHours", x.getWeeklyHours(), "color", x.getColor(), "icon", x.getIcon(), "archived", x.isArchived(),
+                "goalExternalIds", String.join("|", goalsByRoutine.getOrDefault(x.getId(), List.of())))).toList());
         rows.put("routine_schedules", query("from RoutineSchedule x where x.routine.user = :user order by x.id", RoutineSchedule.class, user).stream().map(x -> map(
                 "externalId", xid(user, "routine_schedule", x.getId()), "routineExternalId", xid(user, "routine", x.getRoutine().getId()),
                 "dayOfWeek", x.getDayOfWeek(), "startTime", x.getStartTime(), "endTime", x.getEndTime())).toList());
@@ -80,8 +87,11 @@ public class DataSyncExportService {
         rows.put("time_entries", timeEntries.stream().map(x -> map(
                 "externalId", xid(user, "time_entry", x.getId()), "deloExternalId", x.getDelo() == null ? null : xid(user, "delo", x.getDelo().getId()),
                 "adHocText", x.getAdHocText(), "startAt", x.getStartAt(), "endAt", x.getEndAt(), "status", x.getStatus())).toList());
+        Map<Long, List<String>> projectsByGoal = new HashMap<>();
+        goalProjects.forEach(link -> projectsByGoal.computeIfAbsent(link.getGoal().getId(), ignored -> new ArrayList<>()).add(xid(user, "project", link.getProject().getId())));
         rows.put("goals", goals.stream().map(x -> map(
-                "externalId", xid(user, "goal", x.getId()), "title", x.getTitle(), "description", x.getDescription(), "priority", x.getPriority(), "archived", x.getArchived())).toList());
+                "externalId", xid(user, "goal", x.getId()), "title", x.getTitle(), "description", x.getDescription(), "priority", x.getPriority(), "archived", x.getArchived(),
+                "projectExternalIds", String.join("|", projectsByGoal.getOrDefault(x.getId(), List.of())))).toList());
         rows.put("goal_metrics", query("from GoalMetric x where x.goal.user = :user order by x.id", GoalMetric.class, user).stream().map(x -> map(
                 "externalId", xid(user, "goal_metric", x.getId()), "goalExternalId", xid(user, "goal", x.getGoal().getId()), "kind", x.getKind(),
                 "value", x.getValue(), "targetValue", x.getTargetValue(), "at", x.getAt())).toList());

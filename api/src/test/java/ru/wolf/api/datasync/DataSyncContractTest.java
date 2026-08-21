@@ -18,5 +18,9 @@ class DataSyncContractTest {
                         "notes", "synergies", "project_dependencies", "backlog_items", "checklist_items",
                         "activity_mappings");
         assertThat(manifest.sheets()).allSatisfy(sheet -> assertThat(sheet.columns()).contains("externalId"));
+        assertThat(manifest.sheets().stream().filter(sheet -> sheet.name().equals("goals")).findFirst().orElseThrow().columns())
+                .contains("projectExternalIds");
+        assertThat(manifest.sheets().stream().filter(sheet -> sheet.name().equals("routines")).findFirst().orElseThrow().columns())
+                .contains("goalExternalIds");
     }
 }
