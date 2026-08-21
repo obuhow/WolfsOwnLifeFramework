@@ -26,7 +26,7 @@ function categoryLabel(value) {
 }
 
 function authorLabel(value) {
-  return value === 'AGENT' ? 'подложка агента' : 'моя заметка'
+  return value === 'AGENT' ? 'Агент' : 'Моя заметка'
 }
 
 async function load() {
@@ -52,8 +52,8 @@ onMounted(load)
 <template>
   <div class="morning-page">
     <header class="page-header">
-      <h1>Утро</h1>
-      <p class="eyebrow">Один спокойный взгляд на то, что сейчас живо.</p>
+      <h1>Утренний обход</h1>
+      <p class="eyebrow">Управление потоком · один спокойный взгляд на то, что сейчас живо</p>
     </header>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>
@@ -109,9 +109,9 @@ onMounted(load)
           <span class="muted">{{ digest.weekId }}</span>
         </div>
         <div v-if="!digest.goalsFact.length" class="muted-block">Активных целей пока нет.</div>
-        <div v-for="goal in digest.goalsFact" :key="goal.goalId" class="goal-progress-row">
-          <div class="goal-progress-label"><span>{{ goal.title }}</span><span>{{ formatHours(goal.factHours) }} / {{ formatHours(goal.budgetHours) }} ч</span></div>
-          <div class="goal-progress-track"><div class="goal-progress-fill" :style="{ width: `${goal.budgetHours ? Math.min(100, Number(goal.factHours || 0) / Number(goal.budgetHours) * 100) : 0}%` }"></div></div>
+        <div v-for="goal in digest.goalsFact" :key="goal.goalId" class="goal-fact-row">
+          <span class="goal-fact-title">{{ goal.title }}</span>
+          <span class="goal-fact-hours">{{ formatHours(goal.factHours) }} / {{ formatHours(goal.budgetHours) }} ч</span>
         </div>
       </section>
     </template>
@@ -120,13 +120,14 @@ onMounted(load)
 
 <style scoped>
 .morning-project + .morning-project { border-top: 1px solid var(--wolf-subrule); }
-.morning-project-heading, .goal-progress-label { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.morning-project-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .morning-project-link, .morning-delo { color: var(--wolf-ink); text-decoration: none; border-bottom: 1px solid var(--wolf-rule); }
 .morning-project-link { font-size: 18px; }
 .morning-project-detail { display: grid; grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr); gap: 28px; padding: 16px 0 20px; }
 .morning-project-detail h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; }
 .morning-note { padding: 10px 0; border-top: 1px solid var(--wolf-subrule); white-space: pre-wrap; }
-.morning-note-agent { background: var(--wolf-done-surface); padding-left: 8px; }
+.morning-note-agent { border-left: 2px solid var(--wolf-ink); padding-left: 10px; }
+.morning-note-agent .morning-note-meta { color: var(--wolf-ink); }
 .morning-note-meta { margin-bottom: 4px; color: var(--wolf-muted); font-size: 11px; }
 .morning-delo { display: block; width: fit-content; margin: 0 0 8px; }
 .morning-idea-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -134,10 +135,8 @@ onMounted(load)
 .morning-idea strong, .morning-idea span { display: block; }
 .morning-idea span { margin-top: 4px; color: var(--wolf-muted); font-size: 11px; }
 .morning-idea p { margin: 8px 0 0; color: var(--wolf-muted); }
-.goal-progress-row + .goal-progress-row { margin-top: 14px; }
-.goal-progress-label { color: var(--wolf-muted); font-size: 12px; }
-.goal-progress-label span:first-child { color: var(--wolf-ink); }
-.goal-progress-track { height: 5px; margin-top: 6px; background: var(--wolf-subrule); }
-.goal-progress-fill { height: 100%; background: var(--wolf-muted); }
+.goal-fact-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--wolf-subrule); }
+.goal-fact-title { color: var(--wolf-ink); font-size: 13px; }
+.goal-fact-hours { color: var(--wolf-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 700px) { .morning-project-detail, .morning-idea-grid { grid-template-columns: 1fr; } }
 </style>

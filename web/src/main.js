@@ -24,6 +24,8 @@ import WaveStatsView from './components/WaveStatsView.vue'
 import ChecklistReportView from './components/ChecklistReportView.vue'
 import DataSyncView from './components/DataSyncView.vue'
 import BacklogView from './components/BacklogView.vue'
+import SpheresView from './components/SpheresView.vue'
+import SynergyView from './components/SynergyView.vue'
 import PlaceholderView from './components/PlaceholderView.vue'
 
 const routes = [
@@ -50,12 +52,8 @@ const routes = [
   // Управление потоком
   { path: '/goals', component: GoalsView, meta: { requiresAuth: true } },
   { path: '/goals/:id', component: GoalsView, meta: { requiresAuth: true } },
-  { path: '/spheres', component: PlaceholderView, meta: { requiresAuth: true, title: 'Сферы жизни', note: 'Управление потоком · справочник сфер', owner: '09', sections: [
-    { title: 'Справочник сфер', description: 'Реестр с правилами: название и краткое описание сферы. Девять сфер — справочные данные, а не оценка пользователя.', fields: ['Название сферы', 'Краткое описание'], empty: 'Список подключается в тикете 09.' }
-  ] } },
-  { path: '/synergy', component: PlaceholderView, meta: { requiresAuth: true, title: 'Синергия', note: 'Управление потоком · влияние на сферы жизни', owner: '09', sections: [
-    { title: 'Матрица синергии', description: 'Субъект (Проект или Идея), Сфера жизни, знак влияния и описание. Знак и текст — без красного кодирования отрицательного влияния.', fields: ['Субъект: Проект или Идея', 'Сфера жизни', 'Влияние: +, 0, −', 'Описание влияния'], empty: 'Матрица подключается в тикете 09.' }
-  ] } },
+  { path: '/spheres', component: SpheresView, meta: { requiresAuth: true } },
+  { path: '/synergy', component: SynergyView, meta: { requiresAuth: true } },
   { path: '/notes', component: PlaceholderView, meta: { requiresAuth: true, title: 'Заметки / LLM Wiki', note: 'Управление потоком · заметки, источники и материалы агента', owner: '09', sections: [
     { title: 'Поиск и фильтры', description: 'Фактические фильтры над хронологическим реестром заметок.', fields: ['Поиск по тексту', 'Фильтр по источнику и автору', 'Фильтр по тегам'], empty: 'Фильтры подключаются в тикете 09.' },
     { title: 'Хронологический реестр', description: 'Каждая заметка показывает контекст источника, автора, отметку времени, текст или расшифровку и ручные теги. Материал агента помечен подписью автора и тонким левым правилом, а не ярким блоком.', fields: ['Контекст источника и автор', 'Отметка времени', 'Текст или расшифровка', 'Ручные теги', 'Аудио — явная строка вложения'], empty: 'Заметки подключаются в тикете 09.' },

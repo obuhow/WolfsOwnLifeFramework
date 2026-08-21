@@ -45,7 +45,30 @@ onMounted(load)
     <header class="page-header"><div><p class="eyebrow">Зеркало факта</p><h1>Отчёт — чек-лист</h1><p class="page-intro">Пункты дня и отметки переключений без оценок и процентов.</p></div></header>
     <div class="report-toolbar card"><label>От <input v-model="from" type="date" @change="load" /></label><label>До <input v-model="to" type="date" @change="load" /></label><button class="btn btn-ghost" @click="setDays(7)">7 дней</button><button class="btn btn-ghost" @click="setDays(14)">14 дней</button><button class="btn btn-ghost" @click="setDays(30)">30 дней</button><button class="btn btn-ghost" @click="download('md')">Markdown</button><button class="btn btn-ghost" @click="download('csv')">CSV</button><button class="btn btn-primary" @click="saveAsNote">Сохранить как Заметку</button></div>
     <p v-if="error" class="alert alert-error">{{ error }}</p><p v-if="loading" class="loading">Загрузка…</p>
-    <template v-if="report"><div class="report-totals card"><strong>Отмечено {{ report.checkedTotal }} из {{ report.itemsTotal }}</strong><span>Переключений: {{ report.distractionsTotal }}</span></div><div class="report-days"><article v-for="day in report.days" :key="day.date" class="card report-day"><h2>{{ day.date }}</h2><p class="hint">Отмечено {{ day.checkedCount }} из {{ day.totalCount }}</p><ul v-if="day.items.length" class="report-items"><li v-for="item in day.items" :key="item.title"><span :class="{ checked: item.done }">{{ item.done ? '✓' : '·' }}</span>{{ item.title }}<small v-if="item.deloTitle"> · {{ item.deloTitle }}</small></li></ul><p v-else class="hint">Пусто</p><div v-for="switchItem in day.distractions" :key="switchItem.at" class="switch-row">переключение на {{ switchItem.target || 'текст' }}<small v-if="switchItem.minutes"> · {{ switchItem.minutes }} мин</small></div></article></div></template>
+    <template v-if="report">
+      <p class="report-totals">Отмечено {{ report.checkedTotal }} из {{ report.itemsTotal }} · переключений: {{ report.distractionsTotal }}</p>
+      <div class="report-days">
+        <section v-for="day in report.days" :key="day.date" class="report-day">
+          <header class="report-day-head">
+            <h2>{{ day.date }}</h2>
+            <span class="report-day-meta">Отмечено {{ day.checkedCount }} из {{ day.totalCount }}</span>
+          </header>
+          <ul v-if="day.items.length" class="report-items">
+            <li v-for="item in day.items" :key="item.title" :class="{ done: item.done }">
+              <span class="mark" aria-hidden="true">{{ item.done ? '✓' : '·' }}</span>
+              <span class="item-title">{{ item.title }}</span>
+              <small v-if="item.deloTitle" class="item-delo">{{ item.deloTitle }}</small>
+            </li>
+          </ul>
+          <p v-else class="report-day-empty">Записей за этот день нет.</p>
+          <div v-for="switchItem in day.distractions" :key="switchItem.at" class="switch-row">
+            <span class="switch-time">{{ String(switchItem.at).slice(11, 16) }}</span>
+            переключение на {{ switchItem.target || 'текст' }}
+            <small v-if="switchItem.minutes"> · {{ switchItem.minutes }} мин</small>
+          </div>
+        </section>
+      </div>
+    </template>
   </section>
 </template>
 
@@ -53,12 +76,34 @@ onMounted(load)
 .checklist-report { display: grid; gap: 1rem; }
 .report-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }
 .report-toolbar label { display: grid; gap: .25rem; color: var(--wolf-muted); font-size: .8rem; }
-.report-totals { display: flex; gap: 1.25rem; }
-.report-days { display: grid; gap: .75rem; }
-.report-day h2 { margin: 0; }
-.report-items { list-style: none; margin: .5rem 0; padding: 0; display: grid; gap: .35rem; }
-.report-items li { color: var(--wolf-ink); }
-.report-items .checked { color: var(--wolf-muted); }
-.report-items small { color: var(--wolf-muted); }
-.switch-row { color: var(--wolf-muted); border-top: 1px solid var(--wolf-rule); padding-top: .4rem; margin-top: .4rem; }
+.report-totals { margin: 0; color: var(--wolf-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.report-days { display: grid; gap: 0; border-top: 1px solid var(--wolf-rule); }
+
+/* Chronological ruled table grouped by day; a day without data stays neutral. */
+.report-day { padding: 12px 0 14px; border-bottom: 1px solid var(--wolf-rule); }
+.report-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
+.report-day h2 { margin: 0; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.report-day-meta { color: var(--wolf-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.report-day-empty { margin: 8px 0 0; color: var(--wolf-muted); font-size: 12px; }
+
+.report-items { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; gap: 0; }
+.report-items li {
+  display: grid;
+  grid-template-columns: 1.2rem minmax(0, 1fr) auto;
+  gap: .5rem;
+  align-items: baseline;
+  padding: 5px 6px;
+  color: var(--wolf-ink);
+  font-size: 13px;
+  border-bottom: 1px solid var(--wolf-subrule);
+}
+/* Pale green marks completion only — never a score, never a missing-day signal. */
+.report-items li.done { background: var(--wolf-done-surface); }
+.report-items li.done .mark { color: var(--wolf-done-ink); }
+.mark { color: var(--wolf-muted); font-variant-numeric: tabular-nums; }
+.item-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-delo { color: var(--wolf-muted); font-size: 11px; }
+
+.switch-row { color: var(--wolf-muted); font-size: 12px; padding-top: .4rem; margin-top: .4rem; }
+.switch-time { font-variant-numeric: tabular-nums; margin-right: .35rem; }
 </style>
