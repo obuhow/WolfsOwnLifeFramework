@@ -20,6 +20,19 @@ const nightEnd = ref('07:00')
 const dayEndSetting = ref('02:00')
 const showNightHours = ref(false)
 
+// Weekly project backlog (ticket 04 — same grouped register as Today)
+const weekBacklog = ref([])
+const projectWeekHours = ref({})
+const backlogLoading = ref(false)
+const backlogError = ref('')
+const executionModeFilter = ref('ALL')
+const EXECUTION_MODES = [
+  { value: 'ALL', label: 'Все' },
+  { value: 'SELF', label: 'Мне' },
+  { value: 'DELEGATABLE', label: 'Делегировать' },
+  { value: 'AUTOMATABLE', label: 'Автоматизировать' }
+]
+
 // Picker
 const pickerOpen = ref(false)
 const pickerSlot = ref(null)
@@ -274,6 +287,125 @@ const weekLabel = computed(() => {
 
 const nightHoursLabel = computed(() => `${nightStart.value}–${nightEnd.value}`)
 
+function formatHours(value) {
+  const n = Number(value || 0)
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
+}
+function hoursOrDash(value) {
+  if (value == null) return '—'
+  return formatHours(value)
+}
+
+const filteredWeekBacklog = computed(() => {
+  if (executionModeFilter.value === 'ALL') return weekBacklog.value
+  return weekBacklog.value.filter(d => d.executionMode === executionModeFilter.value)
+})
+
+/** Weekly backlog grouped by Project with real x / y ч (see ticket 03). */
+const backlogGroups = computed(() => {
+  const projectTitle = id => projects.value.find(p => p.id === id)?.title || `Проект #${id}`
+  const groups = new Map()
+  for (const delo of filteredWeekBacklog.value) {
+    const pids = (delo.projectIds && delo.projectIds.length) ? delo.projectIds : [null]
+    for (const pid of pids) {
+      const key = pid == null ? '__none__' : String(pid)
+      if (!groups.has(key)) {
+        const hours = pid == null ? null : projectWeekHours.value[String(pid)]
+        groups.set(key, {
+          key,
+          projectId: pid,
+          label: pid == null ? 'Без проекта' : projectTitle(pid),
+          fact: pid == null ? null : (hours ? hours.fact : 0),
+          plan: pid == null ? null : (hours ? hours.plan : null),
+          items: []
+        })
+      }
+      const g = groups.get(key)
+      if (!g.items.some(x => x.id === delo.id)) g.items.push(delo)
+    }
+  }
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.key === '__none__') return 1
+    if (b.key === '__none__') return -1
+    return a.label.localeCompare(b.label, 'ru')
+  })
+})
+
+function groupHoursLabel(group) {
+  if (group.projectId == null) return ''
+  return `${hoursOrDash(group.fact ?? 0)} / ${hoursOrDash(group.plan)} ч`
+}
+function executionModeLabel(mode) {
+  const found = EXECUTION_MODES.find(m => m.value === mode)
+  return found ? found.label : (mode || '')
+}
+
+/** Load the grouped weekly backlog for the current ISO week + real project hours. */
+async function loadWeekBacklog() {
+  if (isoYear.value == null || isoWeek.value == null) return
+  backlogLoading.value = true
+  backlogError.value = ''
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/backlog/week/${isoYear.value}/${isoWeek.value}`, { headers })
+    if (!res.ok) throw new Error(`Бэклог недели: HTTP ${res.status}`)
+    const body = await res.json()
+    const byId = new Map(delos.value.map(d => [d.id, d]))
+    weekBacklog.value = (body.delos || []).map(d => ({
+      ...d,
+      projectIds: byId.get(d.id)?.projectIds || []
+    }))
+    await loadProjectWeekHours()
+  } catch (e) {
+    backlogError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    backlogLoading.value = false
+  }
+}
+
+/** Real current-week plan/fact hours per Project from the Gantt aggregate. */
+async function loadProjectWeekHours() {
+  const headers = authHeaders()
+  if (!headers || !weekStart.value) return
+  try {
+    const res = await fetch(`${apiBase()}/gantt?from=${weekStart.value}&weeks=1`, { headers })
+    if (!res.ok) { projectWeekHours.value = {}; return }
+    const body = await res.json()
+    const map = {}
+    for (const row of body.projects || []) {
+      const cell = (row.cells || [])[0] || {}
+      map[String(row.id)] = {
+        plan: cell.planHours == null ? null : Number(cell.planHours),
+        fact: Number(cell.factHours || 0)
+      }
+    }
+    projectWeekHours.value = map
+  } catch (e) {
+    projectWeekHours.value = {}
+  }
+}
+
+async function removeFromBacklog(deloId) {
+  if (isoYear.value == null || isoWeek.value == null) return
+  const headers = authHeaders()
+  if (!headers) return
+  saving.value = true
+  error.value = ''
+  try {
+    const res = await fetch(`${apiBase()}/backlog/week/${isoYear.value}/${isoWeek.value}/delos/${deloId}`, {
+      method: 'DELETE',
+      headers
+    })
+    if (!res.ok) throw new Error(`Удаление из бэклога: HTTP ${res.status}`)
+    await loadWeekBacklog()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    saving.value = false
+  }
+}
+
 /** Identity of a slot content for merge: same delo OR same ad-hoc text + same status. */
 function entryMergeKey(entry) {
   if (!entry) return null
@@ -519,6 +651,7 @@ async function loadWeek(query = null) {
     body = await res.json()
     applyWeekBody(body)
   }
+  await loadWeekBacklog()
 }
 
 async function loadAll() {
@@ -870,7 +1003,7 @@ onMounted(loadAll)
 
     <div v-else class="week-layout">
       <section class="card grid-card" aria-label="Сетка недели">
-        <div class="week-scroll">
+        <div class="week-scroll" role="region" aria-label="Сетка недели, прокрутка по горизонтали" tabindex="0">
           <div class="week-grid" :style="{ '--day-cols': days.length || 7 }">
             <!-- header row -->
             <div class="week-corner" aria-hidden="true" :style="{ gridColumn: 1, gridRow: 1 }"></div>
@@ -925,45 +1058,47 @@ onMounted(loadAll)
         </p>
       </section>
 
-      <aside class="card panel-card" aria-label="На неделе">
-        <h2>На неделе</h2>
-        <p class="hint" style="margin-bottom: 1rem">
-          Записи времени в видимой ISO-неделе ({{ weekLabel }}).
-        </p>
-        <ul v-if="panelItems.length" class="week-list">
-          <li v-for="item in panelItems" :key="item.id" class="week-list-item">
-            <span class="week-list-time">
-              {{ formatDayHeader(item.day) }}
-              <br />
-              {{ item.time }}
-            </span>
-            <div class="week-list-body">
-              <strong>{{ item.title }}</strong>
-              <span class="week-list-meta" :class="item.status === 'DONE' ? 'meta-done' : 'meta-planned'">
-                {{ item.statusLabel }}
-                <template v-if="!item.deloId"> · ad-hoc</template>
-              </span>
-            </div>
-            <div class="week-list-actions">
-              <button
-                v-if="item.status === 'PLANNED' && isPastSlot(normalizeStart(item.startAt))"
-                type="button"
-                class="btn btn-ghost btn-sm"
-                title="Подтвердить факт"
-                :disabled="saving"
-                @click="confirmSlot(item.startAt)"
-              >✓</button>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                title="Снять"
-                :disabled="saving"
-                @click="clearSlot(item.startAt)"
-              >×</button>
-            </div>
-          </li>
-        </ul>
-        <p v-else class="hint">Пока пусто — кликните ячейку в сетке.</p>
+      <!-- Weekly project backlog (ticket 04 — same grouped register as Today) -->
+      <aside class="card panel-card backlog-panel" aria-label="Бэклог недели">
+        <div class="panel-header">
+          <h2>Бэклог недели</h2>
+          <div class="panel-filter">
+            <label for="week-backlog-mode-filter" class="visually-hidden">Фильтр по способу исполнения</label>
+            <select id="week-backlog-mode-filter" class="input input-sm" v-model="executionModeFilter">
+              <option v-for="mode in EXECUTION_MODES" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
+            </select>
+          </div>
+        </div>
+        <p class="panel-subtitle">Неделя {{ weekLabel }}</p>
+        <div v-if="backlogLoading" class="loading">Загрузка бэклога…</div>
+        <div v-else-if="backlogError" class="alert alert-error">{{ backlogError }}</div>
+        <div v-else-if="backlogGroups.length" class="backlog-groups">
+          <section v-for="group in backlogGroups" :key="group.key" class="backlog-group">
+            <header class="backlog-group-head">
+              <span class="backlog-group-title">{{ group.label }}</span>
+              <span v-if="group.projectId != null" class="backlog-group-hours">{{ groupHoursLabel(group) }}</span>
+            </header>
+            <ul class="backlog-group-list">
+              <li v-for="delo in group.items" :key="delo.id + '-' + group.key" class="backlog-delo">
+                <div class="backlog-delo-body">
+                  <span class="backlog-delo-title">{{ delo.title }}</span>
+                  <span class="backlog-delo-meta">
+                    {{ executionModeLabel(delo.executionMode) }}
+                    <template v-if="delo.plannedHours != null"> · {{ formatHours(delo.plannedHours) }} ч</template>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  title="Убрать из бэклога"
+                  :disabled="saving"
+                  @click="removeFromBacklog(delo.id)"
+                >×</button>
+              </li>
+            </ul>
+          </section>
+        </div>
+        <p v-else class="hint">Бэклог недели пуст — добавьте Дела через «Дела».</p>
       </aside>
     </div>
 
@@ -1457,26 +1592,47 @@ onMounted(loadAll)
 .delo-option input {
   accent-color: var(--wolf-ink);
 }
-/* Ticket 01: normalize existing weekly-grid and picker presentation without
-   changing the shared time-grid coordinate system. */
-.week-grid-scroll,
-.week-grid-wrap,
+/* Ticket 01/04: normalize weekly-grid and picker presentation; shared grid
+   coordinate system (header + body tracks) is unchanged. */
+.week-scroll,
 .delo-picker-list { border-color: var(--wolf-rule); border-radius: 0; background: var(--wolf-surface); }
 .week-cell { border-color: var(--wolf-subrule); color: var(--wolf-ink); }
-.week-cell.cell-planned { background: #f7f8fa; }
+.week-cell.cell-planned { background: #F7F8FA; }
 .week-cell.cell-done { background: var(--wolf-done-surface); }
 .week-cell:hover:not(:disabled),
 .delo-option:hover,
 .delo-option.selected { background: var(--wolf-hover); }
-.time-cell,
-.time-label,
-.week-day-meta,
-.today-list-time,
-.today-list-meta,
-.backlog-item-meta { color: var(--wolf-muted); }
-.week-day-head { border-color: var(--wolf-rule); background: var(--wolf-surface); }
-.today-list-item,
-.backlog-list-item { border-color: var(--wolf-rule); border-radius: 0; background: transparent; }
+.week-cell.cell-night.cell-empty { background: var(--wolf-surface); }
+.week-corner,
+.week-day-head { background: var(--wolf-surface); border-color: var(--wolf-rule); }
+.week-day-head.is-today { background: var(--wolf-hover); }
+.week-time { background: var(--wolf-surface); border-color: var(--wolf-subrule); color: var(--wolf-muted); }
+.week-time.cell-hour { border-top-color: var(--wolf-rule); color: var(--wolf-ink); }
+.week-time.cell-night { background: var(--wolf-surface); color: var(--wolf-muted); }
+.week-cell.cell-hour { border-top-color: var(--wolf-rule); }
+.wd-date { color: var(--wolf-muted); }
+.week-cell-label { color: var(--wolf-ink); }
+.delo-group-title { color: var(--wolf-muted); background: var(--wolf-surface); }
+.delo-option { border-bottom-color: var(--wolf-subrule); }
 .legend-swatch { border-color: var(--wolf-rule); border-radius: 0; }
 .modal { border-radius: 0; box-shadow: none; }
+
+/* Weekly project backlog aside (shared with Today register) */
+.week-layout { grid-template-columns: minmax(0, 1fr) 268px; }
+.panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.panel-header h2 { margin: 0; }
+.panel-filter { flex-shrink: 0; }
+.input-sm { font-size: 12px; padding: 4px 1.5rem 4px 0; min-width: 120px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.backlog-panel .panel-subtitle { margin: 0 0 12px; color: var(--wolf-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.backlog-groups { display: grid; gap: 18px; }
+.backlog-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--wolf-rule); }
+.backlog-group-title { color: var(--wolf-ink); font-size: 13px; font-weight: 600; }
+.backlog-group-hours { color: var(--wolf-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.backlog-group-list { list-style: none; margin: 0; padding: 0; }
+.backlog-delo { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--wolf-subrule); }
+.backlog-delo-body { display: grid; gap: 2px; min-width: 0; }
+.backlog-delo-title { color: var(--wolf-ink); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.backlog-delo-meta { color: var(--wolf-muted); font-size: 11px; }
+@media (max-width: 1000px) { .week-layout { grid-template-columns: 1fr; } }
 </style>
