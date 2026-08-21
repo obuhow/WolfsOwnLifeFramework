@@ -21,6 +21,8 @@ const showNightHours = ref(false)
 
 // Week backlog state
 const weekBacklog = ref([])
+// Per-project current-week hours {projectId: {plan, fact}} sourced from Gantt (real API).
+const projectWeekHours = ref({})
 const todayBacklog = ref(null)
 const checklist = ref([])
 const checklistTitle = ref('')
@@ -267,8 +269,61 @@ const filteredWeekBacklog = computed(() => {
   return weekBacklog.value.filter(d => d.executionMode === executionModeFilter.value)
 })
 
+/** Format an hours BigDecimal/number to a compact tabular value, or '—' when absent. */
+function hoursOrDash(value) {
+  if (value == null) return '—'
+  return formatHours(value)
+}
+
+/**
+ * Weekly backlog grouped by Project. Each group carries `x / y ч` where
+ * x = completed fact hours (current ISO week), y = planned hours — both from the
+ * Gantt API (projectWeekHours), never invented from the visible page.
+ * Delos without a Project fall into a separate «Без проекта» group.
+ */
+const backlogGroups = computed(() => {
+  const projectTitle = id => projects.value.find(p => p.id === id)?.title || `Проект #${id}`
+  const groups = new Map()
+
+  for (const delo of filteredWeekBacklog.value) {
+    const pids = (delo.projectIds && delo.projectIds.length) ? delo.projectIds : [null]
+    for (const pid of pids) {
+      const key = pid == null ? '__none__' : String(pid)
+      if (!groups.has(key)) {
+        const hours = pid == null ? null : projectWeekHours.value[String(pid)]
+        groups.set(key, {
+          key,
+          projectId: pid,
+          label: pid == null ? 'Без проекта' : projectTitle(pid),
+          fact: pid == null ? null : (hours ? hours.fact : 0),
+          plan: pid == null ? null : (hours ? hours.plan : null),
+          items: []
+        })
+      }
+      const g = groups.get(key)
+      if (!g.items.some(x => x.id === delo.id)) g.items.push(delo)
+    }
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.key === '__none__') return 1
+    if (b.key === '__none__') return -1
+    return a.label.localeCompare(b.label, 'ru')
+  })
+})
+
+/** `x / y ч` for a group, or empty for «Без проекта». Missing plan → `x / — ч`. */
+function groupHoursLabel(group) {
+  if (group.projectId == null) return ''
+  return `${hoursOrDash(group.fact ?? 0)} / ${hoursOrDash(group.plan)} ч`
+}
+
+function executionModeLabel(mode) {
+  const found = EXECUTION_MODES.find(m => m.value === mode)
+  return found ? found.label : (mode || '')
+}
+
 const backlogFactLabel = computed(() => `${formatHours(todayBacklog.value?.totalFact || 0)} ч из ${formatHours(todayBacklog.value?.totalPlanned || 0)} ч`)
-const progressPercent = computed(() => { const plan = Number(todayBacklog.value?.totalPlanned || 0); return plan ? Math.min(100, Number(todayBacklog.value?.totalFact || 0) / plan * 100) : 0 })
 function formatHours(value) {
   const n = Number(value || 0)
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
@@ -467,11 +522,49 @@ async function loadWeekBacklog() {
     if (handleAuthFailure(res)) return
     if (!res.ok) throw new Error(`Бэклог недели: HTTP ${res.status}`)
     const body = await res.json()
-    weekBacklog.value = body.delos || []
+    // Backlog API returns id/title/executionMode/plannedHours (no projectIds);
+    // enrich with project links from the loaded Delo catalog so grouping works.
+    const byId = new Map(delos.value.map(d => [d.id, d]))
+    weekBacklog.value = (body.delos || []).map(d => ({
+      ...d,
+      projectIds: byId.get(d.id)?.projectIds || []
+    }))
+    await loadProjectWeekHours()
   } catch (e) {
     backlogError.value = e instanceof Error ? e.message : String(e)
   } finally {
     backlogLoading.value = false
+  }
+}
+
+/**
+ * Load real current-week plan/fact hours per Project from the Gantt aggregate
+ * (single-week window). Populates projectWeekHours[projectId] = {plan, fact}.
+ * plan is null when no week-plan is set (rendered as «—»); fact defaults to 0.
+ */
+async function loadProjectWeekHours() {
+  const headers = authHeaders()
+  if (!headers || !selectedDate.value) return
+  try {
+    // Monday of the selected ISO week
+    const d = new Date(`${selectedDate.value}T00:00:00`)
+    const day = (d.getDay() + 6) % 7 // Mon=0 … Sun=6
+    d.setDate(d.getDate() - day)
+    const monday = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+    const res = await fetch(`${apiBase()}/gantt?from=${monday}&weeks=1`, { headers })
+    if (!res.ok) { projectWeekHours.value = {}; return }
+    const body = await res.json()
+    const map = {}
+    for (const row of body.projects || []) {
+      const cell = (row.cells || [])[0] || {}
+      map[String(row.id)] = {
+        plan: cell.planHours == null ? null : Number(cell.planHours),
+        fact: Number(cell.factHours || 0)
+      }
+    }
+    projectWeekHours.value = map
+  } catch (e) {
+    projectWeekHours.value = {}
   }
 }
 
@@ -798,7 +891,7 @@ onMounted(loadAll)
               :class="cellClass(slot)"
               :title="cellTitle(slot)"
               :disabled="saving"
-              :style="slot.span > 1 ? { minHeight: `calc(${slot.span} * 1.5rem)` } : undefined"
+              :style="slot.span > 1 ? { minHeight: `calc(${slot.span} * 26px)` } : undefined"
               @click="onCellClick(slot)"
             >
               <span class="cell-time">{{ slot.label }}</span>
@@ -868,8 +961,8 @@ onMounted(loadAll)
         <p v-else class="hint">Пока пусто — кликните ячейку в сетке.</p>
       </aside>
 
-      <!-- Week Backlog Panel -->
-      <aside class="card panel-card" aria-label="Бэклог недели">
+      <!-- Week Backlog Panel — grouped by Project (ticket 03) -->
+      <aside class="card panel-card backlog-panel" aria-label="Бэклог недели">
         <div class="panel-header">
           <h2>Бэклог недели</h2>
           <div class="panel-filter">
@@ -884,30 +977,36 @@ onMounted(loadAll)
             </select>
           </div>
         </div>
-        <p class="hint" style="margin-bottom: 1rem">
-          Дела, запланированные на эту неделю. Кликните чтобы добавить в сетку.
-        </p>
+        <p class="panel-subtitle">Неделя {{ weekLabel }}</p>
         <div v-if="backlogLoading" class="loading">Загрузка бэклога…</div>
         <div v-else-if="backlogError" class="alert alert-error">{{ backlogError }}</div>
-        <ul v-else-if="filteredWeekBacklog.length" class="backlog-list">
-          <li v-for="delo in filteredWeekBacklog" :key="delo.id" class="backlog-list-item">
-            <div class="backlog-item-body">
-              <strong>{{ delo.title }}</strong>
-              <span class="backlog-item-meta">{{ delo.executionMode }}</span>
-            </div>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              title="Убрать из бэклога"
-              :disabled="saving"
-              @click="removeFromBacklog(delo.id)"
-            >×</button>
-          </li>
-        </ul>
+        <div v-else-if="backlogGroups.length" class="backlog-groups">
+          <section v-for="group in backlogGroups" :key="group.key" class="backlog-group">
+            <header class="backlog-group-head">
+              <span class="backlog-group-title">{{ group.label }}</span>
+              <span v-if="group.projectId != null" class="backlog-group-hours">{{ groupHoursLabel(group) }}</span>
+            </header>
+            <ul class="backlog-group-list">
+              <li v-for="delo in group.items" :key="delo.id + '-' + group.key" class="backlog-delo">
+                <div class="backlog-delo-body">
+                  <span class="backlog-delo-title">{{ delo.title }}</span>
+                  <span class="backlog-delo-meta">
+                    {{ executionModeLabel(delo.executionMode) }}
+                    <template v-if="delo.plannedHours != null"> · {{ formatHours(delo.plannedHours) }} ч</template>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  title="Убрать из бэклога"
+                  :disabled="saving"
+                  @click="removeFromBacklog(delo.id)"
+                >×</button>
+              </li>
+            </ul>
+          </section>
+        </div>
         <p v-else class="hint">Бэклог недели пуст — добавьте Дела через «Дела» или неделю.</p>
-        <p class="hint" style="margin-top: 1rem; font-size: 0.75rem;">
-          Неделя: {{ weekLabel }}
-        </p>
       </aside>
 
       <aside class="card panel-card" aria-label="Чек-лист дня">
@@ -922,13 +1021,6 @@ onMounted(loadAll)
             <div><button class="btn btn-ghost btn-sm" type="button" title="Перенести на завтра" @click="carryChecklistItem(item)">→</button><button class="btn btn-ghost btn-sm" type="button" title="Удалить" @click="deleteChecklistItem(item)">×</button></div>
           </li>
         </ul>
-        <p v-else class="hint">Пусто</p>
-      </aside>
-
-      <aside class="card panel-card" aria-label="План и факт бэклога недели">
-        <div class="panel-header"><h2>План и факт недели</h2><span class="backlog-total">{{ backlogFactLabel }}</span></div>
-        <div class="progress-track"><span class="progress-fill" :style="{ width: `${progressPercent}%` }"></span></div>
-        <ul v-if="todayBacklog?.items?.length" class="checklist-list"><li v-for="item in todayBacklog.items" :key="item.deloId" class="backlog-row"><span>{{ item.title }}</span><span>{{ item.plannedHours == null ? '—/—' : `${formatHours(item.factHours)} / ${formatHours(item.plannedHours)} ч` }}</span></li></ul>
         <p v-else class="hint">Пусто</p>
       </aside>
     </div>
@@ -1029,14 +1121,38 @@ onMounted(loadAll)
 
 .today-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) 268px;
+  gap: 0;
   align-items: start;
+}
+
+/* Time register owns the left column across all aside rows. */
+.grid-card {
+  grid-column: 1;
+  grid-row: 1 / 1000;
+  border-right: 1px solid var(--wolf-rule);
+  padding: 0 20px 12px 0;
+}
+
+.today-layout > .panel-card {
+  grid-column: 2;
+  padding-left: 20px;
 }
 
 @media (max-width: 900px) {
   .today-layout {
     grid-template-columns: 1fr;
+  }
+  .grid-card {
+    grid-column: 1;
+    grid-row: auto;
+    border-right: 0;
+    padding-right: 0;
+  }
+  .today-layout > .panel-card {
+    grid-column: 1;
+    padding-left: 0;
+    border-top: 1px solid var(--wolf-rule);
   }
 }
 
@@ -1046,20 +1162,13 @@ onMounted(loadAll)
 .checklist-item, .backlog-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid var(--wolf-rule); }
 .checklist-item label { display: flex; align-items: center; gap: .5rem; min-width: 0; }
 .checklist-item .done { text-decoration: line-through; color: var(--wolf-muted); }
-.backlog-total { color: var(--wolf-muted); font-size: .8rem; }
-.progress-track { height: 6px; margin: .5rem 0 .75rem; background: #e7e2db; border-radius: 99px; overflow: hidden; }
-.progress-fill { display: block; height: 100%; background: #9aa3ad; }
-
-.grid-card {
-  padding: 1rem 1rem 0.75rem;
-}
 
 .grid-scroll {
-  max-height: calc(100vh - 260px);
+  max-height: calc(100vh - 220px);
   overflow-y: auto;
-  border-radius: 12px;
-  border: 1px solid #e6dfd4;
-  background: #fdfbf7;
+  border-radius: 0;
+  border: 0;
+  background: var(--wolf-surface);
 }
 
 .day-grid {
@@ -1069,19 +1178,19 @@ onMounted(loadAll)
 
 .grid-cell {
   display: grid;
-  grid-template-columns: 3.5rem 1fr;
+  grid-template-columns: 64px minmax(0, 1fr);
   gap: 0.5rem;
   align-items: center;
   width: 100%;
-  min-height: 1.65rem;
-  padding: 0.15rem 0.6rem;
-  border: none;
-  border-bottom: 1px solid #efe8dc;
+  min-height: 26px;
+  padding: 0 0.6rem;
+  border: 0;
+  border-bottom: 1px solid var(--wolf-subrule);
   background: transparent;
   text-align: left;
   font-family: inherit;
   font-size: 0.8rem;
-  color: #2c2a26;
+  color: var(--wolf-ink);
   cursor: pointer;
   transition: background 0.12s;
 }
@@ -1282,42 +1391,72 @@ onMounted(loadAll)
   border: 0;
 }
 
-.backlog-list {
+.backlog-panel .panel-subtitle {
+  margin: 0 0 12px;
+  color: var(--wolf-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.backlog-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.backlog-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--wolf-rule);
+}
+
+.backlog-group-title {
+  color: var(--wolf-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.backlog-group-hours {
+  color: var(--wolf-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.backlog-group-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 0.4rem;
 }
 
-.backlog-list-item {
+.backlog-delo {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
-  padding: 0.4rem 0.5rem;
-  border-radius: 8px;
-  background: #f7f3ec;
-  border: 1px solid #ebe3d6;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--wolf-subrule);
 }
 
-.backlog-item-body {
+.backlog-delo-body {
   display: grid;
-  gap: 0.1rem;
+  gap: 2px;
   min-width: 0;
 }
 
-.backlog-item-body strong {
-  font-size: 0.85rem;
-  font-weight: 600;
+.backlog-delo-title {
+  color: var(--wolf-ink);
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.backlog-item-meta {
-  font-size: 0.7rem;
-  color: #8a8278;
-  text-transform: capitalize;
+.backlog-delo-meta {
+  color: var(--wolf-muted);
+  font-size: 11px;
 }
 
 .modal-backdrop {
@@ -1389,11 +1528,11 @@ onMounted(loadAll)
 .delo-option input {
   accent-color: var(--wolf-ink);
 }
-/* Ticket 01: normalize existing grid/panel rules without altering TimeEntry geometry. */
+/* Ticket 01/03: normalize existing grid/panel rules; register geometry unchanged. */
 .grid-scroll,
 .delo-picker-list { border-color: var(--wolf-rule); border-radius: 0; background: var(--wolf-surface); }
 .grid-cell { border-bottom-color: var(--wolf-subrule); color: var(--wolf-ink); }
-.grid-cell.cell-planned { background: #f7f8fa; }
+.grid-cell.cell-planned { background: #F7F8FA; }
 .grid-cell.cell-done { background: var(--wolf-done-surface); }
 .grid-cell:hover:not(:disabled),
 .delo-option:hover,
@@ -1408,4 +1547,9 @@ onMounted(loadAll)
 .backlog-list-item { border-color: var(--wolf-rule); border-radius: 0; background: transparent; }
 .legend-swatch { border-color: var(--wolf-rule); border-radius: 0; }
 .modal { border-radius: 0; box-shadow: none; }
+/* Entry labels must stay visible (override legacy transparent rule). */
+.grid-cell .cell-label { color: var(--wolf-ink); }
+.grid-cell.cell-empty .cell-label { color: transparent; }
+.delo-group-title { color: var(--wolf-muted); background: var(--wolf-surface); }
+.delo-option { border-bottom-color: var(--wolf-subrule); }
 </style>
