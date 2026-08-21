@@ -193,6 +193,13 @@ onMounted(async () => {
               </svg>
               Настройки
             </router-link>
+            <router-link
+              to="/data-sync"
+              class="nav-link"
+              :class="{ active: route.path === '/data-sync' }"
+            >
+              Синхронизация данных
+            </router-link>
           </nav>
 
           <div class="user-menu">
