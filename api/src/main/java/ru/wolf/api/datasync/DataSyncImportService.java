@@ -75,10 +75,12 @@ public class DataSyncImportService {
         Map<String, ChangeSummary> result = new LinkedHashMap<>();
         for (DataSyncContract.Sheet definition : DataSyncContract.manifest().sheets()) {
             Set<String> seen = new HashSet<>(); int create = 0; int update = 0; int skip = 0;
-            String type = entityType(definition.name());
             var sheet = workbook.getSheet(definition.name());
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 String xid = text(sheet.getRow(i), 0); if (!seen.add(xid)) continue;
+                String type = definition.name().equals("project_dependencies")
+                        ? "project_dependency:" + text(sheet.getRow(i), 1) + ":" + text(sheet.getRow(i), 2)
+                        : entityType(definition.name());
                 if (externalIds.findByUserAndEntityTypeAndExternalId(user, type, xid).isPresent()) skip++; else create++;
             }
             int delete = 0;
@@ -124,6 +126,7 @@ public class DataSyncImportService {
         validateRequiredAndScalarFields(workbook, errors);
         validateIntervals(workbook, errors);
         validateProjectCycles(workbook, errors);
+        validateProjectDependencyCycles(workbook, errors);
     }
 
     private void validateRequiredAndScalarFields(Workbook workbook, List<ImportError> errors) {
@@ -148,6 +151,8 @@ public class DataSyncImportService {
     private void validateScheduleIntervals(Workbook workbook, List<ImportError> errors) { var sheet = workbook.getSheet("routine_schedules"); if (sheet == null) return; for (int i = 1; i <= sheet.getLastRowNum(); i++) try { if (!LocalTime.parse(text(sheet.getRow(i), 3)).isBefore(LocalTime.parse(text(sheet.getRow(i), 4)))) errors.add(new ImportError("routine_schedules", i + 1, "startTime/endTime", text(sheet.getRow(i), 0), "endTime должен быть позже startTime")); } catch (RuntimeException ignored) { } }
     private void validateDoneAt(Workbook workbook, List<ImportError> errors) { var sheet = workbook.getSheet("checklist_items"); if (sheet == null) return; for (int i = 1; i <= sheet.getLastRowNum(); i++) { String done = text(sheet.getRow(i), 5), doneAt = text(sheet.getRow(i), 6); if ("true".equalsIgnoreCase(done) && doneAt.isBlank()) errors.add(new ImportError("checklist_items", i + 1, "doneAt", text(sheet.getRow(i), 0), "doneAt обязателен при done=true")); if ("false".equalsIgnoreCase(done) && !doneAt.isBlank()) errors.add(new ImportError("checklist_items", i + 1, "doneAt", text(sheet.getRow(i), 0), "doneAt должен быть пустым при done=false")); if (!doneAt.isBlank()) try { Instant.parse(doneAt); } catch (RuntimeException ex) { errors.add(new ImportError("checklist_items", i + 1, "doneAt", text(sheet.getRow(i), 0), "Некорректный Instant")); } } }
     private void validateProjectCycles(Workbook workbook, List<ImportError> errors) { var sheet = workbook.getSheet("projects"); if (sheet == null) return; Map<String, String> parents = new HashMap<>(); for (int i = 1; i <= sheet.getLastRowNum(); i++) parents.put(text(sheet.getRow(i), 0), text(sheet.getRow(i), 2)); for (String id : parents.keySet()) { Set<String> seen = new HashSet<>(); String current = id; while (!current.isBlank() && parents.containsKey(current)) { if (!seen.add(current)) { errors.add(new ImportError("projects", 0, "parentExternalId", id, "Обнаружен цикл родителей проекта")); break; } current = parents.get(current); } } }
+    private void validateProjectDependencyCycles(Workbook workbook, List<ImportError> errors) { var sheet = workbook.getSheet("project_dependencies"); if (sheet == null) return; Map<String, Set<String>> graph = new HashMap<>(); for (int i = 1; i <= sheet.getLastRowNum(); i++) graph.computeIfAbsent(text(sheet.getRow(i), 1), ignored -> new HashSet<>()).add(text(sheet.getRow(i), 2)); for (String node : graph.keySet()) detectDependencyCycle(node, node, graph, new HashSet<>(), errors); }
+    private void detectDependencyCycle(String root, String node, Map<String, Set<String>> graph, Set<String> path, List<ImportError> errors) { if (!path.add(node)) { errors.add(new ImportError("project_dependencies", 0, "blockerExternalId/blockedExternalId", root, "Обнаружен цикл зависимостей проектов")); return; } for (String next : graph.getOrDefault(node, Set.of())) detectDependencyCycle(root, next, graph, path, errors); path.remove(node); }
 
     private void validateSheetRows(Workbook workbook, String sheetName, int col, List<ImportError> errors, ValueType type) {
         var sheet = workbook.getSheet(sheetName); if (sheet == null) return;
