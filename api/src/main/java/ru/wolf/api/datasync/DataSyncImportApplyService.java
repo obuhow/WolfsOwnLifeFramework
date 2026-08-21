@@ -410,7 +410,11 @@ public class DataSyncImportApplyService {
             case "backlog_items" -> backlogItems.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).ifPresent(backlogItems::delete);
             case "checklist_items" -> checklistItems.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).ifPresent(checklistItems::delete);
             case "activity_mappings" -> activityMappings.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).ifPresent(activityMappings::delete);
-            case "project_dependencies" -> projectDependencies.findAllForUser(user).stream().filter(x -> x.getBlocker().getId().equals(id) || x.getBlocked().getId().equals(id)).forEach(projectDependencies::delete);
+            case "project_dependencies" -> {
+                projectDependencies.findAllForUser(user).stream()
+                        .filter(x -> x.getBlocker().getId().equals(id) || x.getBlocked().getId().equals(id))
+                        .forEach(projectDependencies::delete);
+            }
             default -> throw new IllegalArgumentException("Неразрешенный delete scope: " + scope);
         }
     }

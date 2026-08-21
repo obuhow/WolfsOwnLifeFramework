@@ -90,6 +90,11 @@ async function applyPreview() {
           <label><input v-model="deleteMissing" type="checkbox" /> Включить только явно выбранные scopes</label>
           <label v-if="deleteMissing"><input v-model="scopes" value="projects" type="checkbox" /> projects</label>
           <label v-if="deleteMissing"><input v-model="scopes" value="delos" type="checkbox" /> delos</label>
+          <label v-if="deleteMissing"><input v-model="scopes" value="routine_schedules" type="checkbox" /> routine_schedules</label>
+          <label v-if="deleteMissing"><input v-model="scopes" value="goal_metrics" type="checkbox" /> goal_metrics</label>
+          <label v-if="deleteMissing"><input v-model="scopes" value="goal_week_budgets" type="checkbox" /> goal_week_budgets</label>
+          <label v-if="deleteMissing"><input v-model="scopes" value="synergies" type="checkbox" /> synergies</label>
+          <label v-if="deleteMissing"><input v-model="scopes" value="project_dependencies" type="checkbox" /> project_dependencies</label>
         </fieldset>
         <button class="btn btn-primary" :disabled="!canApply" @click="applyPreview">Применить preview атомарно</button>
       </div>
