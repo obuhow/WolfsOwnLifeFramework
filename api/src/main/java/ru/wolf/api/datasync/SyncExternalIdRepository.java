@@ -11,5 +11,4 @@ public interface SyncExternalIdRepository extends JpaRepository<SyncExternalId, 
     Optional<SyncExternalId> findByUserAndEntityTypeAndExternalId(User user, String entityType, String externalId);
     List<SyncExternalId> findByUserAndEntityType(User user, String entityType);
 
-    List<SyncExternalId> findByUserAndEntityTypeStartingWith(User user, String entityTypePrefix);
 }

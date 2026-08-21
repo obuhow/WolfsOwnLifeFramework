@@ -342,11 +342,6 @@ public class DataSyncImportApplyService {
             if (isNew && hasDependencyPath(user, blocked.getId(), blocker.getId(), new HashSet<>())) throw rowError("project_dependencies", i, "Циклическая зависимость проектов");
             if (isNew) dependency = ProjectDependency.builder().blocker(blocker).blocked(blocked).user(user).build();
             projectDependencies.save(dependency);
-            String dependencyType = "project_dependency:" + text(row, 1) + ":" + text(row, 2);
-            Long blockerId = blocker.getId();
-            SyncExternalId identity = externalIds.findByUserAndEntityTypeAndExternalId(user, dependencyType, xid).orElse(null);
-            if (identity == null) externalIds.save(SyncExternalId.builder().user(user).entityType(dependencyType).entityId(blockerId).externalId(xid).build());
-            else identity.setEntityId(blockerId);
             count(isNew, "project_dependencies", created, updated);
         }
     }
@@ -382,29 +377,28 @@ public class DataSyncImportApplyService {
             String sheet = scope;
             Set<String> incoming = new HashSet<>();
             for (int i = 1; i <= lastRow(workbook, sheet); i++) incoming.add(text(row(workbook, sheet, i), 0));
-            String entityType = entityType(scope);
-            List<SyncExternalId> identities = "project_dependencies".equals(scope)
-                    ? externalIds.findByUserAndEntityTypeStartingWith(user, "project_dependency:")
-                    : externalIds.findByUserAndEntityType(user, entityType);
-            Set<String> incomingKeys = new HashSet<>();
-            if ("project_dependencies".equals(scope)) for (int i = 1; i <= lastRow(workbook, sheet); i++) incomingKeys.add("project_dependency:" + text(row(workbook, sheet, i), 1) + ":" + text(row(workbook, sheet, i), 2));
-            for (SyncExternalId identity : identities) {
-                if (!("project_dependencies".equals(scope) ? incomingKeys.contains(identity.getEntityType()) : incoming.contains(identity.getExternalId()))) {
-                    if ("project_dependencies".equals(scope)) deleteDependencyIdentity(user, identity);
-                    else deleteEntity(scope, identity.getEntityId(), user);
-                    externalIds.delete(identity);
-                    deleted.merge(scope, 1, Integer::sum);
+            if ("project_dependencies".equals(scope)) {
+                Set<String> incomingKeys = new HashSet<>();
+                for (int i = 1; i <= lastRow(workbook, sheet); i++) incomingKeys.add(text(row(workbook, sheet, i), 1) + "\u0000" + text(row(workbook, sheet, i), 2));
+                for (ProjectDependency dependency : projectDependencies.findAllForUser(user)) {
+                    String blockerExternalId = externalIds.findByUserAndEntityTypeAndEntityId(user, "project", dependency.getBlocker().getId()).map(SyncExternalId::getExternalId).orElse("");
+                    String blockedExternalId = externalIds.findByUserAndEntityTypeAndEntityId(user, "project", dependency.getBlocked().getId()).map(SyncExternalId::getExternalId).orElse("");
+                    if (!incomingKeys.contains(blockerExternalId + "\u0000" + blockedExternalId)) {
+                        projectDependencies.delete(dependency);
+                        deleted.merge(scope, 1, Integer::sum);
+                    }
+                }
+            } else {
+                String entityType = entityType(scope);
+                for (SyncExternalId identity : externalIds.findByUserAndEntityType(user, entityType)) {
+                    if (!incoming.contains(identity.getExternalId())) {
+                        deleteEntity(scope, identity.getEntityId(), user);
+                        externalIds.delete(identity);
+                        deleted.merge(scope, 1, Integer::sum);
+                    }
                 }
             }
         }
-    }
-
-    private void deleteDependencyIdentity(User user, SyncExternalId identity) {
-        String[] parts = identity.getEntityType().split(":", 3);
-        if (parts.length != 3) return;
-        Project blocker = projects.findByUserAndId(user, Long.valueOf(parts[1])).orElse(null);
-        Project blocked = projects.findByUserAndId(user, Long.valueOf(parts[2])).orElse(null);
-        if (blocker != null && blocked != null) projectDependencies.findById(new ProjectDependencyId(blocker.getId(), blocked.getId())).ifPresent(projectDependencies::delete);
     }
 
     private void deleteEntity(String scope, Long id, User user) {

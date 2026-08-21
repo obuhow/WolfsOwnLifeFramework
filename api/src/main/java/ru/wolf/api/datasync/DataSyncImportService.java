@@ -9,6 +9,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import ru.wolf.api.project.ProjectDependencyRepository;
 import ru.wolf.api.user.User;
 
 import java.io.ByteArrayInputStream;
@@ -30,6 +31,7 @@ import java.util.Set;
 public class DataSyncImportService {
     private final SyncImportPreviewRepository previews;
     private final SyncExternalIdRepository externalIds;
+    private final ProjectDependencyRepository projectDependencies;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -78,10 +80,13 @@ public class DataSyncImportService {
             var sheet = workbook.getSheet(definition.name());
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 String xid = text(sheet.getRow(i), 0); if (!seen.add(xid)) continue;
-                String type = definition.name().equals("project_dependencies")
-                        ? "project_dependency:" + text(sheet.getRow(i), 1) + ":" + text(sheet.getRow(i), 2)
-                        : entityType(definition.name());
-                if (externalIds.findByUserAndEntityTypeAndExternalId(user, type, xid).isPresent()) skip++; else create++;
+                if (definition.name().equals("project_dependencies")) {
+                    Long blockerId = externalIds.findByUserAndEntityTypeAndExternalId(user, "project", text(sheet.getRow(i), 1))
+                            .map(SyncExternalId::getEntityId).orElse(null);
+                    Long blockedId = externalIds.findByUserAndEntityTypeAndExternalId(user, "project", text(sheet.getRow(i), 2))
+                            .map(SyncExternalId::getEntityId).orElse(null);
+                    if (blockerId != null && blockedId != null && projectDependencies.existsByUserAndBlockerIdAndBlockedId(user, blockerId, blockedId)) skip++; else create++;
+                } else if (externalIds.findByUserAndEntityTypeAndExternalId(user, entityType(definition.name()), xid).isPresent()) skip++; else create++;
             }
             int delete = 0;
             result.put(definition.name(), new ChangeSummary(create, update, skip, delete));
