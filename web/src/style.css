@@ -688,3 +688,90 @@ input[type="radio"] {
   .brand { padding: 15px 0 12px; }
   .detail-grid { grid-template-columns: 1fr; }
 }
+
+/* Ticket 06: CSV import as a ruled expandable section with full schema hint */
+.csv-import-panel {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin: 0 0 18px;
+  padding: 14px 0 16px;
+  border-top: 1px solid var(--wolf-rule);
+  border-bottom: 1px solid var(--wolf-rule);
+  background: transparent;
+}
+
+.csv-import-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.csv-import-panel label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--wolf-ink);
+}
+
+.csv-schema {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--wolf-subrule);
+  width: 100%;
+}
+
+.csv-schema-title {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--wolf-muted);
+}
+
+.csv-schema code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--wolf-ink);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.csv-schema-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+  color: var(--wolf-muted);
+  font-size: 12px;
+}
+
+.csv-schema-list strong { color: var(--wolf-ink); font-weight: 600; }
+
+.csv-schema-note {
+  margin: 6px 0 0;
+  color: var(--wolf-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Ticket 06: Settings fieldsets */
+.settings-fieldset {
+  margin: 0 0 22px;
+  padding: 0 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--wolf-rule);
+}
+
+.settings-fieldset > legend {
+  padding: 0;
+  margin: 0 0 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--wolf-muted);
+}

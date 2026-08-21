@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiBase } from '../api'
+import ConfirmInline from './ConfirmInline.vue'
 
 const router = useRouter()
 
@@ -13,6 +14,7 @@ const success = ref('')
 const showForm = ref(false)
 const editingId = ref(null)
 const importFile = ref(null)
+const importOpen = ref(false)
 const addImportedToWeek = ref(true)
 const skipOverlapCheck = ref(false)
 const importing = ref(false)
@@ -170,7 +172,6 @@ async function saveDelo() {
 }
 
 async function deleteDelo(delo) {
-  if (!confirm(`Удалить Дело «${delo.title}»?`)) return
   loading.value = true
   error.value = ''
   success.value = ''
@@ -322,22 +323,45 @@ onMounted(loadAll)
       <div class="projects-toolbar">
         <h2 style="margin: 0">Каталог Дел</h2>
         <div class="projects-toolbar-actions">
-          <label class="btn btn-ghost" for="delo-csv-file">Импорт CSV</label>
+          <button
+            class="btn btn-ghost"
+            type="button"
+            :aria-expanded="importOpen"
+            aria-controls="delo-csv-import"
+            @click="importOpen = !importOpen"
+          >{{ importOpen ? 'Скрыть импорт CSV' : 'Импорт CSV' }}</button>
           <button v-if="!showForm" class="btn btn-primary" :disabled="loading" @click="openCreate">
             + Добавить
           </button>
         </div>
       </div>
 
-      <div class="csv-import-panel">
-        <input id="delo-csv-file" type="file" accept=".csv,text/csv" :disabled="importing" @change="importFile = $event.target.files[0] || null" />
+      <section v-if="importOpen" id="delo-csv-import" class="csv-import-panel" aria-label="Импорт Дел из CSV">
+        <div class="csv-import-row">
+          <input id="delo-csv-file" type="file" accept=".csv,text/csv" :disabled="importing" @change="importFile = $event.target.files[0] || null" />
+          <button class="btn btn-primary" :disabled="importing || !importFile" @click="importCsv">
+            {{ importing ? 'Импорт…' : 'Загрузить' }}
+          </button>
+        </div>
         <label><input v-model="addImportedToWeek" type="checkbox" :disabled="importing" /> Добавить в Бэклог текущей недели</label>
         <label><input v-model="skipOverlapCheck" type="checkbox" :disabled="importing" /> Пропустить проверку пересечений</label>
-        <button class="btn btn-primary" :disabled="importing || !importFile" @click="importCsv">
-          {{ importing ? 'Импорт…' : 'Загрузить' }}
-        </button>
-        <small>Запятые: title, date, startAt, endAt, description, executionMode, projects, lifeArea. Проекты создаются автоматически.</small>
-      </div>
+        <div class="csv-schema">
+          <p class="csv-schema-title">Схема (запятая-разделитель):</p>
+          <code>title,date,startAt,endAt,description,executionMode,projects,lifeArea</code>
+          <ul class="csv-schema-list">
+            <li><strong>title</strong> — название Дела (обязательно)</li>
+            <li><strong>date</strong> — <code>YYYY-MM-DD</code></li>
+            <li><strong>startAt</strong> / <strong>endAt</strong> — <code>HH:mm</code> по 15-минутной сетке</li>
+            <li><strong>executionMode</strong> — <code>SELF</code> / <code>DELEGATABLE</code> / <code>AUTOMATABLE</code></li>
+            <li><strong>projects</strong> — названия Проектов через <code>|</code></li>
+            <li><strong>lifeArea</strong> — существующая Область жизни; обязательна, если Проект новый</li>
+          </ul>
+          <p class="csv-schema-note">
+            Поля с запятыми заключайте в кавычки. Отсутствующие Проекты создаются только при явной существующей Области жизни;
+            Области жизни никогда не создаются автоматически. Файл проверяется целиком: при ошибке ничего не импортируется.
+          </p>
+        </div>
+      </section>
 
       <div v-if="loading && delos.length === 0" class="loading">Загрузка…</div>
 
@@ -374,19 +398,13 @@ onMounted(loadAll)
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
             </button>
-            <button
-              class="icon-btn"
-              title="Удалить"
-              aria-label="Удалить"
-              style="color: #8a3a3a"
+            <ConfirmInline
+              label="Удалить"
+              :question="`Удалить Дело «${d.title}»?`"
+              confirm-label="Да, удалить"
               :disabled="loading"
-              @click="deleteDelo(d)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>
+              @confirm="deleteDelo(d)"
+            />
           </div>
         </div>
       </div>

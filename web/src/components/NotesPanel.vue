@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase } from '../api'
+import ConfirmInline from './ConfirmInline.vue'
 
 const props = defineProps({
   projectId: { type: [Number, String], default: null },
@@ -105,7 +106,6 @@ async function saveNote() {
 }
 
 async function removeNote(note) {
-  if (!confirm('Удалить заметку?')) return
   const headers = authHeaders()
   if (!headers) return
   loading.value = true
@@ -171,7 +171,7 @@ onMounted(loadNotes)
           </div>
           <div class="note-actions">
             <button class="btn btn-ghost" :disabled="loading" @click="editNote(note)">Изменить</button>
-            <button class="btn btn-ghost" :disabled="loading" @click="removeNote(note)">Удалить</button>
+            <ConfirmInline label="Удалить" question="Удалить заметку?" confirm-label="Да, удалить" :disabled="loading" @confirm="removeNote(note)" />
           </div>
         </div>
       </article>
