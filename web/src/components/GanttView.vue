@@ -288,8 +288,8 @@ onMounted(loadAll)
   <div class="gantt-page">
     <header class="page-header gantt-header">
       <div>
-        <h1>Планирование</h1>
-        <p class="eyebrow">План и факт по Проектам · {{ MODE_LABEL[hourAccountingMode] || hourAccountingMode }}</p>
+        <h1>Диаграмма Ганта</h1>
+        <p class="eyebrow">Планирование · план и факт по Проектам · {{ MODE_LABEL[hourAccountingMode] || hourAccountingMode }}</p>
       </div>
       <div class="gantt-toolbar">
         <button type="button" class="btn btn-ghost" :disabled="loading" @click="shiftWeeks(-4)" title="На 4 недели назад">←</button>
@@ -344,7 +344,7 @@ onMounted(loadAll)
 
     <div v-if="loading && !projects.length" class="muted">Загрузка…</div>
 
-    <div v-else class="gantt-scroll">
+    <div v-else class="gantt-scroll" role="region" aria-label="Диаграмма Ганта, прокрутка по горизонтали" tabindex="0">
       <div
         v-if="weeks.length"
         class="gantt-grid"
@@ -404,7 +404,14 @@ onMounted(loadAll)
             <div class="strips">
               <div class="strip plan" :title="`План: ${formatHours(c.planHours)} ч`">
                 <div class="bar" :style="{ width: planBarWidth(c.planHours) + '%' }"></div>
-                <span class="val plan-val" @click.stop="startEdit(p, c)">
+                <span
+                  class="val plan-val"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`План ${formatHours(c.planHours)} ч, изменить`"
+                  @click.stop="startEdit(p, c)"
+                  @keydown.enter.prevent="startEdit(p, c)"
+                >
                   <template v-if="isEditing(p.id, c.isoYear, c.isoWeek)">
                     <input
                       v-model="editValue"
@@ -412,6 +419,7 @@ onMounted(loadAll)
                       type="text"
                       inputmode="decimal"
                       :disabled="saving"
+                      :aria-label="`Плановые часы, неделя W${c.isoWeek}`"
                       @keydown.enter.prevent="commitEdit(p, c)"
                       @keydown.esc.prevent="cancelEdit"
                       @blur="commitEdit(p, c)"
@@ -421,6 +429,16 @@ onMounted(loadAll)
                   <template v-else>
                     {{ c.planHours != null ? formatHours(c.planHours) : '·' }}
                   </template>
+                </span>
+              </div>
+              <div
+                class="strip fact"
+                :class="{ 'has-fact': Number(c.factHours) > 0 }"
+                :title="`Факт: ${formatHours(c.factHours)} ч`"
+              >
+                <div class="bar" :style="{ width: factBarWidth(c.factHours) + '%' }"></div>
+                <span class="val fact-val">
+                  {{ Number(c.factHours) > 0 ? formatHours(c.factHours) : '·' }}
                 </span>
               </div>
               <div class="strip forecast" :title="forecastTitle(p)">
@@ -439,8 +457,9 @@ onMounted(loadAll)
     </div>
 
     <p class="legend muted">
-      Верхняя полоска — <strong>план</strong> (клик / двойной клик — правка часов), нижняя — <strong>прогноз</strong>.
-      Наведите на прогноз, чтобы увидеть среднее за 4 недели и остаток. Если данных мало, отображается нейтральное пояснение.
+      Верхняя полоска — <strong>план</strong> (клик или Enter — правка часов, Escape — отмена),
+      средняя — <strong>факт</strong> (бледно-зелёная только при наличии выполненных часов),
+      нижняя — <strong>прогноз</strong>. Если данных мало, отображается нейтральное пояснение.
     </p>
   </div>
 </template>
@@ -942,8 +961,8 @@ onMounted(loadAll)
   color: #8a8278;
 }
 
-/* Ticket 01 override: the existing data geometry stays intact; only the shared
-   register surface, controls and status semantics are normalized here. */
+/* Ticket 01/05 override: flatten Gantt view and capacity list to register tokens
+   without altering internal data grid tracks or calculations. */
 .gantt-page :is(.gantt-filters, .gantt-scroll, .gantt-header-grid .month-cell, .gantt-header-grid .week-head, .sticky-col, .corner, .project-name, .gantt-cell, .month-row .month-cell, .week-row .week-head) {
   background: var(--wolf-surface);
 }
@@ -958,21 +977,24 @@ onMounted(loadAll)
   background: var(--wolf-surface);
   color: var(--wolf-ink);
 }
-.gantt-page .chip.on { border-bottom-color: var(--wolf-ink); }
+.gantt-page .chip.on { border-bottom-color: var(--wolf-ink); background: var(--wolf-hover); }
 .gantt-page .chip-dot { border-radius: 0; }
 .gantt-page :is(.gantt-grid .week-head.current, .gantt-grid .gantt-cell.current, .week-head.current, .gantt-cell.current) {
-  background: #f7f7f5;
+  background: var(--wolf-hover);
   color: var(--wolf-ink);
 }
 .gantt-page :is(.gantt-grid .week-head.current, .week-head.current) { box-shadow: inset 0 -2px 0 var(--wolf-ink); }
 .gantt-page .date-bar { background: var(--wolf-ink); opacity: .35; }
-.gantt-page .strip { border-radius: 0; background: var(--wolf-subrule); }
+.gantt-page .strip { border-radius: 0; background: var(--wolf-subrule); height: 1rem; }
 .gantt-page .strip .bar { border-radius: 0; }
-.gantt-page .strip.plan .bar { background: var(--wolf-ink); }
-.gantt-page .strip.fact .bar { background: var(--wolf-done-ink); }
-.gantt-page .strip.forecast .bar { background: var(--wolf-muted); }
-.gantt-page :is(.strip .val, .plan-val) { color: var(--wolf-ink); }
-.gantt-page .fact-val { color: var(--wolf-done-ink); }
+.gantt-page .strip.plan .bar { background: var(--wolf-ink); opacity: 0.25; }
+.gantt-page .strip.fact .bar { background: transparent; }
+.gantt-page .strip.fact.has-fact .bar { background: var(--wolf-done-surface); }
+.gantt-page .strip.forecast .bar { background: var(--wolf-muted); opacity: 0.15; }
+.gantt-page .strips { min-height: 3.2rem; }
+.gantt-page :is(.strip .val, .plan-val) { color: var(--wolf-ink); font-size: 0.65rem; }
+.gantt-page .fact-val { color: var(--wolf-done-ink); font-weight: 600; }
+.gantt-page .plan-val { color: var(--wolf-ink); }
 .gantt-page .forecast-val { color: var(--wolf-muted); font-size: 0.58rem; }
 .gantt-page .plan-input { background: var(--wolf-surface); outline-color: var(--wolf-ink); border-radius: 0; }
 .gantt-page .project-link:hover { color: var(--wolf-ink); }
@@ -980,6 +1002,7 @@ onMounted(loadAll)
 .gantt-page .banner { margin: 0 0 12px; border-radius: 0; background: transparent; }
 .gantt-page .banner.error { color: var(--wolf-ink); border-color: var(--wolf-ink); }
 .gantt-page .banner.ok { color: var(--wolf-done-ink); border-color: var(--wolf-done-ink); }
+.weeks-select select { border-radius: 0; border-color: var(--wolf-rule); background: var(--wolf-surface); color: var(--wolf-ink); }
 
 @media (max-width: 720px) {
   .sticky-col {

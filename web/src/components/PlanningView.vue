@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import GanttView from './GanttView.vue'
 import { apiBase, authHeaders } from '../api'
 
@@ -27,39 +27,139 @@ async function loadCapacity() {
   } catch (e) { capacityError.value = e.message }
 }
 
+function formatHours(v) {
+  if (v == null || v === '') return '—'
+  const n = Number(v)
+  if (Number.isNaN(n)) return '—'
+  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, '')
+}
+
+/** Neutral textual delta — context, never a score or a blocking warning. */
+function deltaLabel(item) {
+  const d = Number(item.delta)
+  if (Number.isNaN(d)) return ''
+  if (d === 0) return 'план равен доступным часам'
+  if (d > 0) return `свободно ${formatHours(d)} ч`
+  return `план больше доступного на ${formatHours(Math.abs(d))} ч`
+}
+
+const hasCapacity = computed(() => capacity.value.length > 0)
+
 onMounted(loadCapacity)
 </script>
 
 <template>
-  <div>
+  <div class="planning-page">
     <GanttView />
-    <section class="card planning-capacity">
-      <div class="section-heading"><div><span class="eyebrow">Нагрузка</span><h2>Суммарная плановая нагрузка</h2></div></div>
-      <p v-if="capacityError" class="banner error">{{ capacityError }}</p>
-      <div v-else-if="!capacity.length" class="muted">Нет данных по неделям</div>
-      <div v-else class="capacity-list">
-        <div v-for="item in capacity" :key="item.weekId" class="capacity-row">
-          <strong>{{ item.weekId }}</strong><span>план {{ item.plannedHours }} ч</span><span>доступно {{ item.availableHours }} ч</span>
-          <span class="muted">дельта {{ item.delta }} ч</span>
-          <small v-if="Number(item.delta) < 0" class="muted">план недели превышает доступные часы на {{ Math.abs(Number(item.delta)) }} ч</small>
+
+    <section class="planning-capacity">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Нагрузка</span>
+          <h2>Суммарная плановая нагрузка</h2>
         </div>
       </div>
+      <p v-if="capacityError" class="banner error">{{ capacityError }}</p>
+      <div v-else-if="!hasCapacity" class="muted">Нет данных по неделям</div>
+      <div v-else class="capacity-scroll" role="region" aria-label="Нагрузка по неделям, прокрутка по горизонтали" tabindex="0">
+        <div class="capacity-list">
+          <div class="capacity-row capacity-head">
+            <span>Неделя</span>
+            <span>План</span>
+            <span>Доступно</span>
+            <span>Разница</span>
+          </div>
+          <div v-for="item in capacity" :key="item.weekId" class="capacity-row">
+            <strong class="cap-week">{{ item.weekId }}</strong>
+            <span class="cap-num">{{ formatHours(item.plannedHours) }} ч</span>
+            <span class="cap-num">{{ formatHours(item.availableHours) }} ч</span>
+            <span class="cap-delta">{{ deltaLabel(item) }}</span>
+          </div>
+        </div>
+      </div>
+
       <div v-if="curve.length" class="curve-list">
         <h3>Кривые нагрузки</h3>
-        <div v-for="item in curve" :key="item.id" class="curve-row"><strong>{{ item.title }}</strong><span>{{ item.weekStart }}</span><span>{{ item.hours }} ч/нед</span></div>
+        <div v-for="item in curve" :key="item.id" class="curve-row">
+          <strong>{{ item.title }}</strong>
+          <span class="cap-num">{{ item.weekStart }}</span>
+          <span class="cap-num">{{ formatHours(item.hours) }} ч/нед</span>
+        </div>
       </div>
     </section>
   </div>
 </template>
 
-
 <style scoped>
-.planning-capacity { margin-top: 1.25rem; }
-.capacity-list { display: grid; gap: .35rem; }
-.capacity-row { display: grid; grid-template-columns: 7rem 9rem 10rem 8rem 1fr; gap: .75rem; align-items: center; padding: .55rem .7rem; border-top: 1px solid var(--border, #e6dfd4); }
-.capacity-row small { color: var(--muted-foreground, #7a7268); }
-.curve-list { margin-top: 1.25rem; border-top: 1px solid var(--border, #e6dfd4); padding-top: .8rem; }
-.curve-list h3 { margin: 0 0 .5rem; }
-.curve-row { display: grid; grid-template-columns: 1fr 8rem 8rem; gap: .75rem; padding: .4rem 0; border-top: 1px solid var(--border, #e6dfd4); }
-@media (max-width: 700px) { .capacity-row { grid-template-columns: 1fr 1fr; } }
+.planning-page { width: 100%; }
+
+.planning-capacity {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--wolf-rule);
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.section-heading { margin-bottom: 0.85rem; }
+.section-heading h2 { margin: 0; font-size: 1rem; }
+.section-heading .eyebrow {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--wolf-muted);
+}
+
+.capacity-scroll { overflow-x: auto; }
+.capacity-list { display: grid; min-width: 34rem; }
+
+.capacity-row {
+  display: grid;
+  grid-template-columns: 7rem 6rem 7rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--wolf-subrule);
+  font-size: 0.85rem;
+  color: var(--wolf-ink);
+}
+
+.capacity-row.capacity-head {
+  border-top: 0;
+  border-bottom: 1px solid var(--wolf-rule);
+  color: var(--wolf-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cap-week { font-variant-numeric: tabular-nums; font-weight: 600; }
+.cap-num { font-variant-numeric: tabular-nums; }
+.cap-delta { color: var(--wolf-muted); }
+
+.curve-list {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--wolf-rule);
+  padding-top: 0.9rem;
+}
+.curve-list h3 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+.curve-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem 8rem;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--wolf-subrule);
+  font-size: 0.85rem;
+  color: var(--wolf-ink);
+}
+
+.banner { padding: 0.6rem 0; margin: 0 0 0.75rem; border-radius: 0; background: transparent; font-size: 0.9rem; }
+.banner.error { color: var(--wolf-ink); border-bottom: 1px solid var(--wolf-ink); }
+.muted { color: var(--wolf-muted); }
+
+@media (max-width: 700px) {
+  .curve-row { grid-template-columns: minmax(0, 1fr) 6rem; }
+}
 </style>
