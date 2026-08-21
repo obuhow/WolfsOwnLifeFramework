@@ -96,7 +96,7 @@ public class DataSyncImportApplyService {
     private final ActivityMappingRepository activityMappings;
     private final ObjectMapper objectMapper;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ApplyResponse apply(User user, Long previewId, String checksum, boolean deleteMissing,
                                List<String> scopes) throws Exception {
         SyncImportPreview preview = importService.find(user, previewId);
@@ -237,12 +237,16 @@ public class DataSyncImportApplyService {
             delo = delos.save(delo); bind(user, "delo", delo.getId(), xid); result.put(xid, delo); count(isNew, "delos", created, updated);
             Set<String> projectIds = pipe(row, 8); String primary = nullable(row, 9);
             if (!primary.isBlank() && !projectIds.contains(primary)) throw rowError("delos", i, "primaryProjectExternalId должен входить в projectExternalIds");
+            Set<Long> incomingProjectIds = new HashSet<>();
             for (String projectId : projectIds) {
                 Project project = require(projects, projectId, "Неизвестный projectExternalId: " + projectId);
-                if (!deloProjects.existsByDeloAndProject(delo, project)) {
-                    deloProjects.save(DeloProject.builder().id(new DeloProjectId(delo.getId(), project.getId())).delo(delo).project(project).isPrimary(projectId.equals(primary)).build());
-                }
+                incomingProjectIds.add(project.getId());
+                DeloProject link = deloProjects.findById(new DeloProjectId(delo.getId(), project.getId())).orElse(null);
+                if (link == null) link = DeloProject.builder().id(new DeloProjectId(delo.getId(), project.getId())).delo(delo).project(project).build();
+                link.setIsPrimary(projectId.equals(primary));
+                deloProjects.save(link);
             }
+            for (DeloProject link : deloProjects.findByDeloId(delo.getId())) if (!incomingProjectIds.contains(link.getProject().getId())) deloProjects.delete(link);
         }
         return result;
     }
@@ -255,7 +259,7 @@ public class DataSyncImportApplyService {
             boolean isNew = idea == null;
             if (isNew) idea = Idea.builder().user(user).build();
             idea.setTitle(required(row, 1, "ideas", i)); idea.setDescription(nullable(row, 2)); idea.setCategory(enumValue(row, 3, Idea.Category.class, "ideas", i)); idea.setStatus(enumValue(row, 4, Idea.Status.class, "ideas", i));
-            idea.setPromotedProject(nullable(row, 5).isBlank() ? null : require(projects, text(row, 5), "Неизвестный promotedProjectExternalId: " + text(row, 5)));
+            idea.setPromotedProject(nullable(row, 6).isBlank() ? null : require(projects, text(row, 6), "Неизвестный promotedProjectExternalId: " + text(row, 6)));
             idea = ideas.save(idea); bind(user, "idea", idea.getId(), xid); result.put(xid, idea); count(isNew, "ideas", created, updated);
         }
         return result;
@@ -264,7 +268,7 @@ public class DataSyncImportApplyService {
     private void applyRoutineSchedules(User user, Workbook workbook, Map<String, Routine> routines, Map<String, Integer> created, Map<String, Integer> updated) {
         for (int i = 1; i <= lastRow(workbook, "routine_schedules"); i++) {
             Row row = row(workbook, "routine_schedules", i); String xid = text(row, 0); Routine routine = require(routines, text(row, 1), "Неизвестная Routine: " + text(row, 1));
-            RoutineSchedule schedule = existing(user, "routine_schedule", xid, id -> routineSchedules.findById(id).orElseThrow());
+            RoutineSchedule schedule = existing(user, "routine_schedule", xid, id -> routineSchedules.findById(id).filter(x -> x.getRoutine().getUser().getId().equals(user.getId())).orElseThrow());
             boolean isNew = schedule == null; if (isNew) schedule = RoutineSchedule.builder().routine(routine).build();
             schedule.setRoutine(routine); schedule.setDayOfWeek(enumValue(row, 2, DayOfWeek.class, "routine_schedules", i)); schedule.setStartTime(requiredTime(row, 3, "routine_schedules", i)); schedule.setEndTime(requiredTime(row, 4, "routine_schedules", i));
             schedule = routineSchedules.save(schedule); bind(user, "routine_schedule", schedule.getId(), xid); count(isNew, "routine_schedules", created, updated);
@@ -291,7 +295,7 @@ public class DataSyncImportApplyService {
     private void applyGoalMetrics(User user, Workbook workbook, Map<String, Goal> goals, Map<String, Integer> created, Map<String, Integer> updated) {
         for (int i = 1; i <= lastRow(workbook, "goal_metrics"); i++) {
             Row row = row(workbook, "goal_metrics", i); String xid = text(row, 0); Goal goal = require(goals, text(row, 1), "Неизвестная Goal: " + text(row, 1));
-            GoalMetric metric = existing(user, "goal_metric", xid, id -> goalMetrics.findById(id).orElseThrow()); boolean isNew = metric == null; if (isNew) metric = GoalMetric.builder().goal(goal).build();
+            GoalMetric metric = existing(user, "goal_metric", xid, id -> goalMetrics.findById(id).filter(x -> x.getGoal().getUser().getId().equals(user.getId())).orElseThrow()); boolean isNew = metric == null; if (isNew) metric = GoalMetric.builder().goal(goal).build();
             metric.setGoal(goal); metric.setKind(required(row, 2, "goal_metrics", i)); metric.setValue(requiredDecimalValue(row, 3, "goal_metrics", i)); metric.setTargetValue(decimal(row, 4)); metric.setAt(requiredDateTime(row, 5, "goal_metrics", i));
             metric = goalMetrics.save(metric); bind(user, "goal_metric", metric.getId(), xid); count(isNew, "goal_metrics", created, updated);
         }
@@ -300,7 +304,7 @@ public class DataSyncImportApplyService {
     private void applyGoalBudgets(User user, Workbook workbook, Map<String, Goal> goals, Map<String, Integer> created, Map<String, Integer> updated) {
         for (int i = 1; i <= lastRow(workbook, "goal_week_budgets"); i++) {
             Row row = row(workbook, "goal_week_budgets", i); String xid = text(row, 0); Goal goal = require(goals, text(row, 1), "Неизвестная Goal: " + text(row, 1));
-            GoalWeekBudget budget = existing(user, "goal_week_budget", xid, id -> goalWeekBudgets.findById(id).orElseThrow()); boolean isNew = budget == null; if (isNew) budget = GoalWeekBudget.builder().goal(goal).build();
+            GoalWeekBudget budget = existing(user, "goal_week_budget", xid, id -> goalWeekBudgets.findById(id).filter(x -> x.getGoal().getUser().getId().equals(user.getId())).orElseThrow()); boolean isNew = budget == null; if (isNew) budget = GoalWeekBudget.builder().goal(goal).build();
             budget.setGoal(goal); budget.setIsoYear(integerRequired(row, 2, "goal_week_budgets", i)); budget.setIsoWeek(integerRequired(row, 3, "goal_week_budgets", i)); budget.setHours(requiredDecimalValue(row, 4, "goal_week_budgets", i));
             budget = goalWeekBudgets.save(budget); bind(user, "goal_week_budget", budget.getId(), xid); count(isNew, "goal_week_budgets", created, updated);
         }
@@ -314,14 +318,15 @@ public class DataSyncImportApplyService {
             Note note = existing(user, "note", xid, id -> notes.findByUserAndId(user, id).orElseThrow()); boolean isNew = note == null; if (isNew) note = Note.builder().user(user).build();
             note.setProject(project); note.setDelo(delo); note.setAuthor(enumValue(row, 3, Note.Author.class, "notes", i)); note.setBody(required(row, 4, "notes", i)); note.setTags(pipe(row, 5).toArray(String[]::new));
             note = notes.save(note); bind(user, "note", note.getId(), xid); count(isNew, "notes", created, updated);
-            String audioRef = nullable(row, 6); if (!audioRef.isBlank()) note.setAudioAttachment(NoteAttachment.builder().note(note).audioRef(audioRef).contentType(nullable(row, 7)).originalFilename(nullable(row, 8)).build());
+            String audioRef = nullable(row, 6);
+            note.setAudioAttachment(audioRef.isBlank() ? null : NoteAttachment.builder().note(note).audioRef(audioRef).contentType(nullable(row, 7)).originalFilename(nullable(row, 8)).build());
         }
     }
 
     private void applySynergies(User user, Workbook workbook, Map<String, LifeSphere> spheres, Map<String, Project> projects, Map<String, Routine> routines, Map<String, Idea> ideas, Map<String, Integer> created, Map<String, Integer> updated) {
         for (int i = 1; i <= lastRow(workbook, "synergies"); i++) {
             Row row = row(workbook, "synergies", i); String xid = text(row, 0); LifeSphere sphere = require(spheres, text(row, 4), "Неизвестная sphereExternalId: " + text(row, 4));
-            Synergy synergy = existing(user, "synergy", xid, id -> synergies.findById(id).orElseThrow()); boolean isNew = synergy == null; if (isNew) synergy = Synergy.builder().user(user).build();
+            Synergy synergy = existing(user, "synergy", xid, id -> synergies.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).orElseThrow()); boolean isNew = synergy == null; if (isNew) synergy = Synergy.builder().user(user).build();
             int targetCount = (!nullable(row, 1).isBlank() ? 1 : 0) + (!nullable(row, 2).isBlank() ? 1 : 0) + (!nullable(row, 3).isBlank() ? 1 : 0);
             if (targetCount != 1) throw rowError("synergies", i, "Ровно одна target-ссылка обязательна");
             synergy.setSphere(sphere); synergy.setProject(nullable(row, 1).isBlank() ? null : require(projects, text(row, 1), "Неизвестный projectExternalId: " + text(row, 1))); synergy.setIdeaId(nullable(row, 2).isBlank() ? null : require(ideas, text(row, 2), "Неизвестный ideaExternalId: " + text(row, 2)).getId()); synergy.setRoutine(nullable(row, 3).isBlank() ? null : require(routines, text(row, 3), "Неизвестный routineExternalId: " + text(row, 3))); synergy.setImpact(enumValue(row, 5, Synergy.Impact.class, "synergies", i));
@@ -333,14 +338,9 @@ public class DataSyncImportApplyService {
         for (int i = 1; i <= lastRow(workbook, "project_dependencies"); i++) {
             Row row = row(workbook, "project_dependencies", i); String xid = text(row, 0); Project blocker = require(projects, text(row, 1), "Неизвестный blockerExternalId: " + text(row, 1)); Project blocked = require(projects, text(row, 2), "Неизвестный blockedExternalId: " + text(row, 2));
             if (blocker.getId().equals(blocked.getId())) throw rowError("project_dependencies", i, "Проект не может зависеть от самого себя");
-            ProjectDependency dependency = projectDependencies.findById(new ProjectDependencyId(blocker.getId(), blocked.getId())).orElse(null); boolean isNew = dependency == null;
+            ProjectDependency dependency = projectDependencies.findById(new ProjectDependencyId(blocker.getId(), blocked.getId())).filter(x -> x.getUser().getId().equals(user.getId())).orElse(null); boolean isNew = dependency == null;
             if (isNew) dependency = ProjectDependency.builder().blocker(blocker).blocked(blocked).user(user).build();
             projectDependencies.save(dependency);
-            String dependencyType = "project_dependency:" + dependency.getBlocker().getId() + ":" + dependency.getBlocked().getId();
-            Long blockerId = dependency.getBlocker().getId();
-            SyncExternalId identity = externalIds.findByUserAndEntityTypeAndExternalId(user, dependencyType, xid).orElse(null);
-            if (identity == null) externalIds.save(SyncExternalId.builder().user(user).entityType(dependencyType).entityId(blockerId).externalId(xid).build());
-            else identity.setEntityId(blockerId);
             count(isNew, "project_dependencies", created, updated);
         }
     }
@@ -348,7 +348,7 @@ public class DataSyncImportApplyService {
     private void applyBacklog(User user, Workbook workbook, Map<String, Delo> delos, Map<String, Integer> created, Map<String, Integer> updated) {
         for (int i = 1; i <= lastRow(workbook, "backlog_items"); i++) {
             Row row = row(workbook, "backlog_items", i); String xid = text(row, 0); Delo delo = require(delos, text(row, 1), "Неизвестный deloExternalId: " + text(row, 1));
-            BacklogItem item = existing(user, "backlog_item", xid, id -> backlogItems.findById(id).orElseThrow()); boolean isNew = item == null; if (isNew) item = BacklogItem.builder().user(user).delo(delo).build();
+            BacklogItem item = existing(user, "backlog_item", xid, id -> backlogItems.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).orElseThrow()); boolean isNew = item == null; if (isNew) item = BacklogItem.builder().user(user).delo(delo).build();
             item.setDelo(delo); item.setScope(enumValue(row, 2, BacklogItem.Scope.class, "backlog_items", i)); item.setPeriodId(required(row, 3, "backlog_items", i)); item.setPlannedHours(decimal(row, 4)); item.setPosition(integer(row, 5, 0)); item.setMovedToWeek(nullable(row, 6));
             item = backlogItems.save(item); bind(user, "backlog_item", item.getId(), xid); count(isNew, "backlog_items", created, updated);
         }
@@ -364,21 +364,26 @@ public class DataSyncImportApplyService {
 
     private void applyActivityMappings(User user, Workbook workbook, Map<String, Delo> delos, Map<String, Integer> created, Map<String, Integer> updated) {
         for (int i = 1; i <= lastRow(workbook, "activity_mappings"); i++) {
-            Row row = row(workbook, "activity_mappings", i); String xid = text(row, 0); Delo delo = require(delos, text(row, 2), "Неизвестный deloExternalId: " + text(row, 2)); ActivityMapping mapping = existing(user, "activity_mapping", xid, id -> activityMappings.findById(id).orElseThrow()); boolean isNew = mapping == null; if (isNew) mapping = ActivityMapping.builder().user(user).build();
+            Row row = row(workbook, "activity_mappings", i); String xid = text(row, 0); Delo delo = require(delos, text(row, 2), "Неизвестный deloExternalId: " + text(row, 2)); ActivityMapping mapping = existing(user, "activity_mapping", xid, id -> activityMappings.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).orElseThrow()); boolean isNew = mapping == null; if (isNew) mapping = ActivityMapping.builder().user(user).build();
             mapping.setActivityText(required(row, 1, "activity_mappings", i)); mapping.setDelo(delo); mapping = activityMappings.save(mapping); bind(user, "activity_mapping", mapping.getId(), xid); count(isNew, "activity_mappings", created, updated);
         }
     }
 
     private void deleteMissing(User user, Workbook workbook, List<String> scopes, Map<String, Integer> deleted) {
-        Set<String> allowed = Set.of("life_areas", "life_spheres", "projects", "routines", "delos", "goals", "ideas", "notes", "time_entries", "backlog_items", "checklist_items", "activity_mappings");
+        Set<String> allowed = Set.of("life_areas", "life_spheres", "projects", "routines", "routine_schedules", "delos", "time_entries", "goals", "goal_metrics", "goal_week_budgets", "ideas", "notes", "synergies", "project_dependencies", "backlog_items", "checklist_items", "activity_mappings");
         for (String scope : scopes) {
             if (!allowed.contains(scope)) throw new IllegalArgumentException("Неразрешенный delete scope: " + scope);
             String sheet = scope;
             Set<String> incoming = new HashSet<>();
             for (int i = 1; i <= lastRow(workbook, sheet); i++) incoming.add(text(row(workbook, sheet, i), 0));
             String entityType = entityType(scope);
-            for (SyncExternalId identity : externalIds.findByUserAndEntityType(user, entityType)) {
-                if (!incoming.contains(identity.getExternalId())) {
+            List<SyncExternalId> identities = "project_dependencies".equals(scope)
+                    ? externalIds.findByUserAndEntityTypeStartingWith(user, "project_dependency:")
+                    : externalIds.findByUserAndEntityType(user, entityType);
+            Set<String> incomingKeys = new HashSet<>();
+            if ("project_dependencies".equals(scope)) for (int i = 1; i <= lastRow(workbook, sheet); i++) incomingKeys.add("project_dependency:" + text(row(workbook, sheet, i), 1) + ":" + text(row(workbook, sheet, i), 2));
+            for (SyncExternalId identity : identities) {
+                if (!("project_dependencies".equals(scope) ? incomingKeys.contains(identity.getEntityType()) : incoming.contains(identity.getExternalId()))) {
                     deleteEntity(scope, identity.getEntityId(), user);
                     externalIds.delete(identity);
                     deleted.merge(scope, 1, Integer::sum);
@@ -393,14 +398,19 @@ public class DataSyncImportApplyService {
             case "life_spheres" -> lifeSpheres.findByUserAndId(user, id).ifPresent(lifeSpheres::delete);
             case "projects" -> projects.findByUserAndId(user, id).ifPresent(projects::delete);
             case "routines" -> routines.findByUserAndId(user, id).ifPresent(routines::delete);
+            case "routine_schedules" -> routineSchedules.findById(id).filter(x -> x.getRoutine().getUser().getId().equals(user.getId())).ifPresent(routineSchedules::delete);
             case "delos" -> delos.findByUserAndId(user, id).ifPresent(delos::delete);
             case "goals" -> goals.findByUserAndId(user, id).ifPresent(goals::delete);
+            case "goal_metrics" -> goalMetrics.findById(id).filter(x -> x.getGoal().getUser().getId().equals(user.getId())).ifPresent(goalMetrics::delete);
+            case "goal_week_budgets" -> goalWeekBudgets.findById(id).filter(x -> x.getGoal().getUser().getId().equals(user.getId())).ifPresent(goalWeekBudgets::delete);
             case "ideas" -> ideas.findByUserAndId(user, id).ifPresent(ideas::delete);
             case "notes" -> notes.findByUserAndId(user, id).ifPresent(notes::delete);
+            case "synergies" -> synergies.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).ifPresent(synergies::delete);
             case "time_entries" -> timeEntries.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).ifPresent(timeEntries::delete);
             case "backlog_items" -> backlogItems.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).ifPresent(backlogItems::delete);
             case "checklist_items" -> checklistItems.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).ifPresent(checklistItems::delete);
             case "activity_mappings" -> activityMappings.findById(id).filter(x -> x.getUser().getId().equals(user.getId())).ifPresent(activityMappings::delete);
+            case "project_dependencies" -> projectDependencies.findAllForUser(user).stream().filter(x -> x.getBlocker().getId().equals(id) || x.getBlocked().getId().equals(id)).forEach(projectDependencies::delete);
             default -> throw new IllegalArgumentException("Неразрешенный delete scope: " + scope);
         }
     }

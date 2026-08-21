@@ -100,8 +100,11 @@ public class DataSyncExportService {
                 "externalId", xid(user, "synergy", x.getId()), "projectExternalId", x.getProject() == null ? null : xid(user, "project", x.getProject().getId()),
                 "ideaExternalId", x.getIdeaId() == null ? null : xid(user, "idea", x.getIdeaId()), "routineExternalId", x.getRoutine() == null ? null : xid(user, "routine", x.getRoutine().getId()),
                 "sphereExternalId", xid(user, "life_sphere", x.getSphere().getId()), "impact", x.getImpact())).toList());
-        rows.put("project_dependencies", dependencies.stream().map(x -> map(
-                "externalId", dependencyXid(user, x.getBlocker().getId(), x.getBlocked().getId()), "blockerExternalId", xid(user, "project", x.getBlocker().getId()), "blockedExternalId", xid(user, "project", x.getBlocked().getId()))).toList());
+        rows.put("project_dependencies", dependencies.stream().map(x -> {
+            String blockerExternalId = xid(user, "project", x.getBlocker().getId());
+            String blockedExternalId = xid(user, "project", x.getBlocked().getId());
+            return map("externalId", dependencyXid(blockerExternalId, blockedExternalId), "blockerExternalId", blockerExternalId, "blockedExternalId", blockedExternalId);
+        }).toList());
         rows.put("backlog_items", backlog.stream().map(x -> map(
                 "externalId", xid(user, "backlog_item", x.getId()), "deloExternalId", xid(user, "delo", x.getDelo().getId()), "scope", x.getScope(),
                 "periodId", x.getPeriodId(), "plannedHours", x.getPlannedHours(), "position", x.getPosition(), "movedToWeek", x.getMovedToWeek())).toList());
@@ -121,8 +124,8 @@ public class DataSyncExportService {
         return externalIds.externalId(user, type, id);
     }
 
-    private String dependencyXid(User user, Long blockerId, Long blockedId) {
-        return "project-dependency-" + xid(user, "project", blockerId) + "-" + xid(user, "project", blockedId);
+    private String dependencyXid(String blockerExternalId, String blockedExternalId) {
+        return "project-dependency-" + blockerExternalId + "-" + blockedExternalId;
     }
 
     private static Map<String, Object> map(Object... values) {
