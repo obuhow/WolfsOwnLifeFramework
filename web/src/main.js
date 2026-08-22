@@ -3,6 +3,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import './style.css'
 import App from './App.vue'
 import LoginView from './components/LoginView.vue'
+import RegisterView from './components/RegisterView.vue'
 import SettingsView from './components/SettingsView.vue'
 import LifeAreasView from './components/LifeAreasView.vue'
 import ProjectsView from './components/ProjectsView.vue'
@@ -31,6 +32,7 @@ import PlaceholderView from './components/PlaceholderView.vue'
 const routes = [
   { path: '/', redirect: '/today' },
   { path: '/login', component: LoginView, meta: { public: true } },
+  { path: '/register', component: RegisterView, meta: { public: true } },
   { path: '/today', component: TodayView, meta: { requiresAuth: true } },
   { path: '/morning', component: MorningView, meta: { requiresAuth: true } },
   // Календарь
