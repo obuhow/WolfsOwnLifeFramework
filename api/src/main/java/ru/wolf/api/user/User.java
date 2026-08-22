@@ -68,6 +68,35 @@ public class User implements UserDetails {
     @Column(name = "updated_at", nullable = false)
     private java.time.Instant updatedAt;
 
+    /** USER | ADMIN */
+    @Builder.Default
+    @Column(nullable = false, length = 20)
+    private String role = "USER";
+
+    /** ACTIVE | BLOCKED */
+    @Builder.Default
+    @Column(nullable = false, length = 20)
+    private String status = "ACTIVE";
+
+    /** REGULAR | DEMO */
+    @Builder.Default
+    @Column(name = "account_type", nullable = false, length = 20)
+    private String accountType = "REGULAR";
+
+    @Column(length = 255)
+    private String email;
+
+    /** Only set for DEMO accounts; null means the account never expires. */
+    @Column(name = "expires_at")
+    private java.time.Instant expiresAt;
+
+    /** Set once the first-run wizard is completed or skipped. */
+    @Column(name = "onboarding_completed_at")
+    private java.time.Instant onboardingCompletedAt;
+
+    @Column(name = "last_login_at")
+    private java.time.Instant lastLoginAt;
+
     @PrePersist
     void onCreate() {
         this.createdAt = java.time.Instant.now();
@@ -81,7 +110,7 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
     @Override
@@ -96,7 +125,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return true;
+        return expiresAt == null || expiresAt.isAfter(java.time.Instant.now());
     }
 
     @Override
@@ -111,6 +140,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return "ACTIVE".equals(status);
     }
 }

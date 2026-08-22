@@ -41,18 +41,27 @@ public class JwtUtil {
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", extractUserIdFromUserDetails(userDetails));
-        return createToken(claims, userDetails.getUsername());
+        return createToken(claims, userDetails.getUsername(), expirationMs);
     }
 
-    public String generateToken(String username, Long userId) {
+    public String generateToken(String username, Long userId, String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
-        return createToken(claims, username);
+        claims.put("role", role);
+        return createToken(claims, username, expirationMs);
     }
 
-    private String createToken(Map<String, Object> claims, String subject) {
+    /** For ephemeral demo accounts: token lifetime equals the account's remaining lifetime. */
+    public String generateToken(String username, Long userId, String role, long ttlMs) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("role", role);
+        return createToken(claims, username, ttlMs);
+    }
+
+    private String createToken(Map<String, Object> claims, String subject, long ttlMs) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
+        Date expiry = new Date(now.getTime() + ttlMs);
         return Jwts.builder()
                 .claims(claims)
                 .subject(subject)
@@ -68,6 +77,10 @@ public class JwtUtil {
 
     public Long extractUserId(String token) {
         return extractClaim(token, claims -> claims.get("userId", Long.class));
+    }
+
+    public String extractRole(String token) {
+        return extractClaim(token, claims -> claims.get("role", String.class));
     }
 
     public Date extractExpiration(String token) {
