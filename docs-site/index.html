@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WOLF — Документация</title>
+  <style>
+    :root {
+      --ink: #1f2328;
+      --ink-soft: #57606a;
+      --ink-faint: #8b949e;
+      --rule: #e3e6ea;
+      --rule-strong: #d0d5da;
+      --bg: #ffffff;
+      --surface: #fafbfc;
+      --done: #e8f3ec;
+      --done-ink: #2f6f43;
+      --link: #1f2328;
+      --max: 860px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--link); text-decoration: none; border-bottom: 1px solid var(--rule-strong); }
+    a:hover { border-bottom-color: var(--ink); }
+
+    .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      border-right: 1px solid var(--rule);
+      padding: 2rem 1.25rem;
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .brand { font-weight: 600; letter-spacing: .02em; font-size: 1.05rem; margin: 0 0 .25rem; }
+    .brand-sub { color: var(--ink-faint); font-size: .8rem; margin: 0 0 1.75rem; }
+    .nav-group { margin-bottom: 1.5rem; }
+    .nav-title {
+      text-transform: uppercase;
+      font-size: .68rem;
+      letter-spacing: .09em;
+      color: var(--ink-faint);
+      margin: 0 0 .5rem;
+    }
+    .nav-group a {
+      display: block;
+      padding: .28rem 0;
+      color: var(--ink-soft);
+      border: 0;
+      font-size: .9rem;
+    }
+    .nav-group a:hover { color: var(--ink); }
+
+    /* Content */
+    .content { padding: 3rem 3rem 6rem; max-width: var(--max); }
+    header.page-head { border-bottom: 1px solid var(--rule); padding-bottom: 1.5rem; margin-bottom: 2.5rem; }
+    header.page-head h1 { font-size: 2rem; font-weight: 600; margin: 0 0 .4rem; letter-spacing: -.01em; }
+    header.page-head p { color: var(--ink-soft); margin: 0; }
+
+    h2 { font-size: 1.35rem; font-weight: 600; margin: 2.75rem 0 .75rem; padding-top: .5rem; }
+    h3 { font-size: 1.05rem; font-weight: 600; margin: 1.75rem 0 .5rem; }
+    p { margin: .75rem 0; }
+    ul, ol { padding-left: 1.25rem; }
+    li { margin: .3rem 0; }
+
+    code {
+      font-family: var(--mono);
+      font-size: .86em;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: .1em .4em;
+    }
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 1rem 1.15rem;
+      overflow-x: auto;
+      line-height: 1.55;
+    }
+    pre code { background: none; border: 0; padding: 0; font-size: .85rem; }
+
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+    th, td { text-align: left; padding: .55rem .75rem; border-bottom: 1px solid var(--rule); }
+    th { color: var(--ink-soft); font-weight: 600; }
+
+    .tag {
+      display: inline-block;
+      font-size: .72rem;
+      padding: .12rem .5rem;
+      border-radius: 999px;
+      background: var(--done);
+      color: var(--done-ink);
+      border: 1px solid #cfe6d6;
+      vertical-align: middle;
+    }
+
+    footer.page-foot {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--rule);
+      color: var(--ink-faint);
+      font-size: .82rem;
+    }
+
+    @media (max-width: 720px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); }
+      .content { padding: 2rem 1.25rem 4rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="brand">WOLF</p>
+      <p class="brand-sub">Документация</p>
+
+      <nav class="nav-group">
+        <p class="nav-title">Обзор</p>
+        <a href="#intro">Введение</a>
+        <a href="#stack">Стек и порты</a>
+        <a href="#run">Запуск</a>
+      </nav>
+
+      <nav class="nav-group">
+        <p class="nav-title">Разделы</p>
+        <a href="#domain">Доменная модель</a>
+        <a href="#import">Импорт данных</a>
+        <a href="#api">API</a>
+      </nav>
+
+      <nav class="nav-group">
+        <p class="nav-title">Как править эту доку</p>
+        <a href="#editing">Правка страниц</a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <header class="page-head">
+        <h1>WOLF — Документация</h1>
+        <p>Wolf's Own Life System — персональная Life OS: учёт времени, планирование недели, Ганта, цели, LLM Wiki.</p>
+      </header>
+
+      <section id="intro">
+        <h2>Введение</h2>
+        <p>
+          Это стартовая страница документации WOLF. Она отдаётся <strong>отдельным контейнером</strong>
+          (<code>wolf-docs</code>) и доступна по адресу <code>/docs</code> основного домена.
+          Контент смонтирован в nginx через bind-mount, поэтому правка файлов не требует пересборки —
+          достаточно сохранить файл и обновить вкладку.
+        </p>
+      </section>
+
+      <section id="stack">
+        <h2>Стек и порты</h2>
+        <table>
+          <thead>
+            <tr><th>Сервис</th><th>Технология</th><th>Порт (host)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>web</td><td>Vue 3 + nginx</td><td>80</td></tr>
+            <tr><td>api</td><td>Java 21 + Spring Boot</td><td>8082</td></tr>
+            <tr><td>db</td><td>PostgreSQL 16</td><td>5434</td></tr>
+            <tr><td>docs</td><td>nginx (bind-mount)</td><td>8090</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="run">
+        <h2>Запуск</h2>
+        <pre><code>docker compose up -d
+# приложение:      http://localhost/  (wolfs.smallmba.space)
+# документация:    http://localhost/docs  (wolfs.smallmba.space/docs)
+# документация(local direct): http://localhost:8090</code></pre>
+      </section>
+
+      <section id="domain">
+        <h2>Доменная модель</h2>
+        <p>
+          Ключевые сущности UI: <strong>Дела</strong>, <strong>Сферы жизни</strong>,
+          <strong>Области жизни</strong>, <strong>Проекты</strong>, <strong>Синергия</strong>.
+        </p>
+      </section>
+
+      <section id="import">
+        <h2>Импорт данных</h2>
+        <p>Схема подготовленного CSV для импорта Дел:</p>
+        <pre><code>title,date,startAt,endAt,description,executionMode,projects,lifeArea</code></pre>
+        <ul>
+          <li><code>date</code> — <code>YYYY-MM-DD</code></li>
+          <li><code>startAt</code> / <code>endAt</code> — <code>HH:mm</code>, сетка 15 минут</li>
+          <li><code>projects</code> — названия проектов через <code>|</code></li>
+          <li><code>lifeArea</code> — существующая Область жизни (для новых проектов)</li>
+        </ul>
+      </section>
+
+      <section id="api">
+        <h2>API</h2>
+        <p>Базовый префикс — <code>/api/v1</code>. Health-check: <code>GET /actuator/health</code>.</p>
+      </section>
+
+      <section id="editing">
+        <h2>Как править эту доку <span class="tag">без пересборки</span></h2>
+        <ol>
+          <li>Редактируй файлы в папке <code>docs-site/</code> в корне репозитория.</li>
+          <li>Сохрани — контейнер <code>wolf-docs</code> отдаёт их напрямую через bind-mount.</li>
+          <li>Обнови вкладку браузера (Ctrl+F5 при кэше). Пересборка Docker не нужна.</li>
+        </ol>
+        <p>Новые страницы кладутся туда же: <code>docs-site/guide.html</code> → <code>/docs/guide.html</code>.</p>
+      </section>
+
+      <footer class="page-foot">
+        WOLF · документация отдаётся контейнером <code>wolf-docs</code> · bind-mount, без пересборки фронта.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
