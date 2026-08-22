@@ -59,7 +59,7 @@ onMounted(() => {
         </button>
       </form>
 
-      <p class="login-hint">Seed: <code>admin</code> / <code>admin</code></p>
+      <p class="login-hint"><a href="#/register">У меня есть код</a></p>
     </section>
   </main>
 </template>
