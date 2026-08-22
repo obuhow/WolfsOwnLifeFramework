@@ -16,6 +16,7 @@ const settings = ref({
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
+const isAdmin = ref(false)
 
 const timezones = [
   'Europe/Moscow',
@@ -106,7 +107,23 @@ async function saveSettings() {
   }
 }
 
+async function loadRole() {
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) return
+    const res = await fetch(`${apiBase()}/auth/me`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    isAdmin.value = data.role === 'ADMIN'
+  } catch {
+    // ignore network blips — menu item just stays hidden
+  }
+}
+
 onMounted(loadSettings)
+onMounted(loadRole)
 </script>
 
 <template>
@@ -235,6 +252,14 @@ onMounted(loadSettings)
         <div v-if="error" class="alert alert-error">{{ error }}</div>
         <div v-if="success" class="alert alert-success">{{ success }}</div>
       </div>
+    </section>
+
+    <section v-if="isAdmin" class="card admin-section">
+      <fieldset class="settings-fieldset">
+        <legend>Администрирование</legend>
+        <p class="hint">Выпуск и отзыв пригласительных кодов — доступно только администратору.</p>
+        <router-link to="/admin/invites" class="btn btn-ghost">Пользователи / Инвайт-коды</router-link>
+      </fieldset>
     </section>
   </div>
 </template>

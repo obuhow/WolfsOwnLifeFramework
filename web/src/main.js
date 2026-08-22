@@ -5,6 +5,7 @@ import App from './App.vue'
 import LoginView from './components/LoginView.vue'
 import RegisterView from './components/RegisterView.vue'
 import SettingsView from './components/SettingsView.vue'
+import AdminInvitesView from './components/AdminInvitesView.vue'
 import LifeAreasView from './components/LifeAreasView.vue'
 import ProjectsView from './components/ProjectsView.vue'
 import ProjectDetailView from './components/ProjectDetailView.vue'
@@ -64,6 +65,7 @@ const routes = [
   { path: '/reports/checklist', component: ChecklistReportView, meta: { requiresAuth: true } },
   // Настройки
   { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
+  { path: '/admin/invites', component: AdminInvitesView, meta: { requiresAuth: true } },
   // Совместимость: маршруты без прямого пункта в согласованной навигации
   { path: '/routines', component: RoutinesView, meta: { requiresAuth: true } },
   { path: '/import/xlsx', component: XlsxImportView, meta: { requiresAuth: true } },
