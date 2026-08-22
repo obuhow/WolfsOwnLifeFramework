@@ -88,12 +88,21 @@ textarea:focus-visible,
 
 .brand {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 14px;
-  padding: 17px 0 14px;
+  padding: 0;
   text-decoration: none;
   color: var(--wolf-ink);
   white-space: nowrap;
+  min-height: 54px;
+}
+
+.brand-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
 }
 
 .brand-logo {
@@ -101,12 +110,37 @@ textarea:focus-visible,
   line-height: 1;
   font-weight: 700;
   letter-spacing: .14em;
+  color: var(--wolf-ink);
 }
 
 .brand-tagline {
   color: var(--wolf-muted);
   font-size: 11px;
   line-height: 1;
+  letter-spacing: 0.5px;
+}
+
+.brand-container-sm {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.brand-logo-sm {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--wolf-ink);
+}
+
+.brand-tagline-sm {
+  color: var(--wolf-muted);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.4px;
 }
 
 .nav {

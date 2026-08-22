@@ -216,7 +216,10 @@ onBeforeUnmount(() => {
       <header class="app-header">
         <div class="header-inner">
           <router-link to="/today" class="brand" aria-label="WOLF — Главная">
-            <span class="brand-logo">WOLF</span>
+            <div class="brand-container">
+              <div class="brand-logo">WOLF</div>
+              <div class="brand-tagline">Система управления потоком</div>
+            </div>
           </router-link>
 
           <!-- Desktop top navigation -->
@@ -296,7 +299,10 @@ onBeforeUnmount(() => {
             @keydown="onDrawerKeydown"
           >
             <div class="drawer-head">
-              <span class="brand-logo">WOLF</span>
+              <div class="brand-container-sm">
+                <div class="brand-logo-sm">WOLF</div>
+                <div class="brand-tagline-sm">Система управления потоком</div>
+              </div>
               <button type="button" class="menu-trigger" aria-label="Закрыть меню" @click="closeDrawer">
                 <span aria-hidden="true">✕</span>
               </button>
