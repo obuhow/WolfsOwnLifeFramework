@@ -20,3 +20,8 @@
 # Env
 .env
 .env.*
+
+# Local office / agent scratch noise
+.~lock.*#
+*.bak-*
+hermes-verify-*.py
