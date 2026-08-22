@@ -144,8 +144,13 @@ public class FocusReviewController {
     }
 
     private Integer suggestedMinutes(FocusDistraction d) { return d.getMinutes() == null ? null : (int) (Math.ceil(d.getMinutes() / 15.0) * 15); }
-    private FocusSession ownedSession(Authentication auth, Long id) { User user = current(auth); return sessions.findById(id).filter(s -> s.getUser().getId().equals(user.getId())).orElseThrow(); }
-    private FocusDistraction distraction(FocusSession session, Long id) { return distractions.findById(id).filter(d -> d.getSession().getId().equals(session.getId())).orElseThrow(); }
+    private FocusSession ownedSession(Authentication auth, Long id) { 
+        User user = current(auth); 
+        return sessions.findByUserAndId(user, id).orElseThrow(); 
+    }
+    private FocusDistraction distraction(FocusSession session, Long id) { 
+        return distractions.findBySessionIdAndId(session.getId(), id).orElseThrow(); 
+    }
     private Delo delo(Authentication auth, Long id) { return id == null ? null : delos.findByUserAndId(current(auth), id).orElseThrow(); }
     private User current(Authentication auth) { return users.findByUsername(auth.getName()).orElseThrow(); }
     private LocalDateTime floor15(LocalDateTime value) { return value.withSecond(0).withNano(0).minusMinutes(value.getMinute() % 15); }

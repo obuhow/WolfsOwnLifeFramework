@@ -12,4 +12,7 @@ public interface BacklogItemRepository extends JpaRepository<BacklogItem, Long> 
     List<BacklogItem> findPeriod(@Param("user") User user, @Param("scope") BacklogItem.Scope scope, @Param("period") String period);
     Optional<BacklogItem> findByUserAndDeloIdAndScopeAndPeriodId(User user, Long deloId, BacklogItem.Scope scope, String periodId);
     int countByUserAndScope(User user, BacklogItem.Scope scope);
+    
+    @Query("SELECT b FROM BacklogItem b WHERE b.user = :user AND b.id = :id")
+    Optional<BacklogItem> findByUserAndId(@Param("user") User user, @Param("id") Long id);
 }

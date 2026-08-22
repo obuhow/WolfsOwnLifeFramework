@@ -33,4 +33,7 @@ public interface SynergyRepository extends JpaRepository<Synergy, Long> {
     boolean existsByUserAndIdeaIdAndSphere(User user, Long ideaId, LifeSphere sphere);
 
     boolean existsByUserAndRoutineAndSphere(User user, ru.wolf.api.routine.Routine routine, LifeSphere sphere);
+
+    @Query("SELECT s FROM Synergy s WHERE s.user = :user AND s.id = :id")
+    Optional<Synergy> findByUserAndId(@Param("user") User user, @Param("id") Long id);
 }

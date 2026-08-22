@@ -18,7 +18,7 @@ public class XlsxImportQuestionController {
     @GetMapping("/{id}/questions")
     public ResponseEntity<List<XlsxImportQuestionResponse>> questions(Authentication auth, @PathVariable Long id) {
         var user = users.findByUsername(auth.getName()).orElseThrow();
-        runs.findById(id).filter(run -> run.getUser().getId().equals(user.getId())).orElseThrow();
+        runs.findByUserAndId(user, id).orElseThrow();
         return ResponseEntity.ok(questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id).stream()
                 .map(q -> new XlsxImportQuestionResponse(q.getId(), q.getActivityText(), q.getSheetName(), q.getStartAt()))
                 .toList());

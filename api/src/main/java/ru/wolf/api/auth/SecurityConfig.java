@@ -35,7 +35,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/register").permitAll()
                         .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/api/v1/delos/import").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

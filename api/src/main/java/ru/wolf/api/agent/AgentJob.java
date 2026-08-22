@@ -61,7 +61,7 @@ public class AgentJob {
         int projects = 0;
         int notes = 0;
         int logs = 0;
-        for (User user : userRepository.findAll()) {
+        for (User user : userRepository.findByAccountTypeAndStatus("REGULAR", "ACTIVE")) {
             AgentRunResult result = runForUserInTransaction(user);
             projects += result.projectsProcessed();
             notes += result.notesCreated();
