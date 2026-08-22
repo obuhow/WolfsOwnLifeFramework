@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +15,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsername(String username);
     List<User> findByAccountTypeAndStatus(String accountType, String status);
     
+    long countByAccountTypeAndStatus(String accountType, String status);
+    
     @Query("SELECT u FROM User u WHERE u.accountType <> 'DEMO' ORDER BY u.createdAt DESC")
     List<User> findAllRegularUsers();
     
@@ -21,4 +24,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllUsersIncludeDemo();
     
     long countByRoleAndStatus(String role, String status);
+
+    @Query("SELECT u FROM User u WHERE u.accountType = 'DEMO' AND u.status = 'ACTIVE' AND u.expiresAt < :now")
+    List<User> findExpiredDemoAccounts(@Param("now") Instant now);
 }
