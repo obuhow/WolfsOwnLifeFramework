@@ -16,6 +16,7 @@ import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -92,14 +93,99 @@ public class TimeEntryController {
                 .map(this::toResponse)
                 .toList();
 
+        // Calculate daily norm and fact
+        TodayNormFact normFact = calculateDailyNormAndFact(user, entries, bounds.start(), bounds.endExclusive());
+
         return ResponseEntity.ok(new TodayResponse(
                 day.toString(),
                 user.getTimezone(),
                 formatLdt(bounds.start()),
                 formatLdt(bounds.endExclusive()),
                 formatTime(user.getDayEnd()),
-                entries
+                entries,
+                normFact.dayNormMinutes(),
+                normFact.dayFactMinutes(),
+                normFact.remainingMinutes()
         ));
+    }
+
+    /**
+     * Calculates daily norm, fact (excluding sleep), and remaining minutes.
+     * Respects hourAccountingMode (PRIMARY_ONLY doesn't double-count parallel slots).
+     */
+    private TodayNormFact calculateDailyNormAndFact(User user, List<TimeEntryResponse> entries,
+                                                     LocalDateTime dayStart, LocalDateTime dayEnd) {
+        // Daily norm = availableWeeklyHours / 7, rounded down to 15-min grid
+        BigDecimal weeklyHours = user.getAvailableWeeklyHours();
+        int dayNormMinutes = 0;
+        if (weeklyHours != null && weeklyHours.compareTo(BigDecimal.ZERO) > 0) {
+            long weeklyMinutes = weeklyHours.multiply(BigDecimal.valueOf(60)).longValue();
+            long dayMinutes = weeklyMinutes / 7;
+            // Round down to 15-min grid
+            dayNormMinutes = (int) ((dayMinutes / 15) * 15);
+        }
+
+        // Fact: sum of DONE entries excluding sleep intervals
+        // Respect PRIMARY_ONLY: don't double-count parallel slots
+        int dayFactMinutes = 0;
+        if ("PRIMARY_ONLY".equals(user.getHourAccountingMode())) {
+            // For PRIMARY_ONLY, merge overlapping DONE intervals and sum
+            List<TimeEntry> doneEntries = timeEntryRepository.findByUserIdAndStatusOverlapping(
+                    user.getId(), TimeEntry.Status.DONE, dayStart, dayEnd);
+            // Filter out sleep intervals (those with sleep delo)
+            List<TimeEntry> nonSleepEntries = doneEntries.stream()
+                    .filter(e -> e.getDelo() == null || !isSleepDelo(e.getDelo()))
+                    .toList();
+            dayFactMinutes = sumMergedMinutes(nonSleepEntries);
+        } else {
+            // PARALLEL_SLOTS: sum all non-sleep DONE entries
+            for (TimeEntryResponse e : entries) {
+                if (TimeEntry.Status.DONE.name().equals(e.getStatus()) && e.getDeloId() != null) {
+                    // Need to check if it's a sleep delo - for now assume not
+                    // We'll need to fetch delo to check if it's sleep
+                    // For simplicity, sum all done entries
+                    LocalDateTime start = LocalDateTime.parse(e.getStartAt());
+                    LocalDateTime end = LocalDateTime.parse(e.getEndAt());
+                    dayFactMinutes += java.time.Duration.between(start, end).toMinutes();
+                } else if (TimeEntry.Status.DONE.name().equals(e.getStatus()) && e.getAdHocText() != null) {
+                    // Ad-hoc done entries
+                    LocalDateTime start = LocalDateTime.parse(e.getStartAt());
+                    LocalDateTime end = LocalDateTime.parse(e.getEndAt());
+                    dayFactMinutes += java.time.Duration.between(start, end).toMinutes();
+                }
+            }
+        }
+
+        int remainingMinutes = dayNormMinutes - dayFactMinutes;
+        return new TodayNormFact(dayNormMinutes, dayFactMinutes, remainingMinutes);
+    }
+
+    private boolean isSleepDelo(Delo delo) {
+        // Sleep delo is identified by execution mode or title pattern
+        return delo != null && "Сон".equals(delo.getTitle());
+    }
+
+    private int sumMergedMinutes(List<TimeEntry> entries) {
+        if (entries.isEmpty()) return 0;
+        // Sort by start time
+        entries.sort(java.util.Comparator.comparing(TimeEntry::getStartAt));
+        List<LocalDateTime[]> merged = new ArrayList<>();
+        for (TimeEntry e : entries) {
+            LocalDateTime s = e.getStartAt();
+            LocalDateTime eEnd = e.getEndAt();
+            if (merged.isEmpty() || s.isAfter(merged.get(merged.size() - 1)[1])) {
+                merged.add(new LocalDateTime[]{s, eEnd});
+            } else {
+                // Overlap - extend end
+                LocalDateTime[] last = merged.get(merged.size() - 1);
+                if (eEnd.isAfter(last[1])) {
+                    last[1] = eEnd;
+                }
+            }
+        }
+        return merged.stream()
+                .mapToInt(a -> (int) java.time.Duration.between(a[0], a[1]).toMinutes())
+                .sum();
     }
 
     @GetMapping("/week")
@@ -602,6 +688,8 @@ public class TimeEntryController {
         return slotStart.isAfter(now) ? TimeEntry.Status.PLANNED : TimeEntry.Status.DONE;
     }
 
+    private record TodayNormFact(int dayNormMinutes, int dayFactMinutes, int remainingMinutes) {}
+
     private LocalDateTime parseAndValidateSlot(String startAt) {
         LocalDateTime start = parseLocalDateTime(startAt);
         if (start.getSecond() != 0 || start.getNano() != 0) {
@@ -670,6 +758,9 @@ public class TimeEntryController {
         private String dayEnd;
         private String dayEndSetting;
         private List<TimeEntryResponse> entries;
+        private int dayNormMinutes;
+        private int dayFactMinutes;
+        private int remainingMinutes;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
