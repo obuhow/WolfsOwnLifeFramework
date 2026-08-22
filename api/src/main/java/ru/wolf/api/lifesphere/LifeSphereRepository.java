@@ -22,4 +22,6 @@ public interface LifeSphereRepository extends JpaRepository<LifeSphere, Long> {
     boolean existsByUserAndName(User user, String name);
 
     Optional<LifeSphere> findByUserAndName(User user, String name);
+
+    void deleteAllByUser(User user);
 }

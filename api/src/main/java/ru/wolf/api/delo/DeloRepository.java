@@ -36,4 +36,6 @@ public interface DeloRepository extends JpaRepository<Delo, Long> {
             WHERE d.user = :user AND LOWER(d.title) IN :lowerTitles
             """)
     List<Delo> findByUserAndTitleInIgnoreCase(@Param("user") User user, @Param("lowerTitles") List<String> lowerTitles);
+
+    void deleteAllByUser(User user);
 }
