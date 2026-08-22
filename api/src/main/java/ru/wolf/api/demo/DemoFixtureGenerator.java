@@ -214,20 +214,33 @@ public class DemoFixtureGenerator {
         return deloRepository.save(delo);
     }
 
+    private Delo getOrCreateSleepDelo(User user) {
+        return deloRepository.findFirstByUserAndTitleIgnoreCaseOrderByIdAsc(user, "Сон")
+                .orElseGet(() -> deloRepository.save(Delo.builder()
+                        .user(user)
+                        .title("Сон")
+                        .description("Системное Дело для автозаполнения сна")
+                        .executionMode(Delo.ExecutionMode.SELF)
+                        .build()));
+    }
+
     private void generateTimeEntries(User user, List<Delo> delos, LocalDate today, ZoneId zone, Random random) {
         LocalTime nightStart = user.getNightStart();
         LocalTime dayEnd = user.getDayEnd();
         LocalTime defaultSleepEnd = user.getDefaultSleepEnd();
-        
+
+        // Get or create sleep delo
+        Delo sleepDelo = getOrCreateSleepDelo(user);
+
         // Generate for last 14 days
         for (int dayOffset = -13; dayOffset <= 0; dayOffset++) {
             LocalDate date = today.plusDays(dayOffset);
             boolean isToday = (dayOffset == 0);
             boolean isWeekend = date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY;
-            
+
             // Target hours for the day (workday vs weekend)
             double targetHours = isWeekend ? 2.0 : (4.0 + random.nextDouble() * 3.0); // 4-7h workday, 2h weekend
-            
+
             // Add sleep entry
             LocalDateTime sleepStart = date.atTime(nightStart).atZone(zone).toLocalDateTime();
             LocalDateTime sleepEnd = date.atTime(defaultSleepEnd).atZone(zone).toLocalDateTime();
@@ -236,6 +249,7 @@ public class DemoFixtureGenerator {
             }
             timeEntryRepository.save(TimeEntry.builder()
                     .user(user)
+                    .delo(sleepDelo)
                     .startAt(sleepStart)
                     .endAt(sleepEnd)
                     .status(TimeEntry.Status.DONE)

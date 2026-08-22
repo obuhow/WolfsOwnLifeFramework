@@ -48,8 +48,12 @@ public class DemoController {
         AtomicInteger count = new AtomicInteger(0);
     }
 
+    @GetMapping("/ping")
+    public ResponseEntity<String> ping() {
+        return ResponseEntity.ok("demo-ping-ok");
+    }
+
     @PostMapping("/session")
-    @PreAuthorize("permitAll()")
     @Transactional
     public ResponseEntity<?> createDemoSession(HttpServletRequest request) {
         String clientIp = getClientIp(request);
