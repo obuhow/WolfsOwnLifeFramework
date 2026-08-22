@@ -1,8 +1,8 @@
 name: Deploy to Production
 
 on:
-  push:
-    branches: [ main ]
+  # Автодеплой по push в main ОТКЛЮЧЁН намеренно: релиз на VPS
+  # выкатывается вручную через workflow_dispatch (Actions → Run workflow).
   workflow_dispatch:
 
 concurrency:
