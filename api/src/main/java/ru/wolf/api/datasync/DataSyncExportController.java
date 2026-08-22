@@ -6,6 +6,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -22,13 +23,13 @@ public class DataSyncExportController {
 
     @GetMapping("/export")
     public ResponseEntity<ByteArrayResource> export(
+            Authentication authentication,
             @RequestParam(defaultValue = "xlsx") String format,
             @RequestParam(defaultValue = DataSyncContract.VERSION) String version) throws Exception {
         if (!"xlsx".equalsIgnoreCase(format) || !DataSyncContract.VERSION.equals(version)) {
             throw new IllegalArgumentException("Only XLSX data-sync version 0.21 is supported");
         }
-        User user = userRepository.findByUsername("admin")
-                .orElseThrow(() -> new IllegalStateException("Default user not found"));
+        User user = currentUser(authentication);
         byte[] workbook = exportService.export(user);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
@@ -36,5 +37,10 @@ public class DataSyncExportController {
                         .filename("wolf-data-0.21.xlsx").build().toString())
                 .contentLength(workbook.length)
                 .body(new ByteArrayResource(workbook));
+    }
+
+    private User currentUser(Authentication authentication) {
+        return userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new IllegalStateException("User not found"));
     }
 }

@@ -1,7 +1,7 @@
 # 21-followup: восстановить JWT на data-sync endpoints
 
 - **release**: 0.21
-- **status**: ready-for-agent
+- **status**: resolved
 - **labels**: security, tech-debt, carried-from-0.21
 - **origin**: перенос из feature/21-data-sync (мердж 0.21)
 
@@ -32,3 +32,27 @@ data-sync, чтобы preview/apply/export можно было гонять curl
 - Приёмочный файл был поправлен: `goal_income` priority 1→4
   (конфликт UNIQUE(user_id, priority)); бэкап оригинала лежит рядом
   как `.bak-*`.
+
+## Answer
+Реализовано в ветке `feature/21-followup-restore-jwt` → мердж в `develop`.
+
+1. `SecurityConfig` — убран `.requestMatchers("/api/v1/data-sync/**").permitAll()`;
+   теперь data-sync попадает под `.anyRequest().authenticated()`.
+2. `DataSyncImportController` — все методы (preview/getPreview/apply/result/plan)
+   принимают `Authentication` и резолвят пользователя через
+   `currentUser(authentication)`; убраны `findByUsername("admin")`/`defaultUser()`.
+3. `DataSyncExportController` — `export(...)` принимает `Authentication` и
+   резолвит текущего пользователя (был жёсткий `"admin"`).
+4. Удалён избыточный `config.DataLoader` (сеял `admin` только ради permitAll
+   data-sync). Сид `admin/admin` остаётся в каноническом `auth.DataInitializer`.
+
+### Верификация
+- `DataSyncAuthApiIT` (новый) — 5/5 зелёных: export/manifest/import-preview без
+  токена → 401/403; с валидным Bearer → 200 (export отдаёт XLSX `PK…`, manifest
+  отдаёт `version=0.21`).
+- `AuthApiIT` — 7/7 зелёных: сид `admin` и вход по JWT работают после удаления
+  `config.DataLoader`.
+
+### Осталось (не входило в критерий приёмки этого тикета)
+- Browser/DOM smoke `/data-sync` и CI round-trip fixture — по-прежнему открыты
+  (вынесены выше как не-блокеры).
