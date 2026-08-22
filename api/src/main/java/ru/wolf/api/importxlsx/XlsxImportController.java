@@ -80,14 +80,16 @@ public class XlsxImportController {
     @GetMapping("/xlsx/{id}")
     @Transactional(readOnly = true)
     public ResponseEntity<ImportResponse> get(Authentication auth, @PathVariable Long id) {
-        User user = current(auth); XlsxImportRun run = runs.findById(id).filter(r -> r.getUser().getId().equals(user.getId())).orElseThrow();
+        User user = current(auth); 
+        XlsxImportRun run = runs.findByUserAndId(user, id).orElseThrow();
         return ResponseEntity.ok(toResponse(run));
     }
 
     @PostMapping("/xlsx/{id}/resolve")
     @Transactional
     public ResponseEntity<ImportResponse> resolve(Authentication auth, @PathVariable Long id, @RequestBody ResolveRequest request) {
-        User user = current(auth); XlsxImportRun run = runs.findById(id).filter(r -> r.getUser().getId().equals(user.getId())).orElseThrow();
+        User user = current(auth); 
+        XlsxImportRun run = runs.findByUserAndId(user, id).orElseThrow();
         Delo delo;
         if (request.deloId() != null) delo = delos.findByUserAndId(user, request.deloId()).orElseThrow();
         else { delo = delos.save(Delo.builder().user(user).title(request.createDelo().title()).build()); }

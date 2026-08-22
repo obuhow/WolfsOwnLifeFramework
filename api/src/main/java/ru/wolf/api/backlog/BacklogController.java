@@ -68,7 +68,7 @@ public class BacklogController {
         return ResponseEntity.ok(response(items.save(month)));
     }
 
-    private BacklogItem owned(Authentication auth, Long id) { return items.findById(id).filter(item -> item.getUser().getId().equals(current(auth).getId())).orElseThrow(); }
+    private BacklogItem owned(Authentication auth, Long id) { return items.findByUserAndId(current(auth), id).orElseThrow(); }
     private User current(Authentication auth) { return users.findByUsername(auth.getName()).orElseThrow(); }
     private Response response(BacklogItem item) { return new Response(item.getId(), item.getDelo().getId(), item.getDelo().getTitle(), item.getScope().name().toLowerCase(), item.getPeriodId(), item.getPlannedHours(), item.getPosition(), item.getMovedToWeek()); }
     public record ScopeParam(BacklogItem.Scope value) { public ScopeParam { value = value == null ? BacklogItem.Scope.WEEK : value; } }

@@ -134,12 +134,8 @@ public class SynergyController {
         ru.wolf.api.user.User user = userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        Synergy synergy = synergyRepository.findById(id)
+        Synergy synergy = synergyRepository.findByUserAndId(user, id)
                 .orElseThrow(() -> new IllegalArgumentException("Синергия не найдена"));
-
-        if (!synergy.getUser().getId().equals(user.getId())) {
-            throw new IllegalArgumentException("Синергия не найдена");
-        }
 
         synergyRepository.delete(synergy);
         return ResponseEntity.noContent().build();
@@ -154,18 +150,14 @@ public class SynergyController {
         ru.wolf.api.user.User user = userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        Synergy synergy = synergyRepository.findById(id)
+        Synergy synergy = synergyRepository.findByUserAndId(user, id)
                 .orElseThrow(() -> new IllegalArgumentException("Синергия не найдена"));
-
-        if (!synergy.getUser().getId().equals(user.getId())) {
-            throw new IllegalArgumentException("Синергия не найдена");
-        }
 
         synergy.setImpact(request.getImpact());
         Synergy saved = synergyRepository.save(synergy);
         
         // Reload with sphere to avoid lazy initialization
-        Synergy reloaded = synergyRepository.findById(saved.getId()).orElseThrow();
+        Synergy reloaded = synergyRepository.findByUserAndId(user, saved.getId()).orElseThrow();
         return ResponseEntity.ok(toResponse(reloaded));
     }
 
