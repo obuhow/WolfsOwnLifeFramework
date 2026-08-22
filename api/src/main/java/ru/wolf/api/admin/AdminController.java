@@ -147,6 +147,7 @@ public class AdminController {
     }
 
     @GetMapping("/invite-codes")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<InviteCodeAdminResponse>> listInviteCodes() {
         List<InviteCode> codes = inviteCodeRepository.findAllByOrderByCreatedAtDesc();
         return ResponseEntity.ok(codes.stream().map(this::toInviteAdminResponse).collect(Collectors.toList()));
