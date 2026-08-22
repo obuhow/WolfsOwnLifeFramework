@@ -47,6 +47,7 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testCompileOnly 'org.projectlombok:lombok:1.18.36'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.36'
+    testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {
