@@ -20,4 +20,6 @@ public interface LifeAreaRepository extends JpaRepository<LifeArea, Long> {
     int findMaxSortOrderByUser(@Param("user") User user);
 
     boolean existsByUserAndName(User user, String name);
+
+    void deleteAllByUser(User user);
 }
