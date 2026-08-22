@@ -37,5 +37,9 @@ public class DataInitializer implements CommandLineRunner {
         // Seed life spheres for admin user
         User admin = userRepository.findByUsername("admin").orElseThrow();
         lifeSphereSeeder.seed(admin);
+
+        // Release 0.4 ticket 12: obuhov is created by migration V38__admin_obuhov.sql;
+        // seed its life spheres the same way as any new user (idempotent, no-op if already seeded).
+        userRepository.findByUsername("obuhov").ifPresent(lifeSphereSeeder::seed);
     }
 }
