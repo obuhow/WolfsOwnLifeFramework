@@ -54,6 +54,14 @@ public class User implements UserDetails {
     @Column(name = "hour_accounting_mode", nullable = false, length = 20)
     private String hourAccountingMode = "PRIMARY_ONLY";
 
+    @Builder.Default
+    @Column(name = "time_capture_mode", nullable = false, length = 20)
+    private String timeCaptureMode = "PARALLEL_SLOTS";
+
+    @Builder.Default
+    @Column(name = "available_weekly_hours", nullable = false, precision = 6, scale = 2)
+    private java.math.BigDecimal availableWeeklyHours = java.math.BigDecimal.valueOf(30);
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private java.time.Instant createdAt;
 

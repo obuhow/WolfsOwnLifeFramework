@@ -80,4 +80,13 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
             @Param("to") LocalDateTime to);
 
     void deleteByUserIdAndStartAt(Long userId, LocalDateTime startAt);
+
+    @Query("""
+            SELECT te FROM TimeEntry te
+            LEFT JOIN FETCH te.delo
+            WHERE te.user.id = :userId AND te.delo.id = :deloId
+              AND te.startAt >= :from AND te.startAt < :to
+            ORDER BY te.startAt ASC
+            """)
+    List<TimeEntry> findByUserAndDeloAndStartAtBetween(@Param("userId") Long userId, @Param("deloId") Long deloId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

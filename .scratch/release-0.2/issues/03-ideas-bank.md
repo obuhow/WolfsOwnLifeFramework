@@ -4,15 +4,26 @@
 
 **Blocked by:** 01 — Справочник Сфер жизни + CRUD Синергии (нужна Синергия).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Таблица `idea` (id, user_id, title, description, category, status, promoted_project_id, timestamps)
-- [ ] CRUD `/api/v1/ideas` с фильтрами по категории и статусу
-- [ ] Enum категорий: business, music, personal, creepy (без модерации)
-- [ ] Синергия Идей: расширение `/api/v1/synergies` на ideaId (из тикета 01)
-- [ ] `POST /ideas/{id}/promote` → создание Проекта + копирование описания и Синергии + статус "в работе" + связь idea.promoted_project_id
-- [ ] Повторный promote → 409
-- [ ] UI: страница Банка Идей (список с фильтрами по категориям, создание, редактирование)
-- [ ] UI: кнопка "Взять в работу" на Идее → переход на страницу созданного Проекта
-- [ ] API test: создать идею "Instagram муз. ролики" категории "музыкальные", связать с "Общение на расстоянии" (+), промоутить → Проект создан с теми же связями
-- [ ] API test: повторный promote → 409
+- [x] Таблица `idea` (id, user_id, title, description, category, status, promoted_project_id, timestamps)
+- [x] CRUD `/api/v1/ideas` с фильтрами по категории и статусу
+- [x] Enum категорий: business, music, personal, creepy (без модерации)
+- [x] Синергия Идей: расширение `/api/v1/synergies` на ideaId (из тикета 01)
+- [x] `POST /ideas/{id}/promote` → создание Проекта + копирование описания и Синергии + статус "в работе" + связь idea.promoted_project_id
+- [x] Повторный promote → 409
+- [x] UI: страница Банка Идей (список с фильтрами по категориям, создание, редактирование)
+- [x] UI: кнопка "Взять в работу" на Идее → переход на страницу созданного Проекта
+- [x] API test: создать идею с категорией, связать со Сферами жизни, промоутить → Проект создан с теми же связями
+- [x] API test: повторный promote → 409
+
+## Answer
+
+Реализовано и слито в `develop` merge-коммитом `2eb99fa` (feature-коммит `f2fb0f4`).
+
+Проверено после merge:
+
+- `./gradlew compileJava test --tests 'ru.wolf.api.idea.IdeaApiIT' --no-daemon` — 5 тестов, 0 failures, 0 errors.
+- `npm run build` — успешно.
+- `docker compose config --quiet` — успешно.
+- Отдельный runtime smoke 03-го стека ранее подтверждён: API health `UP`, web assets и маршрут `/ideas` отдаются.

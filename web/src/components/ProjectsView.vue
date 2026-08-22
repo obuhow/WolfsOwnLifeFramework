@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiBase } from '../api'
+import ConfirmInline from './ConfirmInline.vue'
 
 const router = useRouter()
 
@@ -21,7 +22,8 @@ const form = ref({
   description: '',
   startDate: '',
   endDate: '',
-  totalPlanHours: ''
+  totalPlanHours: '',
+  planDistribution: 'NONE'
 })
 
 const filteredProjects = computed(() => {
@@ -164,7 +166,8 @@ function openCreate(parent = null) {
     description: '',
     startDate: '',
     endDate: '',
-    totalPlanHours: ''
+    totalPlanHours: '',
+    planDistribution: 'NONE'
   }
   showForm.value = true
 }
@@ -178,7 +181,8 @@ function openEdit(project) {
     description: project.description || '',
     startDate: project.startDate || '',
     endDate: project.endDate || '',
-    totalPlanHours: project.totalPlanHours != null ? String(project.totalPlanHours) : ''
+    totalPlanHours: project.totalPlanHours != null ? String(project.totalPlanHours) : '',
+    planDistribution: project.planDistribution || 'NONE'
   }
   showForm.value = true
 }
@@ -197,7 +201,8 @@ function payloadFromForm() {
     description: form.value.description.trim() || null,
     startDate: form.value.startDate || null,
     endDate: form.value.endDate || null,
-    totalPlanHours: hoursRaw === '' ? null : Number(hoursRaw)
+    totalPlanHours: hoursRaw === '' ? null : Number(hoursRaw),
+    planDistribution: form.value.planDistribution
   }
 }
 
@@ -230,6 +235,18 @@ async function saveProject() {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.message || `HTTP ${res.status}`)
     }
+    const savedProject = await res.json()
+    if (form.value.planDistribution !== 'NONE' && savedProject.id) {
+      const distributionRes = await fetch(`${apiBase()}/projects/${savedProject.id}/plan-distribution`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ mode: form.value.planDistribution })
+      })
+      if (!distributionRes.ok) {
+        const data = await distributionRes.json().catch(() => ({}))
+        throw new Error(data.message || `Распределение: HTTP ${distributionRes.status}`)
+      }
+    }
     success.value = isEdit ? 'Проект обновлён' : 'Проект создан'
     cancelForm()
     await loadProjects()
@@ -242,7 +259,6 @@ async function saveProject() {
 }
 
 async function deleteProject(project) {
-  if (!confirm(`Удалить проект «${project.title}» и все подпроекты?`)) return
   loading.value = true
   error.value = ''
   success.value = ''
@@ -351,6 +367,13 @@ onMounted(loadAll)
           </div>
         </div>
 
+        <fieldset class="distribution-options">
+          <legend>Распределение времени</legend>
+          <label><input v-model="form.planDistribution" value="EVEN_ALL_DAYS" type="radio" :disabled="!form.startDate || !form.endDate || !form.totalPlanHours" /> Равномерно по дням</label>
+          <label><input v-model="form.planDistribution" value="EVEN_WEEKDAYS" type="radio" :disabled="!form.startDate || !form.endDate || !form.totalPlanHours" /> Равномерно по будням</label>
+          <small v-if="!form.startDate || !form.endDate || !form.totalPlanHours" class="muted">Нужны даты и плановые часы</small>
+        </fieldset>
+
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" :disabled="loading">
             <span v-if="loading">Сохранение…</span>
@@ -429,19 +452,13 @@ onMounted(loadAll)
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
             </button>
-            <button
-              class="icon-btn"
-              title="Удалить"
-              aria-label="Удалить"
-              style="color: #8a3a3a"
+            <ConfirmInline
+              label="Удалить"
+              :question="`Удалить проект «${row.title}» и все подпроекты?`"
+              confirm-label="Да, удалить"
               :disabled="loading"
-              @click="deleteProject(row)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>
+              @confirm="deleteProject(row)"
+            />
           </div>
         </div>
       </div>

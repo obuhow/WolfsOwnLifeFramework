@@ -2,6 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiBase } from '../api'
+import NotesPanel from './NotesPanel.vue'
+import ConfirmInline from './ConfirmInline.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,8 +15,12 @@ const areas = ref([])
 const projects = ref([])
 const delos = ref([])
 const detail = ref(null)
+const dependencies = ref({ blockedBy: [], blocks: [] })
 const editing = ref(false)
 const selectedDeloId = ref('')
+const dependencySearch = ref('')
+const cascadePreview = ref(null)
+const pendingProjectPayload = ref(null)
 
 const form = ref({
   lifeAreaId: '',
@@ -46,6 +52,17 @@ const availableDelos = computed(() => {
     .filter(d => !linkedIds.has(d.id))
     .slice()
     .sort((a, b) => a.title.localeCompare(b.title, 'ru'))
+})
+
+const dependencyOptions = computed(() => {
+  const linkedIds = new Set([
+    ...(dependencies.value.blockedBy || []).map(p => p.id),
+    ...(dependencies.value.blocks || []).map(p => p.id)
+  ])
+  return projects.value
+    .filter(p => p.id !== projectId.value && !linkedIds.has(p.id))
+    .sort((a, b) => a.title.localeCompare(b.title, 'ru'))
+    .map(p => ({ ...p, label: `${p.title} (#${p.id})` }))
 })
 
 const children = computed(() =>
@@ -145,12 +162,23 @@ async function loadDetail() {
   fillFormFromDetail()
 }
 
+async function loadDependencies() {
+  const headers = authHeaders()
+  if (!headers) return
+  const res = await fetch(`${apiBase()}/projects/${projectId.value}/dependencies`, { headers })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.message || `Зависимости: HTTP ${res.status}`)
+  }
+  dependencies.value = await res.json()
+}
+
 async function loadAll() {
   loading.value = true
   error.value = ''
   try {
     await Promise.all([loadAreas(), loadProjects(), loadDelos()])
-    await loadDetail()
+    await Promise.all([loadDetail(), loadDependencies()])
     editing.value = false
     selectedDeloId.value = ''
   } catch (e) {
@@ -190,16 +218,45 @@ async function save() {
     error.value = 'Название обязательно'
     return
   }
-  loading.value = true
   error.value = ''
   success.value = ''
   try {
     const headers = authHeaders(true)
     if (!headers) return
+    const payload = payloadFromForm()
+    if (payload.endDate && payload.endDate !== (detail.value.endDate || '') && payload.endDate > (detail.value.endDate || '')) {
+      const previewRes = await fetch(`${apiBase()}/projects/${projectId.value}/plan-shift-preview`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ newEnd: payload.endDate })
+      })
+      if (!previewRes.ok) {
+        const data = await previewRes.json().catch(() => ({}))
+        throw new Error(data.message || `Preview: HTTP ${previewRes.status}`)
+      }
+      const preview = await previewRes.json()
+      if (preview.totalDeficit > 0) {
+        pendingProjectPayload.value = payload
+        cascadePreview.value = preview
+        return
+      }
+    }
+    await persistProject(payload, headers)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function persistProject(payload, headers = authHeaders(true)) {
+  if (!headers) return
+  loading.value = true
+  try {
     const res = await fetch(`${apiBase()}/projects/${projectId.value}`, {
       method: 'PUT',
       headers,
-      body: JSON.stringify(payloadFromForm())
+      body: JSON.stringify(payload)
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -209,6 +266,73 @@ async function save() {
     editing.value = false
     await loadAll()
     setTimeout(() => { success.value = '' }, 3000)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function confirmCascadeShift() {
+  const payload = pendingProjectPayload.value
+  cascadePreview.value = null
+  pendingProjectPayload.value = null
+  if (!payload) return
+  try {
+    await persistProject(payload)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+function cancelCascadeShift() {
+  cascadePreview.value = null
+  pendingProjectPayload.value = null
+  fillFormFromDetail()
+}
+
+async function addDependency() {
+  const selected = dependencyOptions.value.find(p => p.label === dependencySearch.value)
+  if (!selected) {
+    error.value = 'Выберите существующий Проект из списка'
+    return
+  }
+  loading.value = true
+  error.value = ''
+  try {
+    const headers = authHeaders(true)
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/projects/${projectId.value}/dependencies`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ blockerId: selected.id })
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    dependencies.value = await res.json()
+    dependencySearch.value = ''
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function removeDependency(blockerId) {
+  loading.value = true
+  error.value = ''
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/projects/${projectId.value}/dependencies/${blockerId}`, {
+      method: 'DELETE',
+      headers
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    await loadDependencies()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -218,7 +342,6 @@ async function save() {
 
 async function remove() {
   if (!detail.value) return
-  if (!confirm(`Удалить проект «${detail.value.title}» и все подпроекты?`)) return
   loading.value = true
   error.value = ''
   try {
@@ -335,7 +458,7 @@ onMounted(loadAll)
           <h2 style="margin: 0">Карточка</h2>
           <div class="projects-toolbar-actions">
             <button v-if="!editing" class="btn btn-primary" :disabled="loading" @click="startEdit">Изменить</button>
-            <button v-if="!editing" class="btn btn-ghost" :disabled="loading" style="color: #8a3a3a" @click="remove">Удалить</button>
+            <ConfirmInline v-if="!editing" label="Удалить" :question="`Удалить проект «${detail.title}» и все подпроекты?`" confirm-label="Да, удалить" :disabled="loading" @confirm="remove" />
           </div>
         </div>
 
@@ -387,7 +510,34 @@ onMounted(loadAll)
           </div>
         </form>
 
-        <dl v-else class="detail-grid">
+        <div v-if="cascadePreview" class="dialog-backdrop" @click.self="cancelCascadeShift">
+          <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="cascade-title">
+            <div class="dialog-header">
+              <h2 id="cascade-title">Сдвиг требует пересмотра бюджетов</h2>
+              <button type="button" class="icon-button" @click="cancelCascadeShift">×</button>
+            </div>
+            <p>
+              Сдвиг повлияет на {{ cascadePreview.affectedGoals.length }} целей,
+              общий дефицит {{ formatHours(cascadePreview.totalDeficit) }} ч/нед.
+            </p>
+            <p class="muted">Доступно: {{ formatHours(cascadePreview.availableWeeklyHours) }} ч/нед. Бюджеты автоматически не меняются.</p>
+            <ul class="cascade-list">
+              <li v-for="goal in cascadePreview.affectedGoals" :key="goal.goalId">
+                <strong>{{ goal.title }}</strong>
+                <span>{{ formatHours(goal.currentBudget) }} → {{ formatHours(goal.requiredBudget) }} ч/нед · дефицит {{ formatHours(goal.deficit) }} ч</span>
+              </li>
+            </ul>
+            <p v-if="!cascadePreview.affectedGoals.length" class="muted">
+              Связанные с этим Проектом Цели не имеют отдельного бюджета в перегруженной неделе.
+            </p>
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary" @click="confirmCascadeShift">Применить</button>
+              <button type="button" class="btn btn-ghost" @click="cancelCascadeShift">Отмена</button>
+            </div>
+          </section>
+        </div>
+
+        <dl v-else-if="!editing" class="detail-grid">
           <div>
             <dt>Область жизни</dt>
             <dd>{{ detail.lifeAreaName }}</dd>
@@ -430,6 +580,49 @@ onMounted(loadAll)
             <router-link :to="`/projects/${c.id}`">{{ c.title }}</router-link>
           </li>
         </ul>
+      </section>
+
+      <section class="card" style="margin-bottom: 1.5rem">
+        <div class="projects-toolbar" style="margin-bottom: 1rem">
+          <h2 style="margin: 0">Зависимости</h2>
+          <div class="projects-toolbar-actions">
+            <input
+              v-model="dependencySearch"
+              class="input dependency-input"
+              list="dependency-project-options"
+              placeholder="Проект, который блокирует…"
+              :disabled="loading || dependencyOptions.length === 0"
+              aria-label="Проект-блокер"
+            />
+            <datalist id="dependency-project-options">
+              <option v-for="p in dependencyOptions" :key="p.id" :value="p.label" />
+            </datalist>
+            <button class="btn btn-primary" :disabled="loading || !dependencySearch" @click="addDependency">
+              Добавить
+            </button>
+          </div>
+        </div>
+        <div class="dependency-columns">
+          <div>
+            <h3>Ждёт</h3>
+            <div v-if="dependencies.blockedBy.length" class="link-list">
+              <div v-for="p in dependencies.blockedBy" :key="p.id" class="project-link-row">
+                <router-link :to="`/projects/${p.id}`">{{ p.title }}</router-link>
+                <button class="btn btn-ghost" :disabled="loading" @click="removeDependency(p.id)">Убрать</button>
+              </div>
+            </div>
+            <p v-else class="muted-block">Проект ни от кого не ждёт.</p>
+          </div>
+          <div>
+            <h3>Блокирует</h3>
+            <div v-if="dependencies.blocks.length" class="link-list">
+              <div v-for="p in dependencies.blocks" :key="p.id" class="project-link-row">
+                <router-link :to="`/projects/${p.id}`">{{ p.title }}</router-link>
+              </div>
+            </div>
+            <p v-else class="muted-block">Пока ничего не блокирует.</p>
+          </div>
+        </div>
       </section>
 
       <section class="card" style="margin-bottom: 1.5rem">
@@ -517,6 +710,58 @@ onMounted(loadAll)
           Пока нет учтённых часов по этому проекту.
         </div>
       </section>
+
+      <NotesPanel :project-id="projectId" />
     </template>
   </div>
 </template>
+
+<style scoped>
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.dialog {
+  width: min(480px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--wolf-surface);
+  border: 1px solid var(--wolf-ink);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cascade-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cascade-list li {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--wolf-rule);
+}
+
+.cascade-list span {
+  color: var(--wolf-muted);
+  font-size: 0.85rem;
+}
+</style>

@@ -4,13 +4,13 @@
 
 **Blocked by:** None — can start immediately (builds on release-0.1 domain).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Seed 9 Сфер жизни при bootstrap (idempotent)
-- [ ] CRUD `/api/v1/life-spheres` (create, list, rename, archive)
-- [ ] CRUD `/api/v1/synergies` с полиморфной ссылкой на projectId (ideaId — nullable в этом тикете)
-- [ ] Влияние — enum (+1, −1, 0), уникальность (project_id, sphere_id)
-- [ ] UI: страница Справочника Сфер жизни (список + создание)
-- [ ] UI: блок Синергии на странице Проекта (список связей, добавление/удаление)
-- [ ] API test: создать проект, связать с двумя Сферами (+ и −), прочитать связи через GET
-- [ ] API test: дубликат связи (project, sphere) → 409
+- [x] Seed 9 Сфер жизни при bootstrap (idempotent)
+- [x] CRUD `/api/v1/life-spheres` (create, list, rename, archive)
+- [x] CRUD `/api/v1/synergies` с полиморфной ссылкой на projectId (ideaId — nullable в этом тикете)
+- [x] Влияние — enum (+1, −1, 0), уникальность (project_id, sphere_id)
+- [x] UI: страница Справочника Сфер жизни (список + создание)
+- [x] UI: блок Синергии на странице Проекта (список связей, добавление/удаление)
+- [x] API test: создать проект, связать с двумя Сферами (+ и −), прочитать связи через GET
+- [x] API test: дубликат связи (project, sphere) → 409

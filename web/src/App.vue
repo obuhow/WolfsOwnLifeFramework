@@ -1,26 +1,169 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { apiBase } from './api'
 
 const router = useRouter()
 const route = useRoute()
 const token = ref(localStorage.getItem('wolf_token') || '')
-const healthStatus = ref('…')
 const username = ref('')
 
-async function loadHealth() {
-  try {
-    const res = await fetch(`${apiBase()}/health`)
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`)
-    }
-    const body = await res.json()
-    healthStatus.value = body.status ?? JSON.stringify(body)
-  } catch (e) {
-    healthStatus.value = 'недоступен'
+// --- Navigation model (approved Release 0.3 IA) ---------------------------
+const NAV = [
+  { kind: 'link', label: 'Сегодня', to: '/today' },
+  {
+    kind: 'group', key: 'calendar', label: 'Календарь',
+    children: [
+      { label: 'Неделя', to: '/calendar' },
+      { label: 'Месяц', to: '/calendar/month' },
+    ],
+  },
+  {
+    kind: 'group', key: 'planning', label: 'Планирование',
+    children: [
+      { label: 'Диаграмма Ганта', to: '/planning' },
+      { label: 'Бэклог', to: '/planning/backlog' },
+    ],
+  },
+  {
+    kind: 'group', key: 'projects', label: 'Управление проектами',
+    children: [
+      { label: 'Области жизни', to: '/life-areas' },
+      { label: 'Проекты', to: '/projects' },
+      { label: 'Дела', to: '/delos' },
+      { label: 'Банк идей', to: '/ideas' },
+      { label: 'Импорт XLSX', to: '/import/xlsx' },
+      { label: 'Синхронизация данных', to: '/data-sync' },
+    ],
+  },
+  {
+    kind: 'group', key: 'flow', label: 'Управление потоком',
+    children: [
+      { label: 'Цели', to: '/goals' },
+      { label: 'Сферы жизни', to: '/spheres' },
+      { label: 'Синергия', to: '/synergy' },
+      { label: 'Утренний обход', to: '/morning' },
+      { label: 'Рутины', to: '/routines' },
+      { label: 'Заметки / LLM Wiki', to: '/notes' },
+      { label: 'Отчёт «Чек-лист»', to: '/reports/checklist' },
+      { label: 'Статистика', to: '/stats' },
+    ],
+  },
+  { kind: 'link', label: 'Настройки', to: '/settings' },
+]
+
+// Prefix map for active-state detection (detail routes highlight their parent link).
+function isChildActive(to) {
+  const p = route.path
+  if (p === to) return true
+  // Detail routes share the list prefix
+  const prefixes = ['/projects', '/delos', '/goals', '/ideas']
+  if (prefixes.includes(to) && p.startsWith(to + '/')) return true
+  return false
+}
+
+function isGroupActive(group) {
+  return group.children.some((c) => isChildActive(c.to))
+}
+
+function groupKeyForPath() {
+  for (const item of NAV) {
+    if (item.kind === 'group' && isGroupActive(item)) return item.key
+  }
+  return null
+}
+
+// --- Desktop dropdown state ------------------------------------------------
+const openGroup = ref(null) // key of the desktop group currently open
+
+function toggleGroup(key) {
+  openGroup.value = openGroup.value === key ? null : key
+}
+function closeGroups() {
+  openGroup.value = null
+}
+function onGroupKeydown(e, key) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    toggleGroup(key)
+  } else if (e.key === 'Escape') {
+    closeGroups()
   }
 }
+
+// --- Mobile drawer state ---------------------------------------------------
+const drawerOpen = ref(false)
+const expandedGroups = ref({})
+const drawerEl = ref(null)
+const menuTriggerEl = ref(null)
+
+function openDrawer() {
+  drawerOpen.value = true
+  // Current group starts expanded
+  const active = groupKeyForPath()
+  const state = {}
+  for (const item of NAV) {
+    if (item.kind === 'group') state[item.key] = item.key === active
+  }
+  expandedGroups.value = state
+  nextTick(() => {
+    document.body.style.overflow = 'hidden'
+    const first = drawerEl.value?.querySelector('a, button')
+    first?.focus()
+  })
+}
+
+function closeDrawer() {
+  drawerOpen.value = false
+  document.body.style.overflow = ''
+  nextTick(() => menuTriggerEl.value?.focus())
+}
+
+function toggleDrawerGroup(key) {
+  expandedGroups.value = { ...expandedGroups.value, [key]: !expandedGroups.value[key] }
+}
+
+function onDrawerNavigate() {
+  closeDrawer()
+}
+
+// Focus trap + Escape inside drawer
+function onDrawerKeydown(e) {
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    closeDrawer()
+    return
+  }
+  if (e.key !== 'Tab') return
+  const focusables = drawerEl.value?.querySelectorAll(
+    'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )
+  if (!focusables || !focusables.length) return
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
+// --- Global click-away / escape for desktop dropdowns ----------------------
+function onDocClick(e) {
+  if (!e.target.closest('.nav-group')) closeGroups()
+}
+function onDocKeydown(e) {
+  if (e.key === 'Escape') closeGroups()
+}
+
+// Close menus on route change
+watch(() => route.path, () => {
+  token.value = localStorage.getItem('wolf_token') || ''
+  closeGroups()
+  if (drawerOpen.value) closeDrawer()
+})
 
 async function loadUser() {
   const t = localStorage.getItem('wolf_token')
@@ -49,20 +192,21 @@ async function logout() {
   localStorage.removeItem('wolf_token')
   token.value = ''
   username.value = ''
+  if (drawerOpen.value) closeDrawer()
   router.push('/login')
 }
 
-// Keep token in sync after login (login does full page reload currently)
-watch(() => route.path, () => {
-  token.value = localStorage.getItem('wolf_token') || ''
-})
-
 onMounted(async () => {
   token.value = localStorage.getItem('wolf_token') || ''
-  if (token.value) {
-    await loadUser()
-  }
-  await loadHealth()
+  if (token.value) await loadUser()
+  document.addEventListener('click', onDocClick)
+  document.addEventListener('keydown', onDocKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', onDocKeydown)
+  document.body.style.overflow = ''
 })
 </script>
 
@@ -72,130 +216,148 @@ onMounted(async () => {
       <header class="app-header">
         <div class="header-inner">
           <router-link to="/today" class="brand" aria-label="WOLF — Главная">
-            <span class="brand-logo">WOLF</span>
-            <span class="brand-tagline">Уютно. Тихо. Под вашим контролем.</span>
+            <div class="brand-container">
+              <div class="brand-logo">WOLF</div>
+              <div class="brand-tagline">Система управления потоком</div>
+            </div>
           </router-link>
 
-          <nav class="nav" aria-label="Основная навигация">
-            <router-link
-              to="/today"
-              class="nav-link"
-              :class="{ active: route.path === '/today' }"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              Сегодня
-            </router-link>
-            <router-link
-              to="/week"
-              class="nav-link"
-              :class="{ active: route.path === '/week' }"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-                <line x1="8" y1="14" x2="8" y2="14.01"></line>
-                <line x1="12" y1="14" x2="12" y2="14.01"></line>
-                <line x1="16" y1="14" x2="16" y2="14.01"></line>
-                <line x1="8" y1="18" x2="8" y2="18.01"></line>
-                <line x1="12" y1="18" x2="12" y2="18.01"></line>
-              </svg>
-              Неделя
-            </router-link>
-            <router-link
-              to="/gantt"
-              class="nav-link"
-              :class="{ active: route.path === '/gantt' }"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="8" y1="6" x2="21" y2="6"></line>
-                <line x1="8" y1="12" x2="21" y2="12"></line>
-                <line x1="8" y1="18" x2="21" y2="18"></line>
-                <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                <line x1="3" y1="18" x2="3.01" y2="18"></line>
-              </svg>
-              Гантт
-            </router-link>
-            <router-link
-              to="/life-areas"
-              class="nav-link"
-              :class="{ active: route.path === '/life-areas' }"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-              Области жизни
-            </router-link>
-            <router-link
-              to="/projects"
-              class="nav-link"
-              :class="{ active: route.path === '/projects' || route.path.startsWith('/projects/') }"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-              </svg>
-              Проекты
-            </router-link>
-            <router-link
-              to="/delos"
-              class="nav-link"
-              :class="{ active: route.path === '/delos' || route.path.startsWith('/delos/') }"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 11l3 3L22 4"></path>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-              </svg>
-              Дела
-            </router-link>
-            <router-link
-              to="/settings"
-              class="nav-link"
-              :class="{ active: route.path === '/settings' }"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-              Настройки
-            </router-link>
+          <!-- Desktop top navigation -->
+          <nav class="nav nav-desktop" aria-label="Основная навигация">
+            <template v-for="item in NAV" :key="item.label">
+              <router-link
+                v-if="item.kind === 'link'"
+                :to="item.to"
+                class="nav-link"
+                :class="{ active: isChildActive(item.to) }"
+              >{{ item.label }}</router-link>
+
+              <div
+                v-else
+                class="nav-group"
+                :class="{ open: openGroup === item.key }"
+              >
+                <button
+                  type="button"
+                  class="nav-link nav-group-trigger"
+                  :class="{ active: isGroupActive(item) }"
+                  :aria-expanded="openGroup === item.key ? 'true' : 'false'"
+                  :aria-controls="`grp-${item.key}`"
+                  @click.stop="toggleGroup(item.key)"
+                  @keydown="onGroupKeydown($event, item.key)"
+                >
+                  {{ item.label }}
+                  <span class="caret" aria-hidden="true">▾</span>
+                </button>
+                <div
+                  v-show="openGroup === item.key"
+                  :id="`grp-${item.key}`"
+                  class="nav-submenu"
+                  role="menu"
+                >
+                  <router-link
+                    v-for="child in item.children"
+                    :key="child.to"
+                    :to="child.to"
+                    class="nav-submenu-link"
+                    :class="{ active: isChildActive(child.to) }"
+                    role="menuitem"
+                    @click="closeGroups"
+                  >{{ child.label }}</router-link>
+                </div>
+              </div>
+            </template>
           </nav>
 
-          <div class="user-menu">
-            <span class="user-name">{{ username }}</span>
-            <button @click="logout" class="btn btn-ghost" aria-label="Выйти" title="Выйти">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
+          <div class="header-right">
+            <div class="user-menu">
+              <span class="user-name">{{ username }}</span>
+              <button @click="logout" class="btn btn-ghost logout-btn" aria-label="Выйти" title="Выйти">Выйти</button>
+            </div>
+            <button
+              ref="menuTriggerEl"
+              type="button"
+              class="menu-trigger"
+              aria-label="Меню"
+              :aria-expanded="drawerOpen ? 'true' : 'false'"
+              @click="openDrawer"
+            >
+              <span aria-hidden="true">☰</span>
             </button>
           </div>
         </div>
       </header>
 
+      <!-- Mobile drawer -->
+      <transition name="drawer">
+        <div v-if="drawerOpen" class="drawer-overlay" @click="closeDrawer">
+          <nav
+            ref="drawerEl"
+            class="drawer"
+            aria-label="Мобильная навигация"
+            @click.stop
+            @keydown="onDrawerKeydown"
+          >
+            <div class="drawer-head">
+              <div class="brand-container-sm">
+                <div class="brand-logo-sm">WOLF</div>
+                <div class="brand-tagline-sm">Система управления потоком</div>
+              </div>
+              <button type="button" class="menu-trigger" aria-label="Закрыть меню" @click="closeDrawer">
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
+
+            <div class="drawer-body">
+              <template v-for="item in NAV" :key="item.label">
+                <router-link
+                  v-if="item.kind === 'link'"
+                  :to="item.to"
+                  class="drawer-link"
+                  :class="{ active: isChildActive(item.to) }"
+                  @click="onDrawerNavigate"
+                >{{ item.label }}</router-link>
+
+                <div v-else class="drawer-group">
+                  <button
+                    type="button"
+                    class="drawer-group-trigger"
+                    :class="{ active: isGroupActive(item) }"
+                    :aria-expanded="expandedGroups[item.key] ? 'true' : 'false'"
+                    @click="toggleDrawerGroup(item.key)"
+                  >
+                    {{ item.label }}
+                    <span class="caret" aria-hidden="true">{{ expandedGroups[item.key] ? '▾' : '▸' }}</span>
+                  </button>
+                  <div v-show="expandedGroups[item.key]" class="drawer-submenu">
+                    <router-link
+                      v-for="child in item.children"
+                      :key="child.to"
+                      :to="child.to"
+                      class="drawer-submenu-link"
+                      :class="{ active: isChildActive(child.to) }"
+                      @click="onDrawerNavigate"
+                    >{{ child.label }}</router-link>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div class="drawer-foot">
+              <span class="user-name">{{ username }}</span>
+              <button type="button" class="btn btn-ghost" @click="logout">Выйти</button>
+            </div>
+          </nav>
+        </div>
+      </transition>
+
       <main class="app-main" role="main">
         <router-view />
       </main>
-
-      <footer class="global-footer">
-        <p>API: <code>{{ apiBase() }}</code> — <strong :class="healthStatus === 'UP' ? 'ok' : 'bad'">{{ healthStatus }}</strong></p>
-      </footer>
     </div>
 
     <div v-else class="app-shell">
       <router-view />
-      <footer class="global-footer">
-        <p>API: <code>{{ apiBase() }}</code> — <strong :class="healthStatus === 'UP' ? 'ok' : 'bad'">{{ healthStatus }}</strong></p>
-      </footer>
     </div>
   </div>
 </template>

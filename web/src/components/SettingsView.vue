@@ -8,7 +8,9 @@ const settings = ref({
   nightEnd: '07:00',
   dayEnd: '02:00',
   defaultSleepEnd: '09:00',
-  hourAccountingMode: 'PRIMARY_ONLY'
+  hourAccountingMode: 'PRIMARY_ONLY',
+  timeCaptureMode: 'PARALLEL_SLOTS',
+  availableWeeklyHours: 30
 })
 
 const loading = ref(false)
@@ -60,7 +62,9 @@ async function loadSettings() {
       nightEnd: data.nightEnd?.slice(0, 5) || '07:00',
       dayEnd: data.dayEnd?.slice(0, 5) || '02:00',
       defaultSleepEnd: data.defaultSleepEnd?.slice(0, 5) || '09:00',
-      hourAccountingMode: data.hourAccountingMode
+      hourAccountingMode: data.hourAccountingMode,
+      timeCaptureMode: data.timeCaptureMode || 'PARALLEL_SLOTS',
+      availableWeeklyHours: data.availableWeeklyHours ?? 30
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -116,6 +120,8 @@ onMounted(loadSettings)
       <div v-if="loading" class="loading">Загрузка…</div>
 
       <div v-else class="settings-form">
+        <fieldset class="settings-fieldset">
+        <legend>Время и границы суток</legend>
         <div class="form-group">
           <label for="timezone">Часовой пояс</label>
           <select
@@ -179,7 +185,10 @@ onMounted(loadSettings)
             <p class="hint">До этого времени строки скрыты (не включительно)</p>
           </div>
         </div>
+        </fieldset>
 
+        <fieldset class="settings-fieldset">
+        <legend>Учёт часов и нагрузка</legend>
         <div class="form-group">
           <label for="hourAccountingMode">Режим учёта часов</label>
           <select
@@ -195,6 +204,22 @@ onMounted(loadSettings)
             <strong>Все проекты:</strong> часы засчитываются во все привязанные проекты Дела.
           </p>
         </div>
+
+        <div class="form-group">
+          <label for="timeCaptureMode">Режим фиксации времени</label>
+          <select id="timeCaptureMode" v-model="settings.timeCaptureMode" :disabled="loading" class="input">
+            <option value="PARALLEL_SLOTS">Параллельные слоты</option>
+            <option value="PRIMARY_FOCUS">Фокус-сессия</option>
+          </select>
+          <p class="hint">Как удобнее вводить факт сегодня: вручную по 15-минутным слотам или одной Фокус-сессией с отметками переключений.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="availableWeeklyHours">Доступно часов в неделю</label>
+          <input id="availableWeeklyHours" v-model.number="settings.availableWeeklyHours" type="number" min="0" step="0.25" :disabled="loading" class="input" />
+          <p class="hint">Используется для нейтрального показа недельной нагрузки и влияния сдвига Проектов на Цели. По умолчанию — 30 ч.</p>
+        </div>
+        </fieldset>
 
         <div class="form-actions">
           <button

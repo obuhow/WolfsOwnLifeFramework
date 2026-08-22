@@ -23,6 +23,7 @@ import ru.wolf.api.user.UserRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +40,8 @@ public class ProjectController {
     private final UserRepository userRepository;
     private final DeloProjectRepository deloProjectRepository;
     private final FactAggregateService factAggregateService;
+    private final ResourceCascadeService resourceCascadeService;
+    private final PlanDistributionService planDistributionService;
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(
@@ -87,10 +90,13 @@ public class ProjectController {
                 .lifeArea(lifeArea)
                 .parent(parent)
                 .title(request.getTitle().trim())
+                .status(request.getStatus() == null ? Project.Status.IN_PROGRESS : request.getStatus())
                 .description(normalizeDescription(request.getDescription()))
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .totalPlanHours(request.getTotalPlanHours())
+                .planDistribution(request.getPlanDistribution() == null ? Project.PlanDistribution.NONE : request.getPlanDistribution())
+                .planFrozenAt(LocalDate.now().with(TemporalAdjusters.firstDayOfMonth()))
                 .build();
 
         Project saved = projectRepository.save(project);
@@ -128,10 +134,16 @@ public class ProjectController {
         project.setLifeArea(lifeArea);
         project.setParent(parent);
         project.setTitle(request.getTitle().trim());
+        if (request.getStatus() != null) {
+            project.setStatus(request.getStatus());
+        }
         project.setDescription(normalizeDescription(request.getDescription()));
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
         project.setTotalPlanHours(request.getTotalPlanHours());
+        if (request.getPlanDistribution() != null) {
+            project.setPlanDistribution(request.getPlanDistribution());
+        }
 
         Project saved = projectRepository.save(project);
         return ResponseEntity.ok(toResponse(saved));
@@ -154,6 +166,36 @@ public class ProjectController {
             projectRepository.delete(subtree.get(i));
         }
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/plan-shift-preview")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ResourceCascadeService.Preview> planShiftPreview(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody PlanShiftPreviewRequest request
+    ) {
+        return ResponseEntity.ok(resourceCascadeService.preview(currentUser(authentication), id, request.getNewEnd()));
+    }
+
+    @PostMapping("/{id}/plan-distribution")
+    @Transactional
+    public ResponseEntity<PlanDistributionService.DistributionResult> applyPlanDistribution(
+            Authentication authentication,
+            @PathVariable Long id,
+            @RequestBody PlanDistributionRequest request) {
+        User user = currentUser(authentication);
+        Project project = projectRepository.findByUserAndId(user, id)
+                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
+        Project.PlanDistribution mode;
+        try {
+            mode = Project.PlanDistribution.valueOf(request.getMode().toUpperCase());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Неизвестный режим распределения: " + request.getMode());
+        }
+        project.setPlanDistribution(mode);
+        projectRepository.save(project);
+        return ResponseEntity.ok(planDistributionService.apply(user, project, mode));
     }
 
     private User currentUser(Authentication authentication) {
@@ -239,10 +281,12 @@ public class ProjectController {
                 project.getLifeArea().getId(),
                 project.getParent() != null ? project.getParent().getId() : null,
                 project.getTitle(),
+                project.getStatus(),
                 project.getDescription(),
                 project.getStartDate(),
                 project.getEndDate(),
-                project.getTotalPlanHours()
+                project.getTotalPlanHours(),
+                project.getPlanDistribution()
         );
     }
 
@@ -263,10 +307,12 @@ public class ProjectController {
                 project.getParent() != null ? project.getParent().getId() : null,
                 project.getParent() != null ? project.getParent().getTitle() : null,
                 project.getTitle(),
+                project.getStatus(),
                 project.getDescription(),
                 project.getStartDate(),
                 project.getEndDate(),
                 project.getTotalPlanHours(),
+                project.getPlanDistribution(),
                 deloLinks,
                 aggregates
         );
@@ -280,10 +326,12 @@ public class ProjectController {
         private Long lifeAreaId;
         private Long parentId;
         private String title;
+        private Project.Status status;
         private String description;
         private LocalDate startDate;
         private LocalDate endDate;
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
     }
 
     @Data
@@ -296,10 +344,12 @@ public class ProjectController {
         private Long parentId;
         private String parentTitle;
         private String title;
+        private Project.Status status;
         private String description;
         private LocalDate startDate;
         private LocalDate endDate;
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
         private List<DeloLink> delos;
         private FactAggregate aggregates;
     }
@@ -326,6 +376,8 @@ public class ProjectController {
         @Size(max = 200)
         private String title;
 
+        private Project.Status status;
+
         @Size(max = 10000)
         private String description;
 
@@ -334,6 +386,7 @@ public class ProjectController {
 
         @DecimalMin(value = "0.0", inclusive = true)
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
     }
 
     @Data
@@ -349,6 +402,8 @@ public class ProjectController {
         @Size(max = 200)
         private String title;
 
+        private Project.Status status;
+
         @Size(max = 10000)
         private String description;
 
@@ -357,5 +412,27 @@ public class ProjectController {
 
         @DecimalMin(value = "0.0", inclusive = true)
         private BigDecimal totalPlanHours;
+        private Project.PlanDistribution planDistribution;
+
+        public UpdateProjectRequest(Long lifeAreaId, Long parentId, String title, Project.Status status,
+                                    String description, LocalDate startDate, LocalDate endDate,
+                                    BigDecimal totalPlanHours) {
+            this(lifeAreaId, parentId, title, status, description, startDate, endDate, totalPlanHours, null);
+        }
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PlanShiftPreviewRequest {
+        @NotNull
+        private LocalDate newEnd;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PlanDistributionRequest {
+        private String mode;
     }
 }

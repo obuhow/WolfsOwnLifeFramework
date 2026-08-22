@@ -39,6 +39,11 @@ public class Project {
     @Column(nullable = false, length = 200)
     private String title;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private Status status = Status.IN_PROGRESS;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -51,6 +56,14 @@ public class Project {
     @Column(name = "total_plan_hours", precision = 10, scale = 2)
     private BigDecimal totalPlanHours;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "plan_distribution", nullable = false, length = 20)
+    @Builder.Default
+    private PlanDistribution planDistribution = PlanDistribution.NONE;
+
+    @Column(name = "plan_frozen_at")
+    private LocalDate planFrozenAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -58,4 +71,15 @@ public class Project {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    public enum Status {
+        IN_PROGRESS,
+        ARCHIVED
+    }
+
+    public enum PlanDistribution {
+        NONE,
+        EVEN_ALL_DAYS,
+        EVEN_WEEKDAYS
+    }
 }

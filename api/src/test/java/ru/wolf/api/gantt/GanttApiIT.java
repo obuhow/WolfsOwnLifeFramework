@@ -345,6 +345,7 @@ class GanttApiIT extends ApiIntegrationTest {
     @Test
     void unauthenticated_access_rejected() {
         webTestClient.get().uri("/api/v1/gantt").exchange().expectStatus().isForbidden();
+        webTestClient.get().uri("/api/v1/gantt/forecast").exchange().expectStatus().isForbidden();
         webTestClient.put()
                 .uri("/api/v1/gantt/week-plans")
                 .bodyValue(Map.of("projectId", 1, "isoYear", 2026, "isoWeek", 1, "planHours", 1))
@@ -370,6 +371,33 @@ class GanttApiIT extends ApiIntegrationTest {
         WebTestClient client2 = authedClient("user2", "admin");
         GanttController.GanttResponse gantt = getGantt(client2, "weeks=4");
         assertThat(gantt.getProjects()).isEmpty();
+    }
+
+    @Test
+    void forecast_uses_four_completed_weeks_and_clamps_remaining_work() {
+        WebTestClient authed = authedAdminClient();
+        Long areaId = createLifeArea(authed, "Работа");
+        ProjectController.ProjectResponse project = createProjectWithDatesAndHours(
+                authed, areaId, "Прогноз", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 8, 31), 60);
+        Long deloId = createDelo(authed, "Код", List.of(project.getId()), project.getId());
+
+        LocalDate currentMonday = LocalDate.now(MOSCOW)
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        for (int week = 1; week <= 4; week++) {
+            LocalDate day = currentMonday.minusWeeks(week).plusDays(1);
+            putEntry(authed, day.atTime(10, 0), day.atTime(15, 0), deloId, TimeEntry.Status.DONE);
+        }
+
+        List<GanttController.ForecastResponse> response = authed.get()
+                .uri("/api/v1/gantt/forecast")
+                .exchange().expectStatus().isOk()
+                .expectBodyList(GanttController.ForecastResponse.class)
+                .returnResult().getResponseBody();
+        GanttController.ForecastResponse forecast = response.stream()
+                .filter(item -> item.getProjectId().equals(project.getId())).findFirst().orElseThrow();
+        assertThat(forecast.getWeeklyAvg()).isEqualByComparingTo("5.00");
+        assertThat(forecast.getRemaining()).isEqualByComparingTo("40.00");
+        assertThat(forecast.getForecastEnd()).isEqualTo(currentMonday.plusWeeks(8));
     }
 
     // --- helpers ---
@@ -446,6 +474,20 @@ class GanttApiIT extends ApiIntegrationTest {
                 .expectBody(ProjectController.ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
+    }
+
+    private ProjectController.ProjectResponse createProjectWithDatesAndHours(
+            WebTestClient client, Long areaId, String title, LocalDate start, LocalDate end, int hours
+    ) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("lifeAreaId", areaId);
+        body.put("title", title);
+        body.put("startDate", start.toString());
+        body.put("endDate", end.toString());
+        body.put("totalPlanHours", hours);
+        return client.post().uri("/api/v1/projects").bodyValue(body).exchange()
+                .expectStatus().isOk().expectBody(ProjectController.ProjectResponse.class)
+                .returnResult().getResponseBody();
     }
 
     private Long createDelo(WebTestClient client, String title, List<Long> projectIds, Long primary) {

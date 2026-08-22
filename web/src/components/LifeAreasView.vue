@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { apiBase } from '../api'
+import ConfirmInline from './ConfirmInline.vue'
 
 const areas = ref([])
 const loading = ref(false)
@@ -114,7 +115,6 @@ async function saveArea() {
 }
 
 async function deleteArea(area) {
-  if (!confirm(`Удалить область «${area.name}»?`)) return
 
   loading.value = true
   error.value = ''
@@ -323,19 +323,13 @@ onMounted(loadAreas)
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
             </button>
-            <button
-              class="icon-btn"
-              @click="deleteArea(area)"
+            <ConfirmInline
+              label="Удалить"
+              :question="`Удалить область «${area.name}»?`"
+              confirm-label="Да, удалить"
               :disabled="loading"
-              title="Удалить"
-              aria-label="Удалить"
-              style="color: #8a3a3a"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>
+              @confirm="deleteArea(area)"
+            />
           </div>
         </div>
       </div>

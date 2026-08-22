@@ -11,6 +11,7 @@ const hourAccountingMode = ref('PRIMARY_ONLY')
 const timezone = ref('Europe/Moscow')
 const weeks = ref([])
 const projects = ref([])
+const forecasts = ref([])
 const areas = ref([])
 
 const weekCount = ref(16)
@@ -65,6 +66,14 @@ async function loadGantt() {
     timezone.value = body.timezone || timezone.value
     weeks.value = body.weeks || []
     projects.value = body.projects || []
+
+    const forecastRes = await fetch(`${apiBase()}/gantt/forecast`, { headers })
+    if (handleAuthFailure(forecastRes)) return
+    if (!forecastRes.ok) {
+      const err = await forecastRes.json().catch(() => ({}))
+      throw new Error(err.message || `Прогноз: HTTP ${forecastRes.status}`)
+    }
+    forecasts.value = await forecastRes.json()
     if (!rangeFrom.value && body.rangeStart) {
       rangeFrom.value = body.rangeStart
     }
@@ -204,6 +213,15 @@ function formatHours(v) {
   return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, '')
 }
 
+function projectPlanTotal(project) {
+  if (project.totalPlanHours != null) return project.totalPlanHours
+  return project.cells.reduce((sum, cell) => sum + (Number(cell.planHours) || 0), 0)
+}
+
+function projectFactTotal(project) {
+  return project.cells.reduce((sum, cell) => sum + (Number(cell.factHours) || 0), 0)
+}
+
 function planBarWidth(hours) {
   const n = Number(hours) || 0
   // 40h/week ≈ full strip
@@ -213,6 +231,28 @@ function planBarWidth(hours) {
 function factBarWidth(hours) {
   const n = Number(hours) || 0
   return Math.min(100, Math.round((n / 40) * 100))
+}
+
+function forecastFor(projectId) {
+  return forecasts.value.find(item => item.projectId === projectId) || null
+}
+
+function forecastBarWidth(project, week) {
+  const forecast = forecastFor(project.id)
+  if (!forecast || !forecast.forecastEnd) return 0
+  const start = weeks.value.find(item => item.current)?.weekStart || week.weekStart
+  if (start >= week.weekEndExclusive || forecast.forecastEnd <= week.weekStart) return 0
+  const weekStartMs = Date.parse(week.weekStart)
+  const weekEndMs = Date.parse(week.weekEndExclusive)
+  const overlapStart = Math.max(Date.parse(start), weekStartMs)
+  const overlapEnd = Math.min(Date.parse(forecast.forecastEnd), weekEndMs)
+  return Math.max(0, Math.min(100, Math.round(((overlapEnd - overlapStart) / (weekEndMs - weekStartMs)) * 100)))
+}
+
+function forecastTitle(project) {
+  const forecast = forecastFor(project.id)
+  if (!forecast || !forecast.forecastEnd) return 'Данных для прогноза пока мало'
+  return `Прогноз: ${forecast.forecastEnd} · среднее ${formatHours(forecast.weeklyAvg)} ч/нед · осталось ${formatHours(forecast.remaining)} ч`
 }
 
 function hasDateStrip(project, week) {
@@ -248,8 +288,8 @@ onMounted(loadAll)
   <div class="gantt-page">
     <header class="page-header gantt-header">
       <div>
-        <h1>Гантт</h1>
-        <p class="eyebrow">План и факт по Проектам · {{ MODE_LABEL[hourAccountingMode] || hourAccountingMode }}</p>
+        <h1>Диаграмма Ганта</h1>
+        <p class="eyebrow">Планирование · план и факт по Проектам · {{ MODE_LABEL[hourAccountingMode] || hourAccountingMode }}</p>
       </div>
       <div class="gantt-toolbar">
         <button type="button" class="btn btn-ghost" :disabled="loading" @click="shiftWeeks(-4)" title="На 4 недели назад">←</button>
@@ -304,7 +344,7 @@ onMounted(loadAll)
 
     <div v-if="loading && !projects.length" class="muted">Загрузка…</div>
 
-    <div v-else class="gantt-scroll">
+    <div v-else class="gantt-scroll" role="region" aria-label="Диаграмма Ганта, прокрутка по горизонтали" tabindex="0">
       <div
         v-if="weeks.length"
         class="gantt-grid"
@@ -344,6 +384,7 @@ onMounted(loadAll)
               {{ p.title }}
             </router-link>
             <span class="area-tag" :title="p.lifeAreaName">{{ p.lifeAreaName }}</span>
+            <span class="project-hours">план {{ formatHours(projectPlanTotal(p)) }} ч · факт {{ formatHours(projectFactTotal(p)) }} ч</span>
           </div>
           <div
             v-for="c in p.cells"
@@ -363,7 +404,14 @@ onMounted(loadAll)
             <div class="strips">
               <div class="strip plan" :title="`План: ${formatHours(c.planHours)} ч`">
                 <div class="bar" :style="{ width: planBarWidth(c.planHours) + '%' }"></div>
-                <span class="val plan-val" @click.stop="startEdit(p, c)">
+                <span
+                  class="val plan-val"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`План ${formatHours(c.planHours)} ч, изменить`"
+                  @click.stop="startEdit(p, c)"
+                  @keydown.enter.prevent="startEdit(p, c)"
+                >
                   <template v-if="isEditing(p.id, c.isoYear, c.isoWeek)">
                     <input
                       v-model="editValue"
@@ -371,6 +419,7 @@ onMounted(loadAll)
                       type="text"
                       inputmode="decimal"
                       :disabled="saving"
+                      :aria-label="`Плановые часы, неделя W${c.isoWeek}`"
                       @keydown.enter.prevent="commitEdit(p, c)"
                       @keydown.esc.prevent="cancelEdit"
                       @blur="commitEdit(p, c)"
@@ -382,9 +431,24 @@ onMounted(loadAll)
                   </template>
                 </span>
               </div>
-              <div class="strip fact" :title="`Факт: ${formatHours(c.factHours)} ч`">
+              <div
+                class="strip fact"
+                :class="{ 'has-fact': Number(c.factHours) > 0 }"
+                :title="`Факт: ${formatHours(c.factHours)} ч`"
+              >
                 <div class="bar" :style="{ width: factBarWidth(c.factHours) + '%' }"></div>
-                <span class="val fact-val">{{ formatHours(c.factHours) }}</span>
+                <span class="val fact-val">
+                  {{ Number(c.factHours) > 0 ? formatHours(c.factHours) : '·' }}
+                </span>
+              </div>
+              <div class="strip forecast" :title="forecastTitle(p)">
+                <div
+                  class="bar"
+                  :style="{ width: forecastBarWidth(p, weeks.find(w => w.isoYear === c.isoYear && w.isoWeek === c.isoWeek) || {}) + '%' }"
+                ></div>
+                <span class="val forecast-val">
+                  {{ forecastFor(p.id)?.forecastEnd && weeks.find(w => w.weekStart <= forecastFor(p.id).forecastEnd && forecastFor(p.id).forecastEnd < w.weekEndExclusive)?.weekStart === (weeks.find(w => w.isoYear === c.isoYear && w.isoWeek === c.isoWeek)?.weekStart) ? forecastFor(p.id).forecastEnd : '' }}
+                </span>
               </div>
             </div>
           </div>
@@ -393,8 +457,9 @@ onMounted(loadAll)
     </div>
 
     <p class="legend muted">
-      Верхняя полоска — <strong>план</strong> (клик / двойной клик — правка часов), нижняя — <strong>факт</strong> из выполненных Записей времени.
-      Ad-hoc не входит в факт. Режим учёта: {{ MODE_LABEL[hourAccountingMode] }}.
+      Верхняя полоска — <strong>план</strong> (клик или Enter — правка часов, Escape — отмена),
+      средняя — <strong>факт</strong> (бледно-зелёная только при наличии выполненных часов),
+      нижняя — <strong>прогноз</strong>. Если данных мало, отображается нейтральное пояснение.
     </p>
   </div>
 </template>
@@ -472,9 +537,10 @@ onMounted(loadAll)
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid #e0d8cc;
-  background: #fffefb;
+  border: 0;
+  border-bottom: 1px solid var(--wolf-rule);
+  border-radius: 0;
+  background: var(--wolf-surface);
   font-size: 0.85rem;
   cursor: pointer;
   user-select: none;
@@ -762,6 +828,14 @@ onMounted(loadAll)
   margin-top: 0.1rem;
 }
 
+.project-hours {
+  display: block;
+  font-size: 0.68rem;
+  color: #7a7268;
+  font-weight: 400;
+  margin-top: 0.12rem;
+}
+
 .gantt-cell {
   padding: 0.2rem 0.2rem 0.25rem;
   cursor: default;
@@ -886,6 +960,49 @@ onMounted(loadAll)
 .muted {
   color: #8a8278;
 }
+
+/* Ticket 01/05 override: flatten Gantt view and capacity list to register tokens
+   without altering internal data grid tracks or calculations. */
+.gantt-page :is(.gantt-filters, .gantt-scroll, .gantt-header-grid .month-cell, .gantt-header-grid .week-head, .sticky-col, .corner, .project-name, .gantt-cell, .month-row .month-cell, .week-row .week-head) {
+  background: var(--wolf-surface);
+}
+.gantt-page :is(.gantt-scroll, .gantt-header-grid .corner, .gantt-header-grid .month-cell, .gantt-header-grid .week-head, .gantt-project-row > *, .gantt-grid .gantt-cell, .gantt-grid .sticky-col) {
+  border-color: var(--wolf-rule);
+}
+.gantt-page :is(.gantt-grid .sticky-col, .sticky-col, .corner) { box-shadow: 1px 0 0 var(--wolf-rule); }
+.gantt-page :is(.chip, .chip.on) {
+  border: 0;
+  border-bottom: 1px solid var(--wolf-rule);
+  border-radius: 0;
+  background: var(--wolf-surface);
+  color: var(--wolf-ink);
+}
+.gantt-page .chip.on { border-bottom-color: var(--wolf-ink); background: var(--wolf-hover); }
+.gantt-page .chip-dot { border-radius: 0; }
+.gantt-page :is(.gantt-grid .week-head.current, .gantt-grid .gantt-cell.current, .week-head.current, .gantt-cell.current) {
+  background: var(--wolf-hover);
+  color: var(--wolf-ink);
+}
+.gantt-page :is(.gantt-grid .week-head.current, .week-head.current) { box-shadow: inset 0 -2px 0 var(--wolf-ink); }
+.gantt-page .date-bar { background: var(--wolf-ink); opacity: .35; }
+.gantt-page .strip { border-radius: 0; background: var(--wolf-subrule); height: 1rem; }
+.gantt-page .strip .bar { border-radius: 0; }
+.gantt-page .strip.plan .bar { background: var(--wolf-ink); opacity: 0.25; }
+.gantt-page .strip.fact .bar { background: transparent; }
+.gantt-page .strip.fact.has-fact .bar { background: var(--wolf-done-surface); }
+.gantt-page .strip.forecast .bar { background: var(--wolf-muted); opacity: 0.15; }
+.gantt-page .strips { min-height: 3.2rem; }
+.gantt-page :is(.strip .val, .plan-val) { color: var(--wolf-ink); font-size: 0.65rem; }
+.gantt-page .fact-val { color: var(--wolf-done-ink); font-weight: 600; }
+.gantt-page .plan-val { color: var(--wolf-ink); }
+.gantt-page .forecast-val { color: var(--wolf-muted); font-size: 0.58rem; }
+.gantt-page .plan-input { background: var(--wolf-surface); outline-color: var(--wolf-ink); border-radius: 0; }
+.gantt-page .project-link:hover { color: var(--wolf-ink); }
+.gantt-page :is(.w-date, .area-tag, .depth-mark, .muted, .filter-check) { color: var(--wolf-muted); }
+.gantt-page .banner { margin: 0 0 12px; border-radius: 0; background: transparent; }
+.gantt-page .banner.error { color: var(--wolf-ink); border-color: var(--wolf-ink); }
+.gantt-page .banner.ok { color: var(--wolf-done-ink); border-color: var(--wolf-done-ink); }
+.weeks-select select { border-radius: 0; border-color: var(--wolf-rule); background: var(--wolf-surface); color: var(--wolf-ink); }
 
 @media (max-width: 720px) {
   .sticky-col {

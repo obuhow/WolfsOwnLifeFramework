@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase, authHeaders, handleAuthFailure } from '../api'
+import FocusPanel from './FocusPanel.vue'
 
 const loading = ref(false)
 const error = ref('')
@@ -14,11 +15,17 @@ const delos = ref([])
 const projects = ref([])
 const nightStart = ref('23:00')
 const nightEnd = ref('07:00')
+const timeCaptureMode = ref('PARALLEL_SLOTS')
 // Default hidden per glossary / US-17
 const showNightHours = ref(false)
 
 // Week backlog state
 const weekBacklog = ref([])
+// Per-project current-week hours {projectId: {plan, fact}} sourced from Gantt (real API).
+const projectWeekHours = ref({})
+const todayBacklog = ref(null)
+const checklist = ref([])
+const checklistTitle = ref('')
 const backlogLoading = ref(false)
 const backlogError = ref('')
 // Execution mode filter for panels: 'SELF' | 'DELEGATABLE' | 'AUTOMATABLE' | 'ALL'
@@ -262,6 +269,110 @@ const filteredWeekBacklog = computed(() => {
   return weekBacklog.value.filter(d => d.executionMode === executionModeFilter.value)
 })
 
+/** Format an hours BigDecimal/number to a compact tabular value, or '—' when absent. */
+function hoursOrDash(value) {
+  if (value == null) return '—'
+  return formatHours(value)
+}
+
+/**
+ * Weekly backlog grouped by Project. Each group carries `x / y ч` where
+ * x = completed fact hours (current ISO week), y = planned hours — both from the
+ * Gantt API (projectWeekHours), never invented from the visible page.
+ * Delos without a Project fall into a separate «Без проекта» group.
+ */
+const backlogGroups = computed(() => {
+  const projectTitle = id => projects.value.find(p => p.id === id)?.title || `Проект #${id}`
+  const groups = new Map()
+
+  for (const delo of filteredWeekBacklog.value) {
+    const pids = (delo.projectIds && delo.projectIds.length) ? delo.projectIds : [null]
+    for (const pid of pids) {
+      const key = pid == null ? '__none__' : String(pid)
+      if (!groups.has(key)) {
+        const hours = pid == null ? null : projectWeekHours.value[String(pid)]
+        groups.set(key, {
+          key,
+          projectId: pid,
+          label: pid == null ? 'Без проекта' : projectTitle(pid),
+          fact: pid == null ? null : (hours ? hours.fact : 0),
+          plan: pid == null ? null : (hours ? hours.plan : null),
+          items: []
+        })
+      }
+      const g = groups.get(key)
+      if (!g.items.some(x => x.id === delo.id)) g.items.push(delo)
+    }
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.key === '__none__') return 1
+    if (b.key === '__none__') return -1
+    return a.label.localeCompare(b.label, 'ru')
+  })
+})
+
+/** `x / y ч` for a group, or empty for «Без проекта». Missing plan → `x / — ч`. */
+function groupHoursLabel(group) {
+  if (group.projectId == null) return ''
+  return `${hoursOrDash(group.fact ?? 0)} / ${hoursOrDash(group.plan)} ч`
+}
+
+function executionModeLabel(mode) {
+  const found = EXECUTION_MODES.find(m => m.value === mode)
+  return found ? found.label : (mode || '')
+}
+
+const backlogFactLabel = computed(() => `${formatHours(todayBacklog.value?.totalFact || 0)} ч из ${formatHours(todayBacklog.value?.totalPlanned || 0)} ч`)
+function formatHours(value) {
+  const n = Number(value || 0)
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
+}
+
+async function loadTodayExtras() {
+  const headers = authHeaders()
+  if (!headers || !selectedDate.value) return
+  const [backlogRes, checklistRes] = await Promise.all([
+    fetch(`${apiBase()}/today/backlog?date=${selectedDate.value}`, { headers }),
+    fetch(`${apiBase()}/checklist?date=${selectedDate.value}`, { headers })
+  ])
+  if (backlogRes.ok) todayBacklog.value = await backlogRes.json()
+  if (checklistRes.ok) checklist.value = await checklistRes.json()
+}
+
+async function addChecklistItem() {
+  const title = checklistTitle.value.trim()
+  if (!title || !selectedDate.value) return
+  const res = await fetch(`${apiBase()}/checklist`, { method: 'POST', headers: authHeaders(true), body: JSON.stringify({ date: selectedDate.value, title }) })
+  if (res.ok) { checklist.value.push(await res.json()); checklistTitle.value = '' }
+}
+
+async function toggleChecklist(item) {
+  const res = await fetch(`${apiBase()}/checklist/${item.id}`, { method: 'PATCH', headers: authHeaders(true), body: JSON.stringify({ done: !item.done }) })
+  if (res.ok) Object.assign(item, await res.json())
+}
+
+async function deleteChecklistItem(item) {
+  const res = await fetch(`${apiBase()}/checklist/${item.id}`, { method: 'DELETE', headers: authHeaders(true) })
+  if (res.ok) checklist.value = checklist.value.filter(x => x.id !== item.id)
+}
+
+async function carryChecklistItem(item) {
+  const d = new Date(`${selectedDate.value}T00:00:00`); d.setDate(d.getDate() + 1)
+  await fetch(`${apiBase()}/checklist/${item.id}/carry-over`, { method: 'POST', headers: authHeaders(true), body: JSON.stringify({ toDate: d.toISOString().slice(0, 10) }) })
+}
+
+async function reorderChecklist(event, target) {
+  const sourceId = Number(event.dataTransfer.getData('text/plain'))
+  if (!sourceId || sourceId === target.id) return
+  const sourceIndex = checklist.value.findIndex(x => x.id === sourceId)
+  const targetIndex = checklist.value.findIndex(x => x.id === target.id)
+  if (sourceIndex < 0 || targetIndex < 0) return
+  const [moved] = checklist.value.splice(sourceIndex, 1)
+  checklist.value.splice(targetIndex, 0, moved)
+  await Promise.all(checklist.value.map((item, position) => fetch(`${apiBase()}/checklist/${item.id}`, { method: 'PATCH', headers: authHeaders(true), body: JSON.stringify({ position }) })))
+}
+
 async function loadProjects() {
   const headers = authHeaders()
   if (!headers) return
@@ -291,6 +402,7 @@ async function loadSettings() {
   nightStart.value = (data.nightStart || '23:00:00').slice(0, 5)
   nightEnd.value = (data.nightEnd || '07:00:00').slice(0, 5)
   dayEndSetting.value = (data.dayEnd || '02:00:00').slice(0, 5)
+  timeCaptureMode.value = data.timeCaptureMode || 'PARALLEL_SLOTS'
 }
 
 function dayBounds(dateStr) {
@@ -371,6 +483,7 @@ async function loadAll() {
     await Promise.all([loadProjects(), loadDelos(), loadSettings()])
     await loadToday({ ensureSleep: true })
     await loadWeekBacklog()
+    await loadTodayExtras()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -409,11 +522,49 @@ async function loadWeekBacklog() {
     if (handleAuthFailure(res)) return
     if (!res.ok) throw new Error(`Бэклог недели: HTTP ${res.status}`)
     const body = await res.json()
-    weekBacklog.value = body.delos || []
+    // Backlog API returns id/title/executionMode/plannedHours (no projectIds);
+    // enrich with project links from the loaded Delo catalog so grouping works.
+    const byId = new Map(delos.value.map(d => [d.id, d]))
+    weekBacklog.value = (body.delos || []).map(d => ({
+      ...d,
+      projectIds: byId.get(d.id)?.projectIds || []
+    }))
+    await loadProjectWeekHours()
   } catch (e) {
     backlogError.value = e instanceof Error ? e.message : String(e)
   } finally {
     backlogLoading.value = false
+  }
+}
+
+/**
+ * Load real current-week plan/fact hours per Project from the Gantt aggregate
+ * (single-week window). Populates projectWeekHours[projectId] = {plan, fact}.
+ * plan is null when no week-plan is set (rendered as «—»); fact defaults to 0.
+ */
+async function loadProjectWeekHours() {
+  const headers = authHeaders()
+  if (!headers || !selectedDate.value) return
+  try {
+    // Monday of the selected ISO week
+    const d = new Date(`${selectedDate.value}T00:00:00`)
+    const day = (d.getDay() + 6) % 7 // Mon=0 … Sun=6
+    d.setDate(d.getDate() - day)
+    const monday = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+    const res = await fetch(`${apiBase()}/gantt?from=${monday}&weeks=1`, { headers })
+    if (!res.ok) { projectWeekHours.value = {}; return }
+    const body = await res.json()
+    const map = {}
+    for (const row of body.projects || []) {
+      const cell = (row.cells || [])[0] || {}
+      map[String(row.id)] = {
+        plan: cell.planHours == null ? null : Number(cell.planHours),
+        fact: Number(cell.factHours || 0)
+      }
+    }
+    projectWeekHours.value = map
+  } catch (e) {
+    projectWeekHours.value = {}
   }
 }
 
@@ -439,6 +590,7 @@ watch(selectedDate, async (val, old) => {
   try {
     await loadToday({ ensureSleep: true })
     await loadWeekBacklog()
+    await loadTodayExtras()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -666,6 +818,7 @@ async function removeFromBacklog(deloId) {
     if (handleAuthFailure(res)) return
     if (!res.ok) throw new Error(`Удаление из бэклога: HTTP ${res.status}`)
     await loadWeekBacklog()
+    await loadTodayExtras()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -678,6 +831,7 @@ onMounted(loadAll)
 
 <template>
   <div class="today-page">
+    <FocusPanel v-if="timeCaptureMode === 'PRIMARY_FOCUS'" />
     <header class="page-header today-header">
       <div>
         <h1>Сегодня</h1>
@@ -737,7 +891,7 @@ onMounted(loadAll)
               :class="cellClass(slot)"
               :title="cellTitle(slot)"
               :disabled="saving"
-              :style="slot.span > 1 ? { minHeight: `calc(${slot.span} * 1.5rem)` } : undefined"
+              :style="slot.span > 1 ? { minHeight: `calc(${slot.span} * 26px)` } : undefined"
               @click="onCellClick(slot)"
             >
               <span class="cell-time">{{ slot.label }}</span>
@@ -807,8 +961,8 @@ onMounted(loadAll)
         <p v-else class="hint">Пока пусто — кликните ячейку в сетке.</p>
       </aside>
 
-      <!-- Week Backlog Panel -->
-      <aside class="card panel-card" aria-label="Бэклог недели">
+      <!-- Week Backlog Panel — grouped by Project (ticket 03) -->
+      <aside class="card panel-card backlog-panel" aria-label="Бэклог недели">
         <div class="panel-header">
           <h2>Бэклог недели</h2>
           <div class="panel-filter">
@@ -823,30 +977,51 @@ onMounted(loadAll)
             </select>
           </div>
         </div>
-        <p class="hint" style="margin-bottom: 1rem">
-          Дела, запланированные на эту неделю. Кликните чтобы добавить в сетку.
-        </p>
+        <p class="panel-subtitle">Неделя {{ weekLabel }}</p>
         <div v-if="backlogLoading" class="loading">Загрузка бэклога…</div>
         <div v-else-if="backlogError" class="alert alert-error">{{ backlogError }}</div>
-        <ul v-else-if="filteredWeekBacklog.length" class="backlog-list">
-          <li v-for="delo in filteredWeekBacklog" :key="delo.id" class="backlog-list-item">
-            <div class="backlog-item-body">
-              <strong>{{ delo.title }}</strong>
-              <span class="backlog-item-meta">{{ delo.executionMode }}</span>
-            </div>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              title="Убрать из бэклога"
-              :disabled="saving"
-              @click="removeFromBacklog(delo.id)"
-            >×</button>
+        <div v-else-if="backlogGroups.length" class="backlog-groups">
+          <section v-for="group in backlogGroups" :key="group.key" class="backlog-group">
+            <header class="backlog-group-head">
+              <span class="backlog-group-title">{{ group.label }}</span>
+              <span v-if="group.projectId != null" class="backlog-group-hours">{{ groupHoursLabel(group) }}</span>
+            </header>
+            <ul class="backlog-group-list">
+              <li v-for="delo in group.items" :key="delo.id + '-' + group.key" class="backlog-delo">
+                <div class="backlog-delo-body">
+                  <span class="backlog-delo-title">{{ delo.title }}</span>
+                  <span class="backlog-delo-meta">
+                    {{ executionModeLabel(delo.executionMode) }}
+                    <template v-if="delo.plannedHours != null"> · {{ formatHours(delo.plannedHours) }} ч</template>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  title="Убрать из бэклога"
+                  :disabled="saving"
+                  @click="removeFromBacklog(delo.id)"
+                >×</button>
+              </li>
+            </ul>
+          </section>
+        </div>
+        <p v-else class="hint">Бэклог недели пуст — добавьте Дела через «Дела» или неделю.</p>
+      </aside>
+
+      <aside class="card panel-card" aria-label="Чек-лист дня">
+        <div class="panel-header"><h2>Чек-лист дня</h2></div>
+        <form class="checklist-add" @submit.prevent="addChecklistItem">
+          <input v-model="checklistTitle" class="input" maxlength="500" placeholder="Быстрый пункт…" aria-label="Новый пункт чек-листа" />
+          <button class="btn btn-primary btn-sm" type="submit">Добавить</button>
+        </form>
+        <ul v-if="checklist.length" class="checklist-list">
+          <li v-for="item in checklist" :key="item.id" class="checklist-item" draggable="true" @dragstart="event => event.dataTransfer.setData('text/plain', String(item.id))" @dragover.prevent @drop="event => reorderChecklist(event, item)">
+            <label><input type="checkbox" :checked="item.done" @change="toggleChecklist(item)" /><span :class="{ done: item.done }">{{ item.title }}</span></label>
+            <div><button class="btn btn-ghost btn-sm" type="button" title="Перенести на завтра" @click="carryChecklistItem(item)">→</button><button class="btn btn-ghost btn-sm" type="button" title="Удалить" @click="deleteChecklistItem(item)">×</button></div>
           </li>
         </ul>
-        <p v-else class="hint">Бэклог недели пуст — добавьте Дела через «Дела» или неделю.</p>
-        <p class="hint" style="margin-top: 1rem; font-size: 0.75rem;">
-          Неделя: {{ weekLabel }}
-        </p>
+        <p v-else class="hint">Пусто</p>
       </aside>
     </div>
 
@@ -946,27 +1121,54 @@ onMounted(loadAll)
 
 .today-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) 268px;
+  gap: 0;
   align-items: start;
+}
+
+/* Time register owns the left column across all aside rows. */
+.grid-card {
+  grid-column: 1;
+  grid-row: 1 / 1000;
+  border-right: 1px solid var(--wolf-rule);
+  padding: 0 20px 12px 0;
+}
+
+.today-layout > .panel-card {
+  grid-column: 2;
+  padding-left: 20px;
 }
 
 @media (max-width: 900px) {
   .today-layout {
     grid-template-columns: 1fr;
   }
+  .grid-card {
+    grid-column: 1;
+    grid-row: auto;
+    border-right: 0;
+    padding-right: 0;
+  }
+  .today-layout > .panel-card {
+    grid-column: 1;
+    padding-left: 0;
+    border-top: 1px solid var(--wolf-rule);
+  }
 }
 
-.grid-card {
-  padding: 1rem 1rem 0.75rem;
-}
+.checklist-add { display: flex; gap: .5rem; margin-bottom: .8rem; }
+.checklist-add .input { min-width: 0; flex: 1; }
+.checklist-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem; }
+.checklist-item, .backlog-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid var(--wolf-rule); }
+.checklist-item label { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.checklist-item .done { text-decoration: line-through; color: var(--wolf-muted); }
 
 .grid-scroll {
-  max-height: calc(100vh - 260px);
+  max-height: calc(100vh - 220px);
   overflow-y: auto;
-  border-radius: 12px;
-  border: 1px solid #e6dfd4;
-  background: #fdfbf7;
+  border-radius: 0;
+  border: 0;
+  background: var(--wolf-surface);
 }
 
 .day-grid {
@@ -976,19 +1178,19 @@ onMounted(loadAll)
 
 .grid-cell {
   display: grid;
-  grid-template-columns: 3.5rem 1fr;
+  grid-template-columns: 64px minmax(0, 1fr);
   gap: 0.5rem;
   align-items: center;
   width: 100%;
-  min-height: 1.65rem;
-  padding: 0.15rem 0.6rem;
-  border: none;
-  border-bottom: 1px solid #efe8dc;
+  min-height: 26px;
+  padding: 0 0.6rem;
+  border: 0;
+  border-bottom: 1px solid var(--wolf-subrule);
   background: transparent;
   text-align: left;
   font-family: inherit;
   font-size: 0.8rem;
-  color: #2c2a26;
+  color: var(--wolf-ink);
   cursor: pointer;
   transition: background 0.12s;
 }
@@ -1036,23 +1238,23 @@ onMounted(loadAll)
 }
 
 .cell-planned {
-  background: #e8f0ea;
+  background: #f7f8fa;
 }
 
 .cell-planned:hover:not(:disabled) {
-  background: #dce8df;
+  background: #f2f2f2;
 }
 
 .cell-done {
-  background: #e4eef6;
+  background: var(--wolf-done-surface);
 }
 
 .cell-done:hover:not(:disabled) {
-  background: #d5e4f0;
+  background: #e6f0e5;
 }
 
 .cell-now {
-  box-shadow: inset 3px 0 0 #3d5a4a;
+  box-shadow: inset 3px 0 0 var(--wolf-ink);
 }
 
 .cell-night .cell-time {
@@ -1077,11 +1279,11 @@ onMounted(loadAll)
 }
 
 .legend-swatch.planned {
-  background: #e8f0ea;
+  background: #f7f8fa;
 }
 
 .legend-swatch.done {
-  background: #e4eef6;
+  background: var(--wolf-done-surface);
 }
 
 .panel-card h2 {
@@ -1139,11 +1341,11 @@ onMounted(loadAll)
 }
 
 .meta-planned {
-  color: #3d5a4a;
+  color: var(--wolf-muted);
 }
 
 .meta-done {
-  color: #3a5a7a;
+  color: var(--wolf-done-ink);
 }
 
 .btn-sm {
@@ -1189,42 +1391,72 @@ onMounted(loadAll)
   border: 0;
 }
 
-.backlog-list {
+.backlog-panel .panel-subtitle {
+  margin: 0 0 12px;
+  color: var(--wolf-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.backlog-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.backlog-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--wolf-rule);
+}
+
+.backlog-group-title {
+  color: var(--wolf-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.backlog-group-hours {
+  color: var(--wolf-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.backlog-group-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 0.4rem;
 }
 
-.backlog-list-item {
+.backlog-delo {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
-  padding: 0.4rem 0.5rem;
-  border-radius: 8px;
-  background: #f7f3ec;
-  border: 1px solid #ebe3d6;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--wolf-subrule);
 }
 
-.backlog-item-body {
+.backlog-delo-body {
   display: grid;
-  gap: 0.1rem;
+  gap: 2px;
   min-width: 0;
 }
 
-.backlog-item-body strong {
-  font-size: 0.85rem;
-  font-weight: 600;
+.backlog-delo-title {
+  color: var(--wolf-ink);
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.backlog-item-meta {
-  font-size: 0.7rem;
-  color: #8a8278;
-  text-transform: capitalize;
+.backlog-delo-meta {
+  color: var(--wolf-muted);
+  font-size: 11px;
 }
 
 .modal-backdrop {
@@ -1290,10 +1522,34 @@ onMounted(loadAll)
 }
 
 .delo-option.selected {
-  background: #e8f0ea;
+  background: var(--wolf-hover);
 }
 
 .delo-option input {
-  accent-color: #3d5a4a;
+  accent-color: var(--wolf-ink);
 }
+/* Ticket 01/03: normalize existing grid/panel rules; register geometry unchanged. */
+.grid-scroll,
+.delo-picker-list { border-color: var(--wolf-rule); border-radius: 0; background: var(--wolf-surface); }
+.grid-cell { border-bottom-color: var(--wolf-subrule); color: var(--wolf-ink); }
+.grid-cell.cell-planned { background: #F7F8FA; }
+.grid-cell.cell-done { background: var(--wolf-done-surface); }
+.grid-cell:hover:not(:disabled),
+.delo-option:hover,
+.delo-option.selected { background: var(--wolf-hover); }
+.cell-hour { border-top-color: var(--wolf-rule); }
+.cell-time,
+.today-list-time,
+.today-list-meta,
+.backlog-item-meta { color: var(--wolf-muted); }
+.cell-night .cell-time { color: var(--wolf-muted); }
+.today-list-item,
+.backlog-list-item { border-color: var(--wolf-rule); border-radius: 0; background: transparent; }
+.legend-swatch { border-color: var(--wolf-rule); border-radius: 0; }
+.modal { border-radius: 0; box-shadow: none; }
+/* Entry labels must stay visible (override legacy transparent rule). */
+.grid-cell .cell-label { color: var(--wolf-ink); }
+.grid-cell.cell-empty .cell-label { color: transparent; }
+.delo-group-title { color: var(--wolf-muted); background: var(--wolf-surface); }
+.delo-option { border-bottom-color: var(--wolf-subrule); }
 </style>

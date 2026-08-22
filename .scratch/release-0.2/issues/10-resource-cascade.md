@@ -4,14 +4,14 @@
 
 **Blocked by:** 09 — Честный прогноз Gantt (нужны прогнозы для каскада).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Настройка пользователя `available_weekly_hours` (default 30)
-- [ ] `POST /api/v1/projects/{id}/plan-shift-preview {newEnd}` — dry-run без сохранения
-- [ ] Ответ: affectedGoals[] (goalId, title, currentBudget, requiredBudget, deficit), totalDeficit
-- [ ] Расчёт: сумма недельных бюджетов активных целей vs available_weekly_hours после сдвига
-- [ ] Применение сдвига — обычный update дат проекта (без авто-изменения бюджетов)
-- [ ] UI: диалог при сдвиге дат проекта — список затронутых целей, дефициты, кнопки "Применить" / "Отмена"
-- [ ] Нейтральный тон: "сдвиг требует пересмотра бюджетов", не "вы не успеваете"
-- [ ] API test: сдвиг проекта A на +4 нед → цели, связанные с A, показаны с дефицитом
-- [ ] API test: dry-run не меняет данные (после вызова GET возвращает старые значения)
+- [x] Настройка пользователя `available_weekly_hours` (default 30)
+- [x] `POST /api/v1/projects/{id}/plan-shift-preview {newEnd}` — dry-run без сохранения
+- [x] Ответ: affectedGoals[] (goalId, title, currentBudget, requiredBudget, deficit), totalDeficit
+- [x] Расчёт: сумма недельных бюджетов активных целей vs available_weekly_hours после сдвига
+- [x] Применение сдвига — обычный update дат проекта (без авто-изменения бюджетов)
+- [x] UI: диалог при сдвиге дат проекта — список затронутых целей, дефициты, кнопки "Применить" / "Отмена"
+- [x] Нейтральный тон: "сдвиг требует пересмотра бюджетов", не "вы не успеваете"
+- [x] API test: сдвиг проекта A на +4 нед → цели, связанные с A, показаны с дефицитом
+- [x] API test: dry-run не меняет данные (после вызова GET возвращает старые значения)
