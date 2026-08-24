@@ -4,6 +4,8 @@ import './style.css'
 import App from './App.vue'
 import LoginView from './components/LoginView.vue'
 import RegisterView from './components/RegisterView.vue'
+import ProfileLoadView from './components/ProfileLoadView.vue'
+import { apiBase } from './api'
 import SettingsView from './components/SettingsView.vue'
 import AdminInvitesView from './components/AdminInvitesView.vue'
 import LifeAreasView from './components/LifeAreasView.vue'
@@ -37,6 +39,8 @@ const routes = [
   { path: '/', redirect: '/today' },
   { path: '/login', component: LoginView, meta: { public: true } },
   { path: '/register', component: RegisterView, meta: { public: true } },
+  // Онбординг: выбор демо-профиля (релиз 0.6, тикет 02). Тур — тикет 03.
+  { path: '/onboarding/profile', component: ProfileLoadView, meta: { requiresAuth: true } },
   // Утренний обход
   { path: '/morning', component: MorningView, meta: { requiresAuth: true } },
   // Ежедневник: Неделя (осн.), Сегодня и Месяц — вкладки/deep links той же страницы
@@ -99,13 +103,41 @@ const router = createRouter({
   }
 })
 
-router.beforeEach((to) => {
+// Кэш статуса онбординга: как только он завершён, редиректить незачем.
+let onboardingCompletedCache = false
+
+async function isOnboardingCompleted(token) {
+  if (onboardingCompletedCache) return true
+  try {
+    const res = await fetch(`${apiBase()}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.ok) {
+      const data = await res.json()
+      onboardingCompletedCache = !!data.onboardingCompleted
+      return onboardingCompletedCache
+    }
+  } catch (e) {
+    // Сетевой сбой — не запираем пользователя в онбординге.
+  }
+  return true
+}
+
+router.beforeEach(async (to) => {
   const token = localStorage.getItem('wolf_token')
   if (to.meta.requiresAuth && !token) {
     return '/login'
   }
   if (to.path === '/login' && token) {
     return '/today'
+  }
+  // Онбординг-гейт (релиз 0.6, тикет 02): аутентифицирован + онбординг не завершён
+  // + маршрут не /onboarding → на экран выбора демо-профиля.
+  if (token && to.meta.requiresAuth && !to.path.startsWith('/onboarding')) {
+    const completed = await isOnboardingCompleted(token)
+    if (!completed) {
+      return '/onboarding/profile'
+    }
   }
 })
 

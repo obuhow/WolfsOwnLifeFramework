@@ -1,6 +1,6 @@
 # Экран «Загрузка профиля»
 
-Status: open
+Status: done
 Blocked by: 01
 
 ## Question
@@ -24,3 +24,41 @@ Blocked by: 01
 ## Out of Scope
 
 Сама генерация данных (тикет 01). Тур (тикет 03).
+
+## Answer
+
+Реализовано в ветке `feature/02-profile-load-screen`.
+
+### Что сделано
+- `web/src/components/ProfileLoadView.vue` — экран с заголовком «Загрузка профиля»,
+  подзаголовком и тремя карточками-вариантами (Рабочий класс / Мудрый фрилансер /
+  Свободный художник). Тихий регистр 0.3: без теней и ярких карточек — строки с
+  тонкими правилами, hover-подсветка, focus-visible контур, действие = вся строка-кнопка.
+- Маршрут `/onboarding/profile` в `web/src/main.js` (`requiresAuth`).
+- Клик по карточке → `POST /api/v1/onboarding/load-profile {slug}` → при успехе редирект
+  на `/onboarding/tour` (тикет 03). Ошибки показываются inline через `handleAuthFailure`.
+- Guard в `main.js`: аутентифицирован + `onboardingCompleted == false` (через `/auth/me`,
+  с кэшем) + путь не начинается с `/onboarding` → редирект на `/onboarding/profile`.
+- `RegisterView.vue`: после регистрации по инвайту редирект теперь строго на
+  `/onboarding/profile` (было `/today`).
+- `App.vue`: маршруты `/onboarding/*` рендерятся полноэкранно, без навигационной оболочки.
+
+### Побочный фикс дефекта тикета 01 (блокировал приёмку)
+Эндпоинт `load-profile` читает `profiles/<slug>.json` из classpath, а `build.gradle`
+подключает репо-корневой `assets/` через `srcDir "${rootDir}/../assets"`. Но Docker-контекст
+сервиса `api` был `./api`, поэтому `assets/` не попадал в сборку и JSON-профилей не было в jar —
+эндпоинт отдавал 500/403 на любой профиль. Исправлено: контекст сборки `api` → корень репозитория,
+`api/Dockerfile` копирует `assets` в `/assets` (= `${rootDir}/../assets`), добавлен корневой
+`.dockerignore`. После фикса профили лежат в jar как `BOOT-INF/classes/profiles/*.json`.
+
+### Проверка (гейт)
+- Сборка web (`npm run build`) — OK; `docker compose build web|api` — OK; стек пересоздан.
+- Served-хэши `http://localhost/` совпадают с `web/dist/assets` (свежий бандл).
+- API-контракт (регистрация по инвайту → `load-profile` на чистом юзере), все три профиля HTTP 200:
+  - worker-class: 3 проекта, 2 цели, 2 идеи;
+  - wise-freelancer: 6 проектов, 3 цели, 8 идей;
+  - free-artist: 3 проекта, 2 цели, 10 идей.
+  Ожидаемые имена проектов присутствуют.
+- **DOM-гейт (браузерная аутентификация + инспекция вёрстки) НЕ пройден** — визуальная
+  проверка пропущена по решению пользователя (remote-debugging Chrome не подтверждён в этой сессии).
+  Инструкция ниже позволяет пройти его вручную.

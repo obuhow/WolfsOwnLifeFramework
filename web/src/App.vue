@@ -8,6 +8,9 @@ const route = useRoute()
 const token = ref(localStorage.getItem('wolf_token') || '')
 const username = ref('')
 
+// Онбординг-маршруты (релиз 0.6) — полноэкранные, без навигационной оболочки.
+const isOnboarding = computed(() => route.path.startsWith('/onboarding'))
+
 // --- Navigation model (Release 0.5 IA — see wolf-life-os skill reference
 // navigation-ia-05-supersession.md and .scratch/wayfinder-releases-05-07/issues/04) ---
 const NAV = [
@@ -237,7 +240,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div id="app-root">
-    <div v-if="token" class="app-shell">
+    <div v-if="token && !isOnboarding" class="app-shell">
       <header class="app-header">
         <div class="header-inner">
           <router-link to="/morning" class="brand" aria-label="WOLF — Главная">
