@@ -52,11 +52,11 @@ onMounted(loadCapacity)
   <div class="planning-page">
     <GanttView />
 
-    <section class="planning-capacity">
+    <section id="load-plan" class="planning-capacity">
       <div class="section-heading">
         <div>
           <span class="eyebrow">Нагрузка</span>
-          <h2>Суммарная плановая нагрузка</h2>
+          <h2>План нагрузки</h2>
         </div>
       </div>
       <p v-if="capacityError" class="banner error">{{ capacityError }}</p>
@@ -79,7 +79,7 @@ onMounted(loadCapacity)
       </div>
 
       <div v-if="curve.length" class="curve-list">
-        <h3>Кривые нагрузки</h3>
+        <h3>План нагрузки</h3>
         <div v-for="item in curve" :key="item.id" class="curve-row">
           <strong>{{ item.title }}</strong>
           <span class="cap-num">{{ item.weekStart }}</span>
