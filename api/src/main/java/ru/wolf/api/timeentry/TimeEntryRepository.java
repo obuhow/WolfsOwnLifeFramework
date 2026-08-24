@@ -89,4 +89,8 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
             ORDER BY te.startAt ASC
             """)
     List<TimeEntry> findByUserAndDeloAndStartAtBetween(@Param("userId") Long userId, @Param("deloId") Long deloId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM TimeEntry te WHERE te.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }

@@ -13,6 +13,17 @@ java {
     }
 }
 
+// Repo-root assets/ is the single source of truth for demo profile JSON
+// (ticket 01, release 0.6). Expose it on the runtime classpath so
+// assets/profiles/<slug>.json resolves as classpath resource profiles/<slug>.json.
+sourceSets {
+    main {
+        resources {
+            srcDir "${rootDir}/../assets"
+        }
+    }
+}
+
 repositories {
     mavenCentral()
 }

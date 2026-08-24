@@ -8,9 +8,6 @@ import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.goal.Goal;
 import ru.wolf.api.goal.GoalMetric;
 import ru.wolf.api.goal.GoalMetricRepository;
-import ru.wolf.api.goal.GoalProject;
-import ru.wolf.api.goal.GoalProjectId;
-import ru.wolf.api.goal.GoalProjectRepository;
 import ru.wolf.api.goal.GoalRepository;
 import ru.wolf.api.goal.GoalWeekBudget;
 import ru.wolf.api.goal.GoalWeekBudgetRepository;
@@ -36,11 +33,11 @@ import ru.wolf.api.routine.RoutineScheduleRepository;
 import ru.wolf.api.timeentry.TimeEntry;
 import ru.wolf.api.timeentry.TimeEntryRepository;
 import ru.wolf.api.user.User;
-import ru.wolf.api.user.UserRepository;
 import ru.wolf.api.backlog.BacklogItem;
 import ru.wolf.api.backlog.BacklogItemRepository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,18 +45,27 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.WeekFields;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 /**
- * Generates deterministic, realistic demo fixtures for any user.
- * All dates are relative to "today" in the user's timezone.
- * Deterministic: uses a fixed seed based on user ID for reproducible results.
+ * Generates deterministic, realistic demo fixtures for any user from a declarative
+ * {@link DemoProfile} (see {@code assets/profiles/<slug>.json}). All dates are relative
+ * to "today" in the profile/user timezone at the moment of loading.
+ * Deterministic where the profile does not specify an exact value: uses a fixed seed
+ * based on user ID for reproducible results.
  */
 @Component
 @RequiredArgsConstructor
 public class DemoFixtureGenerator {
+
+    private static final String[] AREA_COLORS = {"#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899", "#06B6D4"};
+    private static final String[] ROUTINE_COLORS = {"#EF4444", "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B"};
+    private static final int DEFAULT_HISTORY_DAYS = 30;
 
     private final LifeSphereSeeder lifeSphereSeeder;
     private final LifeAreaRepository lifeAreaRepository;
@@ -70,7 +76,6 @@ public class DemoFixtureGenerator {
     private final GoalRepository goalRepository;
     private final GoalMetricRepository goalMetricRepository;
     private final GoalWeekBudgetRepository goalWeekBudgetRepository;
-    private final GoalProjectRepository goalProjectRepository;
     private final IdeaRepository ideaRepository;
     private final NoteRepository noteRepository;
     private final SynergyRepository synergyRepository;
@@ -80,97 +85,97 @@ public class DemoFixtureGenerator {
     private final BacklogItemRepository backlogItemRepository;
 
     /**
-     * Populates the given user with a complete demo dataset.
+     * Populates the given user with a complete demo dataset described by {@code profile}.
      * Idempotent on empty user (fails if user already has data).
      */
     @Transactional
-    public void populate(User user) {
+    public void populate(User user, DemoProfile profile) {
         // Check if user already has data
         if (!projectRepository.findByUserOrderByTitleAsc(user).isEmpty()) {
-            throw new IllegalStateException("User already has data, refusing to populate");
+            throw new DemoDataConflictException("У пользователя уже есть данные — загрузка профиля отклонена");
         }
         if (!deloRepository.findByUserOrderByTitleAsc(user).isEmpty()) {
-            throw new IllegalStateException("User already has delos, refusing to populate");
+            throw new DemoDataConflictException("У пользователя уже есть Дела — загрузка профиля отклонена");
         }
-        if (!timeEntryRepository.findOverlapping(user.getId(), 
+        if (!timeEntryRepository.findOverlapping(user.getId(),
                 LocalDateTime.now().minusDays(14), LocalDateTime.now().plusDays(1)).isEmpty()) {
-            throw new IllegalStateException("User already has time entries, refusing to populate");
+            throw new DemoDataConflictException("У пользователя уже есть Записи времени — загрузка профиля отклонена");
         }
 
-        // Use deterministic random based on user ID
+        // Use deterministic random based on user ID, for values the profile does not specify
         Random random = new Random(user.getId() ^ 0x5A5A5A5AL);
-        
-        ZoneId zone = ZoneId.of(user.getTimezone());
+
+        ZoneId zone = ZoneId.of(profile.timezone() != null ? profile.timezone() : user.getTimezone());
         LocalDate today = LocalDate.now(zone);
-        
-        // 1. Seed 9 Life Spheres
+
+        // 1. Seed 9 Life Spheres (canonical, independent of the profile)
         lifeSphereSeeder.seed(user);
         List<LifeSphere> spheres = lifeSphereRepository.findByUserOrderBySortOrderAscNameAsc(user);
-        
-        // 2. Create 3 Life Areas
-        LifeArea workArea = createLifeArea(user, "Работа", 0, "#3B82F6");
-        LifeArea healthArea = createLifeArea(user, "Здоровье", 1, "#10B981");
-        LifeArea growthArea = createLifeArea(user, "Развитие", 2, "#8B5CF6");
-        List<LifeArea> areas = List.of(workArea, healthArea, growthArea);
-        
-        // 3. Create 4 Projects
-        Project redesign = createProject(user, workArea, null, "Редизайн сайта", 
-                Project.Status.IN_PROGRESS, today.minusDays(30), today.plusDays(60), 
-                BigDecimal.valueOf(40), Project.PlanDistribution.EVEN_WEEKDAYS);
-        Project apiDev = createProject(user, workArea, null, "Разработка API", 
-                Project.Status.IN_PROGRESS, today.minusDays(15), today.plusDays(90), 
-                BigDecimal.valueOf(60), Project.PlanDistribution.EVEN_WEEKDAYS);
-        Project javaCourse = createProject(user, growthArea, null, "Курс по Java", 
-                Project.Status.IN_PROGRESS, today.minusDays(10), today.plusDays(120), 
-                BigDecimal.valueOf(30), Project.PlanDistribution.EVEN_WEEKDAYS);
-        Project personalGoals = createProject(user, healthArea, null, "Личные цели", 
-                Project.Status.IN_PROGRESS, today, today.plusDays(180), 
-                BigDecimal.valueOf(20), Project.PlanDistribution.NONE);
-        List<Project> projects = List.of(redesign, apiDev, javaCourse, personalGoals);
-        
-        // 4. Create 12-15 Delos (some without project)
-        List<Delo> delos = new ArrayList<>();
-        // Project-bound delos
-        delos.add(createDelo(user, "Дизайн макета главной", redesign, "Согласовать с заказчиком", LocalTime.of(10, 0), LocalTime.of(12, 0)));
-        delos.add(createDelo(user, "Верстка компонентов", redesign, "UI-кит готов", LocalTime.of(13, 0), LocalTime.of(17, 0)));
-        delos.add(createDelo(user, "Код-ревью PR #42", apiDev, "Проверить тесты", LocalTime.of(11, 0), LocalTime.of(12, 0)));
-        delos.add(createDelo(user, "Написание OpenAPI спеки", apiDev, "Swagger документация", LocalTime.of(14, 0), LocalTime.of(16, 0)));
-        delos.add(createDelo(user, "Модуль 1: Основы Java", javaCourse, "Уроки 1-5", LocalTime.of(19, 0), LocalTime.of(21, 0)));
-        delos.add(createDelo(user, "Модуль 2: Коллекции", javaCourse, "Практикум", LocalTime.of(19, 0), LocalTime.of(21, 0)));
-        delos.add(createDelo(user, "Утренняя пробежка", personalGoals, "5 км в парке", LocalTime.of(7, 0), LocalTime.of(8, 0)));
-        delos.add(createDelo(user, "Медитация", personalGoals, "Headspace 10 мин", LocalTime.of(8, 0), LocalTime.of(8, 15)));
-        // No-project delos (Без проекта)
-        delos.add(createDelo(user, "Покупки на неделю", null, "Продукты + бытовая химия", LocalTime.of(18, 0), LocalTime.of(19, 0)));
-        delos.add(createDelo(user, "Звонок маме", null, "Рассказать про проект", LocalTime.of(20, 0), LocalTime.of(20, 30)));
-        delos.add(createDelo(user, "Чтение книги", null, "Глава 3-4", LocalTime.of(22, 0), LocalTime.of(22, 45)));
-        delos.add(createDelo(user, "Планирование недели", null, "Обзор календаря + бэклог", LocalTime.of(9, 0), LocalTime.of(9, 30)));
-        
-        // 5. Generate Time Entries for last 14 days including today
-        generateTimeEntries(user, delos, today, zone, random);
-        
-        // 6. Weekly Plans (current and next ISO week)
-        generateWeekPlans(user, projects, today, random);
-        
-        // 7. Goals (3 with weekly budgets and metrics)
-        generateGoals(user, projects, today, zone, random);
-        
-        // 8. Synergies (5-6 with different impacts)
-        generateSynergies(user, projects, spheres, random);
-        
-        // 9. Ideas (4 in different states)
-        generateIdeas(user, today, random);
-        
-        // 10. Notes (3, one from Agent)
-        generateNotes(user, projects, delos, today, random);
-        
-        // 11. Project Dependencies (at least 1)
+
+        // 2. Life Areas from the profile
+        Map<String, LifeArea> areasByName = new LinkedHashMap<>();
+        Map<String, String> sphereLabelByAreaName = new HashMap<>();
+        int sortOrder = 0;
+        for (DemoProfile.Area a : safe(profile.areas())) {
+            LifeArea area = createLifeArea(user, a.name(), sortOrder, AREA_COLORS[sortOrder % AREA_COLORS.length]);
+            sortOrder++;
+            areasByName.put(a.name(), area);
+            sphereLabelByAreaName.put(a.name(), a.sphere());
+        }
+
+        // 3. Projects from the profile
+        Map<String, Project> projectsByName = new LinkedHashMap<>();
+        for (DemoProfile.ProfileProject p : safe(profile.projects())) {
+            LifeArea area = areasByName.get(p.area());
+            if (area == null) {
+                throw new IllegalStateException("Профиль ссылается на несуществующую область: " + p.area());
+            }
+            LocalDate start = p.startOffsetDays() != null ? today.plusDays(p.startOffsetDays()) : null;
+            LocalDate due = p.dueOffsetDays() != null ? today.plusDays(p.dueOffsetDays()) : null;
+            Project.Status status = "ARCHIVED".equalsIgnoreCase(p.status()) ? Project.Status.ARCHIVED : Project.Status.IN_PROGRESS;
+            Project project = createProject(user, area, p.name(), status, start, due, p.plannedHours());
+            projectsByName.put(p.name(), project);
+        }
+        List<Project> projects = new ArrayList<>(projectsByName.values());
+
+        // 4. Delos from delosSample — created without a Project link (matches the declarative schema)
+        DemoProfile.DelosSample sample = profile.delosSample();
+        List<Delo> doneDelos = createDelos(user, sample != null ? sample.done() : null);
+        List<Delo> plannedDelos = createDelos(user, sample != null ? sample.planned() : null);
+        List<Delo> backlogDelos = createDelos(user, sample != null ? sample.backlog() : null);
+        List<Delo> allDelos = new ArrayList<>();
+        allDelos.addAll(doneDelos);
+        allDelos.addAll(plannedDelos);
+        allDelos.addAll(backlogDelos);
+
+        // 5. Time entries: history window ending today (today filled partially)
+        int historyDays = profile.timeEntriesHistoryDays() != null ? profile.timeEntriesHistoryDays() : DEFAULT_HISTORY_DAYS;
+        generateTimeEntries(user, doneDelos, plannedDelos, today, zone, random, historyDays);
+
+        // 6. Goals with weekly budgets and an optional metric
+        generateGoals(user, profile.goals(), today, random);
+
+        // 7. Synergies: Project -> LifeSphere, resolved via the profile's area->sphere labels
+        generateSynergies(user, profile.synergy(), projectsByName, sphereLabelByAreaName, spheres, random);
+
+        // 8. Ideas (Банк идей)
+        generateIdeas(user, profile.ideas());
+
+        // 9. Notes (at least one фromAgent=true per profile content)
+        generateNotes(user, profile.notes(), projects, allDelos, random);
+
+        // 10. Project dependency (at least 1 when >=2 projects)
         generateProjectDependencies(user, projects);
-        
-        // 12. Backlog items (current week)
-        generateBacklogItems(user, delos, today, random);
-        
-        // 13. Routines (2-3 with schedules)
-        generateRoutines(user, areas, today, zone, random);
+
+        // 11. Backlog items — one per backlog Дело
+        generateBacklogItems(user, backlogDelos, today, random);
+
+        // 12. Routines (Рутины) with weekly schedules parsed from the profile's rrule
+        generateRoutines(user, profile.routines(), random);
+    }
+
+    private <T> List<T> safe(List<T> list) {
+        return list != null ? list : List.of();
     }
 
     private LifeArea createLifeArea(User user, String name, int sortOrder, String color) {
@@ -183,35 +188,33 @@ public class DemoFixtureGenerator {
         return lifeAreaRepository.save(area);
     }
 
-    private Project createProject(User user, LifeArea lifeArea, Project parent, 
-                                  String title, Project.Status status, 
-                                  LocalDate startDate, LocalDate endDate, 
-                                  BigDecimal totalPlanHours, Project.PlanDistribution planDistribution) {
+    private Project createProject(User user, LifeArea lifeArea, String title, Project.Status status,
+                                  LocalDate startDate, LocalDate endDate, BigDecimal totalPlanHours) {
         Project project = Project.builder()
                 .user(user)
                 .lifeArea(lifeArea)
-                .parent(parent)
                 .title(title)
                 .status(status)
                 .description("Демо-проект: " + title)
                 .startDate(startDate)
                 .endDate(endDate)
                 .totalPlanHours(totalPlanHours)
-                .planDistribution(planDistribution)
+                .planDistribution(totalPlanHours != null ? Project.PlanDistribution.EVEN_WEEKDAYS : Project.PlanDistribution.NONE)
                 .planFrozenAt(LocalDate.now().with(java.time.temporal.TemporalAdjusters.firstDayOfMonth()))
                 .build();
         return projectRepository.save(project);
     }
 
-    private Delo createDelo(User user, String title, Project project, String description,
-                            LocalTime startTime, LocalTime endTime) {
-        Delo delo = Delo.builder()
-                .user(user)
-                .title(title)
-                .description(description)
-                .executionMode(Delo.ExecutionMode.SELF)
-                .build();
-        return deloRepository.save(delo);
+    private List<Delo> createDelos(User user, List<String> titles) {
+        List<Delo> out = new ArrayList<>();
+        for (String title : safe(titles)) {
+            out.add(deloRepository.save(Delo.builder()
+                    .user(user)
+                    .title(title)
+                    .executionMode(Delo.ExecutionMode.SELF)
+                    .build()));
+        }
+        return out;
     }
 
     private Delo getOrCreateSleepDelo(User user) {
@@ -224,16 +227,18 @@ public class DemoFixtureGenerator {
                         .build()));
     }
 
-    private void generateTimeEntries(User user, List<Delo> delos, LocalDate today, ZoneId zone, Random random) {
+    private void generateTimeEntries(User user, List<Delo> doneDelos, List<Delo> plannedDelos,
+                                     LocalDate today, ZoneId zone, Random random, int historyDays) {
         LocalTime nightStart = user.getNightStart();
-        LocalTime dayEnd = user.getDayEnd();
         LocalTime defaultSleepEnd = user.getDefaultSleepEnd();
 
         // Get or create sleep delo
         Delo sleepDelo = getOrCreateSleepDelo(user);
 
-        // Generate for last 14 days
-        for (int dayOffset = -13; dayOffset <= 0; dayOffset++) {
+        List<Delo> pastPool = !doneDelos.isEmpty() ? doneDelos : plannedDelos;
+        List<Delo> todayPool = !plannedDelos.isEmpty() ? plannedDelos : doneDelos;
+
+        for (int dayOffset = -(historyDays - 1); dayOffset <= 0; dayOffset++) {
             LocalDate date = today.plusDays(dayOffset);
             boolean isToday = (dayOffset == 0);
             boolean isWeekend = date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY;
@@ -254,42 +259,46 @@ public class DemoFixtureGenerator {
                     .endAt(sleepEnd)
                     .status(TimeEntry.Status.DONE)
                     .build());
-            
-            // Generate work/personal entries
-            List<Delo> availableDelos = new ArrayList<>(delos);
+
+            List<Delo> pool = isToday ? todayPool : pastPool;
+            if (pool.isEmpty()) {
+                continue;
+            }
+
             // Shuffle deterministically
+            List<Delo> availableDelos = new ArrayList<>(pool);
             for (int i = availableDelos.size() - 1; i > 0; i--) {
                 int j = random.nextInt(i + 1);
                 var temp = availableDelos.get(i);
                 availableDelos.set(i, availableDelos.get(j));
                 availableDelos.set(j, temp);
             }
-            
+
             double accumulatedHours = 0;
             LocalTime currentTime = defaultSleepEnd;
-            
+
             for (Delo delo : availableDelos) {
                 if (accumulatedHours >= targetHours) break;
-                
+
                 // Skip if not today and we've filled enough
                 if (isToday && currentTime.isAfter(LocalTime.now(zone).minusMinutes(15))) {
                     break; // Don't fill future slots for today
                 }
-                
+
                 int durationMinutes = 15 * (1 + random.nextInt(8)); // 15-120 min
                 double durationHours = durationMinutes / 60.0;
-                
+
                 if (accumulatedHours + durationHours > targetHours) {
                     durationHours = targetHours - accumulatedHours;
                     durationMinutes = (int) (durationHours * 60);
                     durationMinutes = (durationMinutes / 15) * 15; // round to 15 min
                 }
-                
+
                 if (durationMinutes < 15) break;
-                
+
                 LocalDateTime start = date.atTime(currentTime);
                 LocalDateTime end = start.plusMinutes(durationMinutes);
-                
+
                 timeEntryRepository.save(TimeEntry.builder()
                         .user(user)
                         .delo(delo)
@@ -297,231 +306,151 @@ public class DemoFixtureGenerator {
                         .endAt(end)
                         .status(isToday ? TimeEntry.Status.PLANNED : TimeEntry.Status.DONE)
                         .build());
-                
+
                 currentTime = end.toLocalTime().plusMinutes(15); // 15 min gap
                 accumulatedHours += durationHours;
             }
         }
     }
 
-    private void generateWeekPlans(User user, List<Project> projects, LocalDate today, Random random) {
+    private void generateGoals(User user, List<DemoProfile.Goal> goals, LocalDate today, Random random) {
+        if (goals == null || goals.isEmpty()) {
+            return;
+        }
         WeekFields wf = WeekFields.ISO;
-        
-        // Current week
-        LocalDate weekStart = today.with(wf.dayOfWeek(), 1); // Monday
-        for (Project project : projects) {
-            if (project.getTotalPlanHours() != null && project.getTotalPlanHours().compareTo(BigDecimal.ZERO) > 0) {
-                // Distribute plan across week days
-                for (int d = 0; d < 7; d++) {
-                    LocalDate day = weekStart.plusDays(d);
-                    double dayPlan = project.getTotalPlanHours().doubleValue() / 5.0; // 5 work days
-                    if (day.getDayOfWeek() == DayOfWeek.SATURDAY || day.getDayOfWeek() == DayOfWeek.SUNDAY) {
-                        dayPlan *= 0.3;
-                    }
-                    if (dayPlan > 0.25) {
-                        // In real implementation, this would create WeekPlanEntry
-                        // For now we just ensure goals have weekly budgets
-                    }
-                }
-            }
-        }
-        
-        // Next week
-        weekStart = weekStart.plusWeeks(1);
-        // Same logic for next week
-    }
+        int priority = 1;
+        for (DemoProfile.Goal g : goals) {
+            Goal goal = Goal.builder()
+                    .user(user)
+                    .title(g.name())
+                    .priority(priority++)
+                    .archived(false)
+                    .build();
+            goal = goalRepository.save(goal);
 
-    private void generateGoals(User user, List<Project> projects, LocalDate today, ZoneId zone, Random random) {
-        Goal goal1 = Goal.builder()
-                .user(user)
-                .title("Запустить MVP продукта")
-                .description("Доступный к продакшену MVP к концу квартала")
-                .priority(1)
-                .archived(false)
-                .build();
-        goal1 = goalRepository.save(goal1);
-        
-        Goal goal2 = Goal.builder()
-                .user(user)
-                .title("Научиться Java Spring Boot")
-                .description("Пройти курс и написать пет-проект")
-                .priority(2)
-                .archived(false)
-                .build();
-        goal2 = goalRepository.save(goal2);
-        
-        Goal goal3 = Goal.builder()
-                .user(user)
-                .title("Улучшить физическую форму")
-                .description("Бегать 3 раза в неделю, силовые 2 раза")
-                .priority(3)
-                .archived(false)
-                .build();
-        goal3 = goalRepository.save(goal3);
-        
-        // Link goals to projects
-        GoalProject gp1 = new GoalProject();
-        gp1.setId(new GoalProjectId(goal1.getId(), projects.get(0).getId()));
-        gp1.setGoal(goal1);
-        gp1.setProject(projects.get(0));
-        goalProjectRepository.save(gp1);
-        
-        GoalProject gp2 = new GoalProject();
-        gp2.setId(new GoalProjectId(goal1.getId(), projects.get(1).getId()));
-        gp2.setGoal(goal1);
-        gp2.setProject(projects.get(1));
-        goalProjectRepository.save(gp2);
-        
-        GoalProject gp3 = new GoalProject();
-        gp3.setId(new GoalProjectId(goal2.getId(), projects.get(2).getId()));
-        gp3.setGoal(goal2);
-        gp3.setProject(projects.get(2));
-        goalProjectRepository.save(gp3);
-        
-        GoalProject gp4 = new GoalProject();
-        gp4.setId(new GoalProjectId(goal3.getId(), projects.get(3).getId()));
-        gp4.setGoal(goal3);
-        gp4.setProject(projects.get(3));
-        goalProjectRepository.save(gp4);
-        
-        // Weekly budgets for current and next 3 weeks
-        WeekFields wf = WeekFields.ISO;
-        for (int w = 0; w < 4; w++) {
-            LocalDate weekStart = today.with(wf.dayOfWeek(), 1).plusWeeks(w);
-            int isoYear = weekStart.get(wf.weekBasedYear());
-            int isoWeek = weekStart.get(wf.weekOfWeekBasedYear());
-            
-            goalWeekBudgetRepository.save(GoalWeekBudget.builder()
-                    .goal(goal1)
-                    .isoYear(isoYear)
-                    .isoWeek(isoWeek)
-                    .hours(BigDecimal.valueOf(10 + random.nextInt(5)))
-                    .build());
-            goalWeekBudgetRepository.save(GoalWeekBudget.builder()
-                    .goal(goal2)
-                    .isoYear(isoYear)
-                    .isoWeek(isoWeek)
-                    .hours(BigDecimal.valueOf(5 + random.nextInt(3)))
-                    .build());
-            goalWeekBudgetRepository.save(GoalWeekBudget.builder()
-                    .goal(goal3)
-                    .isoYear(isoYear)
-                    .isoWeek(isoWeek)
-                    .hours(BigDecimal.valueOf(3 + random.nextInt(2)))
-                    .build());
-        }
-        
-        // Metrics
-        goalMetricRepository.save(GoalMetric.builder()
-                .goal(goal1)
-                .kind("MILESTONE")
-                .value(BigDecimal.ZERO)
-                .targetValue(BigDecimal.ONE)
-                .at(LocalDateTime.now())
-                .build());
-        goalMetricRepository.save(GoalMetric.builder()
-                .goal(goal2)
-                .kind("PROGRESS")
-                .value(BigDecimal.valueOf(30))
-                .targetValue(BigDecimal.valueOf(100))
-                .at(LocalDateTime.now())
-                .build());
-        goalMetricRepository.save(GoalMetric.builder()
-                .goal(goal3)
-                .kind("COUNT")
-                .value(BigDecimal.valueOf(12))
-                .targetValue(BigDecimal.valueOf(20))
-                .at(LocalDateTime.now())
-                .build());
-    }
-
-    private void generateSynergies(User user, List<Project> projects, List<LifeSphere> spheres, Random random) {
-        List<Synergy.Impact> impacts = List.of(Synergy.Impact.POSITIVE, Synergy.Impact.NEUTRAL, Synergy.Impact.NEGATIVE);
-        
-        // Project -> Sphere synergies
-        for (Project project : projects) {
-            if (random.nextBoolean()) {
-                LifeSphere sphere = spheres.get(random.nextInt(spheres.size()));
-                if (!synergyRepository.existsByUserAndProjectAndSphere(user, project, sphere)) {
-                    synergyRepository.save(Synergy.builder()
-                            .user(user)
-                            .project(project)
-                            .sphere(sphere)
-                            .impact(impacts.get(random.nextInt(impacts.size())))
-                            .build());
-                }
+            BigDecimal weeklyHours = g.weeklyBudgetHours() != null ? g.weeklyBudgetHours() : BigDecimal.valueOf(5);
+            for (int w = 0; w < 4; w++) {
+                LocalDate weekStart = today.with(wf.dayOfWeek(), 1).plusWeeks(w);
+                int isoYear = weekStart.get(wf.weekBasedYear());
+                int isoWeek = weekStart.get(wf.weekOfWeekBasedYear());
+                goalWeekBudgetRepository.save(GoalWeekBudget.builder()
+                        .goal(goal)
+                        .isoYear(isoYear)
+                        .isoWeek(isoWeek)
+                        .hours(weeklyHours.setScale(2, RoundingMode.HALF_UP))
+                        .build());
             }
-        }
-        
-        // Additional synergies
-        for (int i = 0; i < 2; i++) {
-            Project project = projects.get(random.nextInt(projects.size()));
-            LifeSphere sphere = spheres.get(random.nextInt(spheres.size()));
-            if (!synergyRepository.existsByUserAndProjectAndSphere(user, project, sphere)) {
-                synergyRepository.save(Synergy.builder()
-                        .user(user)
-                        .project(project)
-                        .sphere(sphere)
-                        .impact(impacts.get(random.nextInt(impacts.size())))
+
+            if (g.metric() != null && !g.metric().isBlank()) {
+                goalMetricRepository.save(GoalMetric.builder()
+                        .goal(goal)
+                        .kind(g.metric())
+                        .value(BigDecimal.ZERO)
+                        .targetValue(BigDecimal.valueOf(100))
+                        .at(LocalDateTime.now())
                         .build());
             }
         }
     }
 
-    private void generateIdeas(User user, LocalDate today, Random random) {
-        String[] ideaTitles = {
-                "Автоматизация деплоя через GitHub Actions",
-                "Внедрение интеграционных тестов",
-                "Миграция на Java 21 LTS",
-                "Добавление темной темы в UI"
+    private void generateSynergies(User user, List<DemoProfile.Synergy> synergyEntries,
+                                   Map<String, Project> projectsByName, Map<String, String> sphereLabelByAreaName,
+                                   List<LifeSphere> spheres, Random random) {
+        if (synergyEntries == null || spheres.isEmpty()) {
+            return;
+        }
+        for (DemoProfile.Synergy s : synergyEntries) {
+            Project project = projectsByName.get(s.project());
+            if (project == null) {
+                continue; // profile referenced an unknown project name — skip defensively
+            }
+            String desiredSphereName = sphereLabelByAreaName.get(s.area());
+            LifeSphere sphere = resolveSphere(desiredSphereName, spheres, random);
+            if (synergyRepository.existsByUserAndProjectAndSphere(user, project, sphere)) {
+                continue;
+            }
+            synergyRepository.save(Synergy.builder()
+                    .user(user)
+                    .project(project)
+                    .sphere(sphere)
+                    .impact(mapWeightToImpact(s.weight()))
+                    .build());
+        }
+    }
+
+    /**
+     * The profile's area {@code sphere} label is descriptive content, not guaranteed to match
+     * one of the 9 canonical seeded Сферы жизни. Resolve by exact name when possible; otherwise
+     * fall back to a deterministic pick so Synergy stays non-empty.
+     */
+    private LifeSphere resolveSphere(String desiredName, List<LifeSphere> spheres, Random random) {
+        if (desiredName != null) {
+            for (LifeSphere sp : spheres) {
+                if (sp.getName().equalsIgnoreCase(desiredName)) {
+                    return sp;
+                }
+            }
+        }
+        int idx = Math.floorMod(desiredName != null ? desiredName.hashCode() : random.nextInt(), spheres.size());
+        return spheres.get(idx);
+    }
+
+    private Synergy.Impact mapWeightToImpact(String weight) {
+        if (weight == null) {
+            return Synergy.Impact.NEUTRAL;
+        }
+        return switch (weight.toLowerCase(Locale.ROOT)) {
+            case "high", "medium" -> Synergy.Impact.POSITIVE;
+            default -> Synergy.Impact.NEUTRAL;
         };
-        Idea.Status[] statuses = {Idea.Status.BANK, Idea.Status.IN_WORK, Idea.Status.IN_WORK, Idea.Status.ARCHIVED};
-        
-        for (int i = 0; i < 4; i++) {
+    }
+
+    private void generateIdeas(User user, List<String> ideas) {
+        if (ideas == null || ideas.isEmpty()) {
+            return;
+        }
+        Idea.Status[] cycle = {Idea.Status.BANK, Idea.Status.IN_WORK, Idea.Status.ARCHIVED};
+        for (int i = 0; i < ideas.size(); i++) {
+            String title = ideas.get(i);
             Idea idea = Idea.builder()
                     .user(user)
-                    .title(ideaTitles[i])
-                    .description("Идея для улучшения: " + ideaTitles[i].toLowerCase())
+                    .title(title)
+                    .description("Идея: " + title.toLowerCase(Locale.ROOT))
                     .category(Idea.Category.PERSONAL)
-                    .status(statuses[i])
+                    .status(cycle[i % cycle.length])
                     .build();
             ideaRepository.save(idea);
         }
     }
 
-    private void generateNotes(User user, List<Project> projects, List<Delo> delos, LocalDate today, Random random) {
-        // User note
-        noteRepository.save(Note.builder()
-                .user(user)
-                .project(projects.get(0))
-                .author(Note.Author.USER)
-                .body("Важное напоминание: согласовать макеты с дизайнером до пятницы")
-                .tags(new String[]{"важное", "дизайн"})
-                .build());
-        
-        // Agent note
-        noteRepository.save(Note.builder()
-                .user(user)
-                .project(projects.get(1))
-                .author(Note.Author.AGENT)
-                .body("Агент предложил: рассмотреть кэширование ответа API для ускорения отдачи списка проектов")
-                .tags(new String[]{"агент", "оптимизация"})
-                .build());
-        
-        // Deli-bound note
-        Delo delo = delos.get(random.nextInt(delos.size()));
-        noteRepository.save(Note.builder()
-                .user(user)
-                .delo(delo)
-                .author(Note.Author.USER)
-                .body("Идея на будущее: добавить фильтр по тегам в бэклог")
-                .tags(new String[]{"идея", "бэклог"})
-                .build());
+    private void generateNotes(User user, List<DemoProfile.Note> notes, List<Project> projects, List<Delo> delos, Random random) {
+        if (notes == null || notes.isEmpty()) {
+            return;
+        }
+        int projectIdx = 0;
+        for (DemoProfile.Note n : notes) {
+            Note.Author author = Boolean.TRUE.equals(n.fromAgent()) ? Note.Author.AGENT : Note.Author.USER;
+            String body = n.title() != null && !n.title().isBlank() ? n.title() + ". " + n.body() : n.body();
+            Note.NoteBuilder builder = Note.builder()
+                    .user(user)
+                    .author(author)
+                    .body(body)
+                    .tags(author == Note.Author.AGENT ? new String[]{"агент"} : new String[0]);
+
+            if (!projects.isEmpty()) {
+                builder.project(projects.get(projectIdx % projects.size()));
+                projectIdx++;
+            } else if (!delos.isEmpty()) {
+                builder.delo(delos.get(random.nextInt(delos.size())));
+            } else {
+                continue; // cannot satisfy the exactly-one-parent constraint
+            }
+            noteRepository.save(builder.build());
+        }
     }
 
     private void generateProjectDependencies(User user, List<Project> projects) {
         if (projects.size() >= 2) {
-            // API development blocks redesign deployment
             projectDependencyRepository.save(ProjectDependency.builder()
                     .user(user)
                     .blocker(projects.get(1))
@@ -530,12 +459,15 @@ public class DemoFixtureGenerator {
         }
     }
 
-    private void generateBacklogItems(User user, List<Delo> delos, LocalDate today, Random random) {
+    private void generateBacklogItems(User user, List<Delo> backlogDelos, LocalDate today, Random random) {
+        if (backlogDelos.isEmpty()) {
+            return;
+        }
         WeekFields wf = WeekFields.ISO;
         String currentWeek = today.get(wf.weekBasedYear()) + "-W" + String.format("%02d", today.get(wf.weekOfWeekBasedYear()));
-        
-        for (int i = 0; i < 5; i++) {
-            Delo delo = delos.get(random.nextInt(delos.size()));
+
+        int position = 0;
+        for (Delo delo : backlogDelos) {
             if (backlogItemRepository.findByUserAndDeloIdAndScopeAndPeriodId(user, delo.getId(), BacklogItem.Scope.WEEK, currentWeek).isEmpty()) {
                 backlogItemRepository.save(BacklogItem.builder()
                         .user(user)
@@ -543,71 +475,81 @@ public class DemoFixtureGenerator {
                         .scope(BacklogItem.Scope.WEEK)
                         .periodId(currentWeek)
                         .plannedHours(BigDecimal.valueOf(0.5 + random.nextDouble() * 2.0))
-                        .position(i)
+                        .position(position++)
                         .build());
             }
         }
     }
 
-    private void generateRoutines(User user, List<LifeArea> areas, LocalDate today, ZoneId zone, Random random) {
-        Routine running = Routine.builder()
-                .user(user)
-                .title("Утренняя пробежка")
-                .description("Легкий бег 30-40 мин")
-                .weeklyHours(BigDecimal.valueOf(2.5))
-                .color("#EF4444")
-                .icon("🏃")
-                .archived(false)
-                .build();
-        running = routineRepository.save(running);
-        
-        routineScheduleRepository.save(RoutineSchedule.builder()
-                .routine(running)
-                .dayOfWeek(DayOfWeek.MONDAY)
-                .startTime(LocalTime.of(7, 0))
-                .endTime(LocalTime.of(7, 45))
-                .build());
-        routineScheduleRepository.save(RoutineSchedule.builder()
-                .routine(running)
-                .dayOfWeek(DayOfWeek.WEDNESDAY)
-                .startTime(LocalTime.of(7, 0))
-                .endTime(LocalTime.of(7, 45))
-                .build());
-        routineScheduleRepository.save(RoutineSchedule.builder()
-                .routine(running)
-                .dayOfWeek(DayOfWeek.FRIDAY)
-                .startTime(LocalTime.of(7, 0))
-                .endTime(LocalTime.of(7, 45))
-                .build());
-        
-        Routine learning = Routine.builder()
-                .user(user)
-                .title("Изучение Java")
-                .description("Курс + практика")
-                .weeklyHours(BigDecimal.valueOf(4.0))
-                .color("#3B82F6")
-                .icon("☕")
-                .archived(false)
-                .build();
-        learning = routineRepository.save(learning);
-        
-        routineScheduleRepository.save(RoutineSchedule.builder()
-                .routine(learning)
-                .dayOfWeek(DayOfWeek.TUESDAY)
-                .startTime(LocalTime.of(19, 0))
-                .endTime(LocalTime.of(21, 0))
-                .build());
-        routineScheduleRepository.save(RoutineSchedule.builder()
-                .routine(learning)
-                .dayOfWeek(DayOfWeek.THURSDAY)
-                .startTime(LocalTime.of(19, 0))
-                .endTime(LocalTime.of(21, 0))
-                .build());
-        routineScheduleRepository.save(RoutineSchedule.builder()
-                .routine(learning)
-                .dayOfWeek(DayOfWeek.SATURDAY)
-                .startTime(LocalTime.of(10, 0))
-                .endTime(LocalTime.of(12, 0))
-                .build());
+    private void generateRoutines(User user, List<DemoProfile.Routine> routines, Random random) {
+        if (routines == null || routines.isEmpty()) {
+            return;
+        }
+        int idx = 0;
+        for (DemoProfile.Routine r : routines) {
+            List<DayOfWeek> weekdays = parseByDay(r.rrule());
+            int minutes = r.durationMinutes() != null ? r.durationMinutes() : 60;
+            BigDecimal weeklyHours = BigDecimal.valueOf(weekdays.size() * minutes / 60.0).setScale(2, RoundingMode.HALF_UP);
+
+            Routine routine = Routine.builder()
+                    .user(user)
+                    .title(r.name())
+                    .weeklyHours(weeklyHours)
+                    .color(ROUTINE_COLORS[idx % ROUTINE_COLORS.length])
+                    .archived(false)
+                    .build();
+            routine = routineRepository.save(routine);
+
+            LocalTime start = LocalTime.of(19, 0);
+            LocalTime end = start.plusMinutes(minutes);
+            for (DayOfWeek day : weekdays) {
+                routineScheduleRepository.save(RoutineSchedule.builder()
+                        .routine(routine)
+                        .dayOfWeek(day)
+                        .startTime(start)
+                        .endTime(end)
+                        .build());
+            }
+            idx++;
+        }
+    }
+
+    /** Minimal RFC5545-style BYDAY parser: {@code "FREQ=WEEKLY;BYDAY=TU,TH"} -> [TUESDAY, THURSDAY]. */
+    private List<DayOfWeek> parseByDay(String rrule) {
+        if (rrule == null || rrule.isBlank()) {
+            return List.of();
+        }
+        Map<String, String> parts = new HashMap<>();
+        for (String token : rrule.split(";")) {
+            String[] kv = token.split("=", 2);
+            if (kv.length == 2) {
+                parts.put(kv[0].trim().toUpperCase(Locale.ROOT), kv[1].trim());
+            }
+        }
+        String byday = parts.get("BYDAY");
+        if (byday == null || byday.isBlank()) {
+            return List.of();
+        }
+        List<DayOfWeek> days = new ArrayList<>();
+        for (String code : byday.split(",")) {
+            DayOfWeek day = mapByDayCode(code.trim().toUpperCase(Locale.ROOT));
+            if (day != null) {
+                days.add(day);
+            }
+        }
+        return days;
+    }
+
+    private DayOfWeek mapByDayCode(String code) {
+        return switch (code) {
+            case "MO" -> DayOfWeek.MONDAY;
+            case "TU" -> DayOfWeek.TUESDAY;
+            case "WE" -> DayOfWeek.WEDNESDAY;
+            case "TH" -> DayOfWeek.THURSDAY;
+            case "FR" -> DayOfWeek.FRIDAY;
+            case "SA" -> DayOfWeek.SATURDAY;
+            case "SU" -> DayOfWeek.SUNDAY;
+            default -> null;
+        };
     }
 }

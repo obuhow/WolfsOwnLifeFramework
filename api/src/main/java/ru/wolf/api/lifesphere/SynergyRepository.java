@@ -36,4 +36,6 @@ public interface SynergyRepository extends JpaRepository<Synergy, Long> {
 
     @Query("SELECT s FROM Synergy s WHERE s.user = :user AND s.id = :id")
     Optional<Synergy> findByUserAndId(@Param("user") User user, @Param("id") Long id);
+
+    void deleteAllByUser(User user);
 }

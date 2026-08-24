@@ -15,4 +15,6 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
 
     @Query("select r from Routine r where r.user = :user and r.id = :id")
     Optional<Routine> findByUserAndId(@Param("user") User user, @Param("id") Long id);
+
+    void deleteAllByUser(User user);
 }

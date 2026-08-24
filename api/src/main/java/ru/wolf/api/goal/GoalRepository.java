@@ -21,4 +21,6 @@ public interface GoalRepository extends JpaRepository<Goal, Long> {
 
     @Query("SELECT COALESCE(MAX(g.priority), 0) FROM Goal g WHERE g.user = :user AND g.archived = false")
     int findMaxActivePriority(@Param("user") User user);
+
+    void deleteAllByUser(User user);
 }

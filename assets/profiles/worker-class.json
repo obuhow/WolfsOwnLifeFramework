@@ -1,0 +1,38 @@
+{
+  "slug": "worker-class",
+  "displayName": "Рабочий класс",
+  "weeklyHoursNorm": 15,
+  "timezone": "Europe/Moscow",
+  "areas": [
+    { "name": "Работа", "sphere": "Карьера" },
+    { "name": "Дом и быт", "sphere": "Здоровье" },
+    { "name": "Отношения", "sphere": "Семья" }
+  ],
+  "projects": [
+    { "name": "Ремонт кухни", "area": "Дом и быт", "plannedHours": 40, "startOffsetDays": -20, "dueOffsetDays": 25, "status": "IN_PROGRESS" },
+    { "name": "Курс английского до B2", "area": "Работа", "plannedHours": 60, "startOffsetDays": -30, "dueOffsetDays": 90, "status": "IN_PROGRESS" },
+    { "name": "Подготовка к отпуску", "area": "Отношения", "plannedHours": 10, "startOffsetDays": -5, "dueOffsetDays": 15, "status": "PLANNED" }
+  ],
+  "goals": [
+    { "name": "Сдать экзамен на B2", "weeklyBudgetHours": 5, "metric": "часы занятий в неделю" },
+    { "name": "Закончить ремонт до холодов", "weeklyBudgetHours": 6, "metric": "% выполненных задач ремонта" }
+  ],
+  "delosSample": {
+    "done": ["Отвёз старую мебель на утилизацию", "Занятие английским (урок 14)", "Позвонил мастеру по плитке"],
+    "planned": ["Забрать плитку со склада", "Занятие английским (урок 15)", "Собрать чемоданы"],
+    "backlog": ["Найти электрика на розетки", "Сравнить цены на билеты"]
+  },
+  "routines": [
+    { "name": "Занятие английским", "rrule": "FREQ=WEEKLY;BYDAY=TU,TH", "durationMinutes": 60 },
+    { "name": "Уборка выходного дня", "rrule": "FREQ=WEEKLY;BYDAY=SA", "durationMinutes": 90 }
+  ],
+  "timeEntriesHistoryDays": 30,
+  "ideas": ["Сделать тёплый пол на кухне позже", "Найти курсы по личным финансам"],
+  "notes": [
+    { "title": "Материалы по ремонту от агента", "body": "Подборка по укладке плитки — от фонового агента после Утреннего обхода.", "fromAgent": true }
+  ],
+  "synergy": [
+    { "project": "Ремонт кухни", "area": "Дом и быт", "weight": "high" },
+    { "project": "Курс английского до B2", "area": "Работа", "weight": "medium" }
+  ]
+}
