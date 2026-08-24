@@ -1,5 +1,6 @@
 package ru.wolf.api.onboarding;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -9,10 +10,13 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import ru.wolf.api.demo.DemoFixtureGenerator;
+import ru.wolf.api.demo.DemoProfile;
 import ru.wolf.api.goal.Goal;
 import ru.wolf.api.goal.GoalProject;
 import ru.wolf.api.goal.GoalProjectId;
@@ -27,6 +31,7 @@ import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -37,6 +42,7 @@ import java.util.Optional;
  * Onboarding wizard for new users: Project -> Goal -> Weekly Hours norm.
  * Each step uses existing domain APIs (projects, goals, user settings).
  * Completion sets onboardingCompletedAt timestamp.
+ * Also provides profile loading endpoint for demo onboarding (release 0.6).
  */
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -49,6 +55,8 @@ public class OnboardingController {
     private final GoalRepository goalRepository;
     private final GoalProjectRepository goalProjectRepository;
     private final GoalWeekBudgetRepository goalWeekBudgetRepository;
+    private final DemoFixtureGenerator demoFixtureGenerator;
+    private final ObjectMapper objectMapper;
 
     /**
      * Step 1: Create first project.
@@ -220,6 +228,42 @@ public class OnboardingController {
         return today.get(wf.weekBasedYear()) + "-W" + String.format("%02d", today.get(wf.weekOfWeekBasedYear()));
     }
 
+    /**
+     * Load a demo profile by slug (worker-class | wise-freelancer | free-artist).
+     * Reads the JSON from assets/profiles/{slug}.json, deserializes to DemoProfile,
+     * and calls DemoFixtureGenerator.populate(user, profile).
+     * Returns the weeklyHoursNorm from the profile for frontend convenience.
+     */
+    @PostMapping("/load-profile")
+    @Transactional
+    public ResponseEntity<LoadProfileResponse> loadProfile(
+            Authentication authentication,
+            @Valid @RequestBody LoadProfileRequest request
+    ) {
+        User user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        String slug = request.getSlug().trim().toLowerCase(java.util.Locale.ROOT);
+        if (!List.of("worker-class", "wise-freelancer", "free-artist").contains(slug)) {
+            throw new IllegalArgumentException("Неизвестный профиль: " + slug);
+        }
+
+        String resourcePath = "profiles/" + slug + ".json";
+        try (InputStream is = new ClassPathResource(resourcePath).getInputStream()) {
+            DemoProfile profile = objectMapper.readValue(is, DemoProfile.class);
+            demoFixtureGenerator.populate(user, profile);
+            // Update user's timezone and weekly hours from the profile
+            user.setTimezone(profile.timezone() != null ? profile.timezone() : "Europe/Moscow");
+            if (profile.weeklyHoursNorm() != null) {
+                user.setAvailableWeeklyHours(profile.weeklyHoursNorm());
+            }
+            userRepository.save(user);
+            return ResponseEntity.ok(new LoadProfileResponse(true, profile.displayName(), profile.weeklyHoursNorm()));
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Не удалось загрузить профиль: " + slug, e);
+        }
+    }
+
     // --- DTOs ---
 
     @Data @NoArgsConstructor @AllArgsConstructor
@@ -278,5 +322,19 @@ public class OnboardingController {
     public static class StatusResponse {
         private boolean onboardingCompleted;
         private Instant completedAt;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class LoadProfileRequest {
+        @NotBlank
+        @Size(max = 50)
+        private String slug;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class LoadProfileResponse {
+        private boolean success;
+        private String displayName;
+        private BigDecimal weeklyHoursNorm;
     }
 }

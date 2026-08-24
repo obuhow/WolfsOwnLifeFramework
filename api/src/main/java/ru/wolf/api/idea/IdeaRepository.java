@@ -34,4 +34,6 @@ public interface IdeaRepository extends JpaRepository<Idea, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Idea i WHERE i.user = :user AND i.id = :id")
     Optional<Idea> findByUserAndIdForUpdate(@Param("user") User user, @Param("id") Long id);
+
+    void deleteAllByUser(User user);
 }

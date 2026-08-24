@@ -57,4 +57,6 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             WHERE p.user = :user AND LOWER(p.title) = LOWER(:title)
             """)
     Optional<Project> findByUserAndTitleIgnoreCase(@Param("user") User user, @Param("title") String title);
+
+    void deleteAllByUser(User user);
 }

@@ -73,4 +73,6 @@ public interface NoteRepository extends JpaRepository<Note, Long> {
             @Param("from") Instant from,
             @Param("to") Instant to
     );
+
+    void deleteAllByUser(User user);
 }

@@ -38,4 +38,6 @@ public interface ProjectDependencyRepository extends JpaRepository<ProjectDepend
     List<ProjectDependency> findAllForUser(@Param("user") User user);
 
     boolean existsByUserAndBlockerIdAndBlockedId(User user, Long blockerId, Long blockedId);
+
+    void deleteAllByUser(User user);
 }

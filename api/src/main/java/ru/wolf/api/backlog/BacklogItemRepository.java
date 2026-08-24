@@ -15,4 +15,6 @@ public interface BacklogItemRepository extends JpaRepository<BacklogItem, Long> 
     
     @Query("SELECT b FROM BacklogItem b WHERE b.user = :user AND b.id = :id")
     Optional<BacklogItem> findByUserAndId(@Param("user") User user, @Param("id") Long id);
+
+    void deleteAllByUser(User user);
 }
