@@ -23,9 +23,9 @@ async function register() {
     }
     const data = await res.json()
     localStorage.setItem('wolf_token', data.token)
-    // Тикет 08 задеплоен только на бэкенде — фронтенд /onboarding ещё не существует,
-    // поэтому редирект идёт сразу на /today (см. поведение тикета 02/10 при недоступности 08).
-    window.location.hash = '#/today'
+    // Релиз 0.6, тикет 02: после регистрации по инвайту — строго на экран
+    // выбора демо-профиля, а не на старый мастер /onboarding или /today.
+    window.location.hash = '#/onboarding/profile'
     window.location.reload()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
