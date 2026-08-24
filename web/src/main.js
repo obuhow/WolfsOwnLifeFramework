@@ -28,6 +28,10 @@ import DataSyncView from './components/DataSyncView.vue'
 import BacklogView from './components/BacklogView.vue'
 import SpheresView from './components/SpheresView.vue'
 import PlaceholderView from './components/PlaceholderView.vue'
+import DocsIndexView from './components/docs/DocsIndexView.vue'
+import ManifestoView from './components/docs/ManifestoView.vue'
+import ScenariosView from './components/docs/ScenariosView.vue'
+import SelfHostingView from './components/docs/SelfHostingView.vue'
 
 const routes = [
   { path: '/', redirect: '/today' },
@@ -76,12 +80,11 @@ const routes = [
   { path: '/admin/invites', component: AdminInvitesView, meta: { requiresAuth: true } },
   { path: '/import/xlsx', component: XlsxImportView, meta: { requiresAuth: true } },
   { path: '/data-sync', component: DataSyncView, meta: { requiresAuth: true } },
-  // Документация — заглушка; полная реализация в тикете 02 релиза 0.5
-  { path: '/docs', component: PlaceholderView, meta: { requiresAuth: true, title: 'Документация', note: 'Манифест, сценарии использования и технические инструкции', owner: '02', sections: [
-    { title: 'Манифест Siberian Wolf', empty: 'Раздел подключается в тикете 02.' },
-    { title: 'Сценарии использования', empty: 'Раздел подключается в тикете 02.' },
-    { title: 'Технические инструкции', empty: 'Раздел подключается в тикете 02.' }
-  ] } },
+  // Документация — доступна без аутентификации (см. тикет 02 релиза 0.5)
+  { path: '/docs', component: DocsIndexView, meta: { public: true } },
+  { path: '/docs/manifesto', component: ManifestoView, meta: { public: true } },
+  { path: '/docs/scenarios', component: ScenariosView, meta: { public: true } },
+  { path: '/docs/self-hosting', component: SelfHostingView, meta: { public: true } },
 ]
 
 const router = createRouter({
