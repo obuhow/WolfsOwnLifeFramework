@@ -8,62 +8,87 @@ const route = useRoute()
 const token = ref(localStorage.getItem('wolf_token') || '')
 const username = ref('')
 
-// --- Navigation model (approved Release 0.3 IA) ---------------------------
+// --- Navigation model (Release 0.5 IA — see wolf-life-os skill reference
+// navigation-ia-05-supersession.md and .scratch/wayfinder-releases-05-07/issues/04) ---
 const NAV = [
-  { kind: 'link', label: 'Сегодня', to: '/today' },
+  { kind: 'link', label: 'Утренний обход', to: '/morning' },
+  { kind: 'link', label: 'Ежедневник', to: '/calendar' },
   {
-    kind: 'group', key: 'calendar', label: 'Календарь',
-    children: [
-      { label: 'Неделя', to: '/calendar' },
-      { label: 'Месяц', to: '/calendar/month' },
-    ],
-  },
-  {
-    kind: 'group', key: 'planning', label: 'Планирование',
-    children: [
-      { label: 'Диаграмма Ганта', to: '/planning' },
-      { label: 'Бэклог', to: '/planning/backlog' },
-    ],
-  },
-  {
-    kind: 'group', key: 'projects', label: 'Управление проектами',
-    children: [
-      { label: 'Области жизни', to: '/life-areas' },
-      { label: 'Проекты', to: '/projects' },
-      { label: 'Дела', to: '/delos' },
-      { label: 'Банк идей', to: '/ideas' },
-      { label: 'Импорт XLSX', to: '/import/xlsx' },
-      { label: 'Синхронизация данных', to: '/data-sync' },
+    kind: 'group', key: 'delo-management', label: 'Управление делами',
+    subgroups: [
+      {
+        title: 'Планирование',
+        children: [
+          { label: 'Дорожная карта', to: '/roadmap' },
+          { label: 'План нагрузки', to: '/roadmap#load-plan' },
+          { label: 'Бэклог', to: '/backlog' },
+        ],
+      },
+      {
+        title: 'Сущности',
+        children: [
+          { label: 'Проекты', to: '/projects' },
+          { label: 'Рутины', to: '/routines' },
+          { label: 'Дела', to: '/delos' },
+          { label: 'Банк идей', to: '/ideas' },
+        ],
+      },
+      {
+        title: 'Аналитика',
+        children: [
+          { label: 'Статистика', to: '/stats' },
+          { label: 'Чек-лист', to: '/checklist' },
+        ],
+      },
     ],
   },
   {
     kind: 'group', key: 'flow', label: 'Управление потоком',
     children: [
+      { label: 'Области жизни', to: '/life-areas' },
       { label: 'Цели', to: '/goals' },
-      { label: 'Сферы жизни', to: '/spheres' },
-      { label: 'Синергия', to: '/synergy' },
-      { label: 'Утренний обход', to: '/morning' },
-      { label: 'Рутины', to: '/routines' },
-      { label: 'Заметки / LLM Wiki', to: '/notes' },
-      { label: 'Отчёт «Чек-лист»', to: '/reports/checklist' },
-      { label: 'Статистика', to: '/stats' },
+      { label: 'Диаграмма компетенций', to: '/competency' },
+      { label: 'Личная база знаний', to: '/knowledge' },
     ],
   },
-  { kind: 'link', label: 'Настройки', to: '/settings' },
+  { kind: 'link', label: 'Документация', to: '/docs' },
+  {
+    kind: 'group', key: 'settings', label: 'Настройки',
+    children: [
+      { label: 'Настройки', to: '/settings' },
+      { label: 'Импорт XLSX', to: '/import/xlsx' },
+      { label: 'Синхронизация данных', to: '/data-sync' },
+    ],
+  },
 ]
+
+// Flat list of every {label, to} pair, group children and subgroup children included.
+function flatChildren(item) {
+  if (item.kind === 'link') return []
+  if (item.children) return item.children
+  if (item.subgroups) return item.subgroups.flatMap((sg) => sg.children)
+  return []
+}
+
+// Anchor-aware match: '/roadmap#load-plan' is active whenever the path is /roadmap.
+function baseOf(to) {
+  const hashIdx = to.indexOf('#')
+  return hashIdx === -1 ? to : to.slice(0, hashIdx)
+}
 
 // Prefix map for active-state detection (detail routes highlight their parent link).
 function isChildActive(to) {
   const p = route.path
-  if (p === to) return true
+  const base = baseOf(to)
+  if (p === base) return true
   // Detail routes share the list prefix
   const prefixes = ['/projects', '/delos', '/goals', '/ideas']
-  if (prefixes.includes(to) && p.startsWith(to + '/')) return true
+  if (prefixes.includes(base) && p.startsWith(base + '/')) return true
   return false
 }
 
 function isGroupActive(group) {
-  return group.children.some((c) => isChildActive(c.to))
+  return flatChildren(group).some((c) => isChildActive(c.to))
 }
 
 function groupKeyForPath() {
@@ -215,7 +240,7 @@ onBeforeUnmount(() => {
     <div v-if="token" class="app-shell">
       <header class="app-header">
         <div class="header-inner">
-          <router-link to="/today" class="brand" aria-label="WOLF — Главная">
+          <router-link to="/morning" class="brand" aria-label="WOLF — Главная">
             <div class="brand-container">
               <div class="brand-logo">WOLF</div>
               <div class="brand-tagline">Система управления потоком</div>
@@ -253,17 +278,34 @@ onBeforeUnmount(() => {
                   v-show="openGroup === item.key"
                   :id="`grp-${item.key}`"
                   class="nav-submenu"
+                  :class="{ 'nav-submenu-grouped': !!item.subgroups }"
                   role="menu"
                 >
-                  <router-link
-                    v-for="child in item.children"
-                    :key="child.to"
-                    :to="child.to"
-                    class="nav-submenu-link"
-                    :class="{ active: isChildActive(child.to) }"
-                    role="menuitem"
-                    @click="closeGroups"
-                  >{{ child.label }}</router-link>
+                  <template v-if="item.subgroups">
+                    <div v-for="subgroup in item.subgroups" :key="subgroup.title" class="nav-subgroup">
+                      <div class="nav-subgroup-title">{{ subgroup.title }}</div>
+                      <router-link
+                        v-for="child in subgroup.children"
+                        :key="child.to"
+                        :to="child.to"
+                        class="nav-submenu-link"
+                        :class="{ active: isChildActive(child.to) }"
+                        role="menuitem"
+                        @click="closeGroups"
+                      >{{ child.label }}</router-link>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <router-link
+                      v-for="child in item.children"
+                      :key="child.to"
+                      :to="child.to"
+                      class="nav-submenu-link"
+                      :class="{ active: isChildActive(child.to) }"
+                      role="menuitem"
+                      @click="closeGroups"
+                    >{{ child.label }}</router-link>
+                  </template>
                 </div>
               </div>
             </template>
@@ -330,14 +372,29 @@ onBeforeUnmount(() => {
                     <span class="caret" aria-hidden="true">{{ expandedGroups[item.key] ? '▾' : '▸' }}</span>
                   </button>
                   <div v-show="expandedGroups[item.key]" class="drawer-submenu">
-                    <router-link
-                      v-for="child in item.children"
-                      :key="child.to"
-                      :to="child.to"
-                      class="drawer-submenu-link"
-                      :class="{ active: isChildActive(child.to) }"
-                      @click="onDrawerNavigate"
-                    >{{ child.label }}</router-link>
+                    <template v-if="item.subgroups">
+                      <div v-for="subgroup in item.subgroups" :key="subgroup.title" class="drawer-subgroup">
+                        <div class="drawer-subgroup-title">{{ subgroup.title }}</div>
+                        <router-link
+                          v-for="child in subgroup.children"
+                          :key="child.to"
+                          :to="child.to"
+                          class="drawer-submenu-link"
+                          :class="{ active: isChildActive(child.to) }"
+                          @click="onDrawerNavigate"
+                        >{{ child.label }}</router-link>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <router-link
+                        v-for="child in item.children"
+                        :key="child.to"
+                        :to="child.to"
+                        class="drawer-submenu-link"
+                        :class="{ active: isChildActive(child.to) }"
+                        @click="onDrawerNavigate"
+                      >{{ child.label }}</router-link>
+                    </template>
                   </div>
                 </div>
               </template>

@@ -288,7 +288,7 @@ onMounted(loadAll)
   <div class="gantt-page">
     <header class="page-header gantt-header">
       <div>
-        <h1>Диаграмма Ганта</h1>
+        <h1>Дорожная карта</h1>
         <p class="eyebrow">Планирование · план и факт по Проектам · {{ MODE_LABEL[hourAccountingMode] || hourAccountingMode }}</p>
       </div>
       <div class="gantt-toolbar">
@@ -344,7 +344,7 @@ onMounted(loadAll)
 
     <div v-if="loading && !projects.length" class="muted">Загрузка…</div>
 
-    <div v-else class="gantt-scroll" role="region" aria-label="Диаграмма Ганта, прокрутка по горизонтали" tabindex="0">
+    <div v-else class="gantt-scroll" role="region" aria-label="Дорожная карта, прокрутка по горизонтали" tabindex="0">
       <div
         v-if="weeks.length"
         class="gantt-grid"

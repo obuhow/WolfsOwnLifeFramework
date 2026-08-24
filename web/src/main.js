@@ -27,55 +27,73 @@ import ChecklistReportView from './components/ChecklistReportView.vue'
 import DataSyncView from './components/DataSyncView.vue'
 import BacklogView from './components/BacklogView.vue'
 import SpheresView from './components/SpheresView.vue'
-import SynergyView from './components/SynergyView.vue'
 import PlaceholderView from './components/PlaceholderView.vue'
 
 const routes = [
   { path: '/', redirect: '/today' },
   { path: '/login', component: LoginView, meta: { public: true } },
   { path: '/register', component: RegisterView, meta: { public: true } },
-  { path: '/today', component: TodayView, meta: { requiresAuth: true } },
+  // Утренний обход
   { path: '/morning', component: MorningView, meta: { requiresAuth: true } },
-  // Календарь
+  // Ежедневник: Неделя (осн.), Сегодня и Месяц — вкладки/deep links той же страницы
   { path: '/week', redirect: '/calendar' },
   { path: '/calendar', component: CalendarView, meta: { requiresAuth: true } },
   { path: '/calendar/month', redirect: { path: '/calendar', query: { view: 'month' } } },
-  // Планирование
-  { path: '/gantt', redirect: '/planning' },
-  { path: '/planning', component: PlanningView, meta: { requiresAuth: true } },
-  { path: '/planning/backlog', component: BacklogView, meta: { requiresAuth: true } },
-  // Управление проектами
-  { path: '/life-areas', component: LifeAreasView, meta: { requiresAuth: true } },
+  { path: '/today', component: TodayView, meta: { requiresAuth: true } },
+  // Управление делами · Планирование
+  { path: '/gantt', redirect: '/roadmap' },
+  { path: '/planning', redirect: '/roadmap' },
+  { path: '/roadmap', component: PlanningView, meta: { requiresAuth: true } },
+  { path: '/backlog', component: BacklogView, meta: { requiresAuth: true } },
+  { path: '/planning/backlog', redirect: '/backlog' },
+  // Управление делами · Сущности
   { path: '/projects', component: ProjectsView, meta: { requiresAuth: true } },
   { path: '/projects/:id', component: ProjectDetailView, meta: { requiresAuth: true } },
+  { path: '/routines', component: RoutinesView, meta: { requiresAuth: true } },
   { path: '/delos', component: DelosView, meta: { requiresAuth: true } },
   { path: '/delos/:id', component: DeloDetailView, meta: { requiresAuth: true } },
   { path: '/ideas', component: IdeasView, meta: { requiresAuth: true } },
   { path: '/ideas/:id', component: IdeaDetailView, meta: { requiresAuth: true } },
+  // Управление делами · Аналитика
+  { path: '/stats', component: WaveStatsView, meta: { requiresAuth: true } },
+  { path: '/checklist', component: ChecklistReportView, meta: { requiresAuth: true } },
+  { path: '/reports/checklist', redirect: '/checklist' },
   // Управление потоком
+  { path: '/life-areas', component: LifeAreasView, meta: { requiresAuth: true } },
   { path: '/goals', component: GoalsView, meta: { requiresAuth: true } },
   { path: '/goals/:id', component: GoalsView, meta: { requiresAuth: true } },
-  { path: '/spheres', component: SpheresView, meta: { requiresAuth: true } },
-  { path: '/synergy', component: SynergyView, meta: { requiresAuth: true } },
-  { path: '/notes', component: PlaceholderView, meta: { requiresAuth: true, title: 'Заметки / LLM Wiki', note: 'Управление потоком · заметки, источники и материалы агента', owner: '09', sections: [
+  { path: '/spheres', redirect: '/competency' },
+  { path: '/synergy', redirect: '/competency' },
+  { path: '/competency', component: SpheresView, meta: { requiresAuth: true } },
+  { path: '/notes', redirect: '/knowledge' },
+  { path: '/knowledge', component: PlaceholderView, meta: { requiresAuth: true, title: 'Личная база знаний', note: 'Управление потоком · заметки, источники и материалы агента', owner: '09', sections: [
     { title: 'Поиск и фильтры', description: 'Фактические фильтры над хронологическим реестром заметок.', fields: ['Поиск по тексту', 'Фильтр по источнику и автору', 'Фильтр по тегам'], empty: 'Фильтры подключаются в тикете 09.' },
     { title: 'Хронологический реестр', description: 'Каждая заметка показывает контекст источника, автора, отметку времени, текст или расшифровку и ручные теги. Материал агента помечен подписью автора и тонким левым правилом, а не ярким блоком.', fields: ['Контекст источника и автор', 'Отметка времени', 'Текст или расшифровка', 'Ручные теги', 'Аудио — явная строка вложения'], empty: 'Заметки подключаются в тикете 09.' },
     { title: 'Сводка', description: 'Запрос сводки — явное текстовое действие, ответ — помеченная секция, не чат-пузырь.', empty: 'Сводка подключается в тикете 09.' }
   ] } },
-  { path: '/reports/checklist', component: ChecklistReportView, meta: { requiresAuth: true } },
-  // Настройки
+  // Настройки (в т.ч. Импорт XLSX + Синхронизация)
   { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
   { path: '/admin/invites', component: AdminInvitesView, meta: { requiresAuth: true } },
-  // Совместимость: маршруты без прямого пункта в согласованной навигации
-  { path: '/routines', component: RoutinesView, meta: { requiresAuth: true } },
   { path: '/import/xlsx', component: XlsxImportView, meta: { requiresAuth: true } },
-  { path: '/stats', component: WaveStatsView, meta: { requiresAuth: true } },
   { path: '/data-sync', component: DataSyncView, meta: { requiresAuth: true } },
+  // Документация — заглушка; полная реализация в тикете 02 релиза 0.5
+  { path: '/docs', component: PlaceholderView, meta: { requiresAuth: true, title: 'Документация', note: 'Манифест, сценарии использования и технические инструкции', owner: '02', sections: [
+    { title: 'Манифест Siberian Wolf', empty: 'Раздел подключается в тикете 02.' },
+    { title: 'Сценарии использования', empty: 'Раздел подключается в тикете 02.' },
+    { title: 'Технические инструкции', empty: 'Раздел подключается в тикете 02.' }
+  ] } },
 ]
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (to.hash) {
+      return { el: to.hash, behavior: 'smooth' }
+    }
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  }
 })
 
 router.beforeEach((to) => {
