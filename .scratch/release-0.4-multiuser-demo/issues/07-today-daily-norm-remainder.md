@@ -4,7 +4,7 @@
 **Status:** resolved
 **Blocked by:** 01 — Модель пользователя
 
-> ⚠ **Поставлена только серверная половина — см. баг `.scratch/release-0.6-demo-onboarding/issues/10-bug-today-norm-remainder-not-rendered.md`.** Коммит `622ecf7` добавил в `TodayResponse` поля `dayNormMinutes`/`dayFactMinutes`/`remainingMinutes`, но фронтенд их не читает: остаток на «Сегодня» не отображается, `TodayNormIT` отсутствует. Статус `resolved` оставлен как есть до решения владельца.
+> ⚠ **Поставлена только серверная половина — см. баг `.scratch/release-0.6-demo-onboarding/bugs/02-today-norm-remainder-not-rendered.md`.** Коммит `622ecf7` добавил в `TodayResponse` поля `dayNormMinutes`/`dayFactMinutes`/`remainingMinutes`, но фронтенд их не читает: остаток на «Сегодня» не отображается, `TodayNormIT` отсутствует. Статус `resolved` оставлен как есть до решения владельца.
 
 **What to build:** Экран «Сегодня» показывает остаток дневной нормы часов — то, ради чего новый пользователь и приходит. Нейтральный факт в информационной шапке дня, без цвета, процентов и прогресс-бара. Ставится до онбординга (08), потому что мастер приводит пользователя именно на этот экран.
 
