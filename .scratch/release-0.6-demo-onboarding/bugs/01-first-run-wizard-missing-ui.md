@@ -53,11 +53,24 @@ frontend-файла мастера до релиза 0.6.
 Баг заведён как запись о расхождении, а не как невыполненная работа. Открытым
 остаётся один вопрос к владельцу:
 
-- [ ] Сверить чек-лист 0.4-08 с фактически поставленным и либо дописать
+- [x] Сверить чек-лист 0.4-08 с фактически поставленным и либо дописать
       недостающие пункты (`OnboardingApiIT`: флаг проставляется, повторный вход не
       редиректит, пропуск не создаёт сущностей), либо явно снять их как покрытые
       тикетом 0.6-04.
+
+      Ветка `fix/01-onboarding-api-it-coverage`: добавлен
+      `api/src/test/java/ru/wolf/api/onboarding/OnboardingApiIT.java` (4 теста,
+      все зелёные — `BUILD SUCCESSFUL`, `tests="4" failures="0" errors="0"`):
+      `complete_sets_onboarding_flag_and_is_reflected_in_me`,
+      `repeat_login_after_completion_does_not_redirect_to_onboarding`,
+      `skip_completes_onboarding_without_creating_project_or_goal`,
+      `full_wizard_creates_project_and_goal_then_completes`. Экран мастера и
+      маршрут `/onboarding` уже покрыты фактом их существования и браузерной
+      проверкой, зафиксированной в 0.6-04 и в разделе «Как закрыт» выше.
 - [ ] Решить, оставлять ли `Status: resolved` у 0.4-08 со ссылкой на этот баг.
+      **Решение владельца требуется отдельно** — серверный чек-лист теперь закрыт
+      тестами, но статус исходного тикета меняет его владелец, не находящий агент
+      (см. `docs/agents/issue-tracker.md`).
 
 ## Вывод на будущее
 
