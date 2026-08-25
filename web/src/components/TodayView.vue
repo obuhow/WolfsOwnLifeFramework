@@ -10,6 +10,9 @@ const selectedDate = ref('')
 const dayStart = ref('') // logical day start LDT from API
 const dayEndExclusive = ref('')
 const dayEndSetting = ref('02:00')
+const dayNormMinutes = ref(0)
+const dayFactMinutes = ref(0)
+const remainingMinutes = ref(0)
 const entries = ref([])
 const delos = ref([])
 const projects = ref([])
@@ -471,6 +474,9 @@ async function loadToday(opts = {}) {
   dayEndExclusive.value = body.dayEnd || ''
   if (body.dayEndSetting) dayEndSetting.value = String(body.dayEndSetting).slice(0, 5)
   entries.value = body.entries || []
+  dayNormMinutes.value = body.dayNormMinutes || 0
+  dayFactMinutes.value = body.dayFactMinutes || 0
+  remainingMinutes.value = body.remainingMinutes ?? 0
 }
 
 async function loadAll() {
@@ -797,6 +803,31 @@ const nightHoursLabel = computed(() => {
   return `${nightStart.value}–${nightEnd.value}`
 })
 
+/** `90` → `1 ч 30 мин`; `240` → `4 ч`; `15` → `15 мин` (omit bare "0 ч"). */
+function formatMinutesLabel(totalMinutes) {
+  const abs = Math.max(0, Math.round(totalMinutes))
+  const hours = Math.floor(abs / 60)
+  const mins = abs % 60
+  if (hours === 0) return `${mins} мин`
+  return mins === 0 ? `${hours} ч` : `${hours} ч ${mins} мин`
+}
+
+/**
+ * Neutral daily-norm remainder fact for the day header (ticket 0.4-07 / bug 0.6-02).
+ * Hidden entirely when no norm is configured. Overage is phrased as «сверх», never
+ * as a negative remainder — no color, no percent, no progress bar (0.3 quiet contract).
+ */
+const dayNormLabel = computed(() => {
+  if (!dayNormMinutes.value || dayNormMinutes.value <= 0) return ''
+  if (remainingMinutes.value > 0) {
+    return `осталось ${formatMinutesLabel(remainingMinutes.value)} из ${formatMinutesLabel(dayNormMinutes.value)}`
+  }
+  if (remainingMinutes.value === 0) {
+    return 'норма выбрана'
+  }
+  return `норма выбрана · +${formatMinutesLabel(-remainingMinutes.value)} сверх`
+})
+
 const weekLabel = computed(() => {
   if (!selectedDate.value) return ''
   const { isoYear, weekNo } = isoWeekParts(selectedDate.value)
@@ -836,6 +867,7 @@ onMounted(loadAll)
       <div>
         <h1>Сегодня</h1>
         <p class="eyebrow">15-минутная сетка · {{ timezone }} · ночь {{ nightHoursLabel }}</p>
+        <p v-if="dayNormLabel" class="eyebrow day-norm-label">{{ dayNormLabel }}</p>
       </div>
       <div class="day-nav">
         <button type="button" class="btn btn-ghost" @click="shiftDay(-1)" :disabled="loading" aria-label="Предыдущий день">←</button>
@@ -1105,6 +1137,10 @@ onMounted(loadAll)
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.day-norm-label {
+  margin-top: 4px;
 }
 
 .day-nav {

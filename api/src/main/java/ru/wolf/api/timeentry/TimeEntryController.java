@@ -167,10 +167,11 @@ public class TimeEntryController {
 
     private int sumMergedMinutes(List<TimeEntry> entries) {
         if (entries.isEmpty()) return 0;
-        // Sort by start time
-        entries.sort(java.util.Comparator.comparing(TimeEntry::getStartAt));
+        // Copy before sorting: callers may pass an immutable list (e.g. Stream#toList()).
+        List<TimeEntry> sorted = new ArrayList<>(entries);
+        sorted.sort(java.util.Comparator.comparing(TimeEntry::getStartAt));
         List<LocalDateTime[]> merged = new ArrayList<>();
-        for (TimeEntry e : entries) {
+        for (TimeEntry e : sorted) {
             LocalDateTime s = e.getStartAt();
             LocalDateTime eEnd = e.getEndAt();
             if (merged.isEmpty() || s.isAfter(merged.get(merged.size() - 1)[1])) {
