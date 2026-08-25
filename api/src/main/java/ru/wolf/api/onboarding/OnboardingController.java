@@ -56,6 +56,7 @@ public class OnboardingController {
     private final GoalProjectRepository goalProjectRepository;
     private final GoalWeekBudgetRepository goalWeekBudgetRepository;
     private final DemoFixtureGenerator demoFixtureGenerator;
+    private final ru.wolf.api.user.UserPurgeService userPurgeService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -264,6 +265,32 @@ public class OnboardingController {
         }
     }
 
+    /**
+     * Ветка «Очистить профиль» Финального выбора (релиз 0.6, тикет 04).
+     *
+     * <p>Точечно удаляет Проекты, Дела, Записи времени, Цели, Идеи и Заметки
+     * пользователя, сохраняя аккаунт, Области жизни и 9 Сфер. Недельная норма
+     * сбрасывается на системный дефолт.
+     *
+     * <p>{@code onboardingCompletedAt} здесь <b>не</b> проставляется: гость уходит
+     * в мастер первого входа (0.4-08), и флаг ставится уже по его завершении —
+     * иначе прерванный мастер оставил бы пользователя в пустой системе без
+     * возможности вернуться.
+     */
+    @PostMapping("/purge-profile")
+    @Transactional
+    public ResponseEntity<PurgeProfileResponse> purgeProfile(
+            Authentication authentication
+    ) {
+        User user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        userPurgeService.purgeProfileData(user);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(new PurgeProfileResponse(true, user.getAvailableWeeklyHours()));
+    }
+
     // --- DTOs ---
 
     @Data @NoArgsConstructor @AllArgsConstructor
@@ -336,5 +363,11 @@ public class OnboardingController {
         private boolean success;
         private String displayName;
         private BigDecimal weeklyHoursNorm;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class PurgeProfileResponse {
+        private boolean success;
+        private BigDecimal availableWeeklyHours;
     }
 }
