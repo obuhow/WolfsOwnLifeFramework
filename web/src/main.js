@@ -6,7 +6,8 @@ import LoginView from './components/LoginView.vue'
 import RegisterView from './components/RegisterView.vue'
 import ProfileLoadView from './components/ProfileLoadView.vue'
 import OnboardingTourEntry from './components/OnboardingTourEntry.vue'
-import OnboardingFinalChoiceStub from './components/OnboardingFinalChoiceStub.vue'
+import OnboardingFinalChoice from './components/OnboardingFinalChoice.vue'
+import OnboardingWizardView from './components/OnboardingWizardView.vue'
 import { apiBase } from './api'
 import { isTourActive } from './onboardingTour'
 import SettingsView from './components/SettingsView.vue'
@@ -47,8 +48,11 @@ const routes = [
   // Тур Знакомства (тикет 03): маршрут только включает режим тура и уходит на
   // первый его пункт — сам тур идёт поверх обычной оболочки.
   { path: '/onboarding/tour', component: OnboardingTourEntry, meta: { requiresAuth: true } },
-  // Финальный выбор — полноценный экран подключается в тикете 04.
-  { path: '/onboarding/final', component: OnboardingFinalChoiceStub, meta: { requiresAuth: true } },
+  // Финальный выбор «Оставить / Очистить» (тикет 04).
+  { path: '/onboarding/final', component: OnboardingFinalChoice, meta: { requiresAuth: true } },
+  // Мастер первого входа Проект → Цель → Норма (0.4-08). Получает управление по
+  // ветке «Очистить профиль» Финального выбора; экран написан в тикете 04, API — в 0.4.
+  { path: '/onboarding', component: OnboardingWizardView, meta: { requiresAuth: true } },
   // Утренний обход
   { path: '/morning', component: MorningView, meta: { requiresAuth: true } },
   // Ежедневник: Неделя (осн.), Сегодня и Месяц — вкладки/deep links той же страницы
