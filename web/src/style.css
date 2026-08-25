@@ -240,6 +240,7 @@ textarea:focus-visible,
 
 .user-name { color: var(--wolf-muted); font-size: 12px; }
 .logout-btn { min-height: auto; }
+.tour-btn { min-height: auto; }
 
 /* Mobile menu trigger — hidden on desktop */
 .menu-trigger {

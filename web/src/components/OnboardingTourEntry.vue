@@ -13,7 +13,7 @@ import { startTour } from '../onboardingTour'
 const router = useRouter()
 
 onMounted(() => {
-  startTour()
+  startTour({ firstRun: true })
   router.replace('/morning')
 })
 </script>

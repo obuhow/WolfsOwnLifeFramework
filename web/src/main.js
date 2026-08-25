@@ -9,7 +9,7 @@ import OnboardingTourEntry from './components/OnboardingTourEntry.vue'
 import OnboardingFinalChoice from './components/OnboardingFinalChoice.vue'
 import OnboardingWizardView from './components/OnboardingWizardView.vue'
 import { apiBase } from './api'
-import { isTourActive } from './onboardingTour'
+import { isTourActive, isOnboardingKnownCompleted, markOnboardingCompleted } from './onboardingTour'
 import SettingsView from './components/SettingsView.vue'
 import AdminInvitesView from './components/AdminInvitesView.vue'
 import LifeAreasView from './components/LifeAreasView.vue'
@@ -115,19 +115,21 @@ const router = createRouter({
   }
 })
 
-// Кэш статуса онбординга: как только он завершён, редиректить незачем.
-let onboardingCompletedCache = false
-
+// Статус онбординга кэшируется в `onboardingTour.js` — общий кэш с туром,
+// чтобы завершение знакомства сразу открывало оболочку без лишнего запроса.
 async function isOnboardingCompleted(token) {
-  if (onboardingCompletedCache) return true
+  if (isOnboardingKnownCompleted()) return true
   try {
     const res = await fetch(`${apiBase()}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.ok) {
       const data = await res.json()
-      onboardingCompletedCache = !!data.onboardingCompleted
-      return onboardingCompletedCache
+      if (data.onboardingCompleted) {
+        markOnboardingCompleted()
+        return true
+      }
+      return false
     }
   } catch (e) {
     // Сетевой сбой — не запираем пользователя в онбординге.

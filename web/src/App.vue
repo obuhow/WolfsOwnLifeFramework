@@ -2,7 +2,7 @@
 import { onMounted, onBeforeUnmount, ref, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { apiBase } from './api'
-import { tourActive } from './onboardingTour'
+import { tourActive, startTour } from './onboardingTour'
 import OnboardingTour from './components/OnboardingTour.vue'
 
 const router = useRouter()
@@ -323,6 +323,14 @@ onBeforeUnmount(() => {
           <div class="header-right">
             <div class="user-menu">
               <span class="user-name">{{ username }}</span>
+              <button
+                @click="() => { startTour(); router.push('/morning'); }"
+                class="btn btn-ghost tour-btn"
+                aria-label="Приветственный тур"
+                title="Пройти Знакомство заново"
+              >
+                Приветственный тур
+              </button>
               <button @click="logout" class="btn btn-ghost logout-btn" aria-label="Выйти" title="Выйти">Выйти</button>
             </div>
             <button
@@ -414,6 +422,14 @@ onBeforeUnmount(() => {
 
             <div class="drawer-foot">
               <span class="user-name">{{ username }}</span>
+              <button
+                @click="() => { startTour(); router.push('/morning'); closeDrawer(); }"
+                class="btn btn-ghost tour-btn"
+                aria-label="Приветственный тур"
+                title="Пройти Знакомство заново"
+              >
+                Приветственный тур
+              </button>
               <button type="button" class="btn btn-ghost" @click="logout">Выйти</button>
             </div>
           </nav>

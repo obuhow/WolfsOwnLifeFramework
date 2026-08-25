@@ -18,7 +18,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { endTour } from '../onboardingTour'
+import { endTour, completeOnboarding, isFirstRunTour } from '../onboardingTour'
 
 const router = useRouter()
 
@@ -269,10 +269,28 @@ function advance(el) {
   }, isGroup ? 1100 : 500)
 }
 
-function finish() {
+/**
+ * Выход из тура — и по завершении последнего шага, и по «Пропустить».
+ *
+ * Первый вход заканчивается финальным выбором «Оставить»/«Очистить»
+ * (релиз 0.6, тикет 04): гость обязан решить судьбу демо-данных сам, и
+ * `onboarding_completed_at` проставит уже выбранная им ветка.
+ *
+ * Повторный запуск из шапки — это просто напоминание по интерфейсу. Показывать
+ * там «Очистить» нельзя: пользователь давно живёт в системе, и кнопка удалила
+ * бы его настоящие данные. Поэтому знакомство сразу помечается завершённым, а
+ * приземление — Ежедневник на вкладке «Неделя», рабочий экран по умолчанию.
+ */
+async function finish() {
   stopMeasuring()
+  const wasFirstRun = isFirstRunTour()
   endTour()
-  router.push('/onboarding/final')
+  if (wasFirstRun) {
+    router.push('/onboarding/final')
+    return
+  }
+  await completeOnboarding()
+  router.push({ path: '/calendar', query: { view: 'week' } })
 }
 
 function stopMeasuring() {
