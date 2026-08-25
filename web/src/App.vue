@@ -2,6 +2,8 @@
 import { onMounted, onBeforeUnmount, ref, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { apiBase } from './api'
+import { tourActive } from './onboardingTour'
+import OnboardingTour from './components/OnboardingTour.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -13,11 +15,13 @@ const isOnboarding = computed(() => route.path.startsWith('/onboarding'))
 
 // --- Navigation model (Release 0.5 IA — see wolf-life-os skill reference
 // navigation-ia-05-supersession.md and .scratch/wayfinder-releases-05-07/issues/04) ---
+// `tour` — стабильный якорь для тура Знакомства (релиз 0.6, тикет 03). Тур
+// только читает эти атрибуты через `data-tour-target`; структуру NAV не меняет.
 const NAV = [
-  { kind: 'link', label: 'Утренний обход', to: '/morning' },
-  { kind: 'link', label: 'Ежедневник', to: '/calendar' },
+  { kind: 'link', label: 'Утренний обход', to: '/morning', tour: 'morning' },
+  { kind: 'link', label: 'Ежедневник', to: '/calendar', tour: 'calendar' },
   {
-    kind: 'group', key: 'delo-management', label: 'Управление делами',
+    kind: 'group', key: 'delo-management', label: 'Управление делами', tour: 'delo-management',
     subgroups: [
       {
         title: 'Планирование',
@@ -46,7 +50,7 @@ const NAV = [
     ],
   },
   {
-    kind: 'group', key: 'flow', label: 'Управление потоком',
+    kind: 'group', key: 'flow', label: 'Управление потоком', tour: 'flow',
     children: [
       { label: 'Области жизни', to: '/life-areas' },
       { label: 'Цели', to: '/goals' },
@@ -54,9 +58,9 @@ const NAV = [
       { label: 'Личная база знаний', to: '/knowledge' },
     ],
   },
-  { kind: 'link', label: 'Документация', to: '/docs' },
+  { kind: 'link', label: 'Документация', to: '/docs', tour: 'docs' },
   {
-    kind: 'group', key: 'settings', label: 'Настройки',
+    kind: 'group', key: 'settings', label: 'Настройки', tour: 'settings',
     children: [
       { label: 'Настройки', to: '/settings' },
       { label: 'Импорт XLSX', to: '/import/xlsx' },
@@ -257,6 +261,7 @@ onBeforeUnmount(() => {
                 v-if="item.kind === 'link'"
                 :to="item.to"
                 class="nav-link"
+                :data-tour-target="item.tour"
                 :class="{ active: isChildActive(item.to) }"
               >{{ item.label }}</router-link>
 
@@ -268,6 +273,7 @@ onBeforeUnmount(() => {
                 <button
                   type="button"
                   class="nav-link nav-group-trigger"
+                  :data-tour-target="item.tour"
                   :class="{ active: isGroupActive(item) }"
                   :aria-expanded="openGroup === item.key ? 'true' : 'false'"
                   :aria-controls="`grp-${item.key}`"
@@ -323,6 +329,7 @@ onBeforeUnmount(() => {
               ref="menuTriggerEl"
               type="button"
               class="menu-trigger"
+              data-tour-target="menu"
               aria-label="Меню"
               :aria-expanded="drawerOpen ? 'true' : 'false'"
               @click="openDrawer"
@@ -359,6 +366,7 @@ onBeforeUnmount(() => {
                   v-if="item.kind === 'link'"
                   :to="item.to"
                   class="drawer-link"
+                  :data-tour-target="item.tour"
                   :class="{ active: isChildActive(item.to) }"
                   @click="onDrawerNavigate"
                 >{{ item.label }}</router-link>
@@ -367,6 +375,7 @@ onBeforeUnmount(() => {
                   <button
                     type="button"
                     class="drawer-group-trigger"
+                    :data-tour-target="item.tour"
                     :class="{ active: isGroupActive(item) }"
                     :aria-expanded="expandedGroups[item.key] ? 'true' : 'false'"
                     @click="toggleDrawerGroup(item.key)"
@@ -414,6 +423,10 @@ onBeforeUnmount(() => {
       <main class="app-main" role="main">
         <router-view />
       </main>
+
+      <!-- Тур Знакомства (релиз 0.6, тикет 03) — поверх реальной оболочки,
+           потому что подсвечивает настоящие пункты NAV, а не их копии. -->
+      <OnboardingTour v-if="tourActive" />
     </div>
 
     <div v-else class="app-shell">
