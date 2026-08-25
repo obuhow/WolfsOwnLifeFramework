@@ -5,7 +5,10 @@ import App from './App.vue'
 import LoginView from './components/LoginView.vue'
 import RegisterView from './components/RegisterView.vue'
 import ProfileLoadView from './components/ProfileLoadView.vue'
+import OnboardingTourEntry from './components/OnboardingTourEntry.vue'
+import OnboardingFinalChoiceStub from './components/OnboardingFinalChoiceStub.vue'
 import { apiBase } from './api'
+import { isTourActive } from './onboardingTour'
 import SettingsView from './components/SettingsView.vue'
 import AdminInvitesView from './components/AdminInvitesView.vue'
 import LifeAreasView from './components/LifeAreasView.vue'
@@ -41,6 +44,11 @@ const routes = [
   { path: '/register', component: RegisterView, meta: { public: true } },
   // Онбординг: выбор демо-профиля (релиз 0.6, тикет 02). Тур — тикет 03.
   { path: '/onboarding/profile', component: ProfileLoadView, meta: { requiresAuth: true } },
+  // Тур Знакомства (тикет 03): маршрут только включает режим тура и уходит на
+  // первый его пункт — сам тур идёт поверх обычной оболочки.
+  { path: '/onboarding/tour', component: OnboardingTourEntry, meta: { requiresAuth: true } },
+  // Финальный выбор — полноценный экран подключается в тикете 04.
+  { path: '/onboarding/final', component: OnboardingFinalChoiceStub, meta: { requiresAuth: true } },
   // Утренний обход
   { path: '/morning', component: MorningView, meta: { requiresAuth: true } },
   // Ежедневник: Неделя (осн.), Сегодня и Месяц — вкладки/deep links той же страницы
@@ -133,7 +141,10 @@ router.beforeEach(async (to) => {
   }
   // Онбординг-гейт (релиз 0.6, тикет 02): аутентифицирован + онбординг не завершён
   // + маршрут не /onboarding → на экран выбора демо-профиля.
-  if (token && to.meta.requiresAuth && !to.path.startsWith('/onboarding')) {
+  // Тур Знакомства (тикет 03) идёт по обычным маршрутам оболочки при ещё не
+  // завершённом онбординге — пока он активен, гейт молчит, иначе первый же шаг
+  // тура вернул бы гостя на экран выбора профиля.
+  if (token && to.meta.requiresAuth && !to.path.startsWith('/onboarding') && !isTourActive()) {
     const completed = await isOnboardingCompleted(token)
     if (!completed) {
       return '/onboarding/profile'
