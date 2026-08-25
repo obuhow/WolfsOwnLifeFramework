@@ -16,7 +16,7 @@ Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
 
 ## Active wayfinder map
 
-`.scratch/wayfinder-releases-05-07/map.md` — релизы 0.5 (навигация и документация), 0.6 (демо-профили и Знакомство), 0.7 (AI-импорт записей).
+`.scratch/wayfinder-release-0.9-layered-arch/map.md` — релиз 0.9: миграция `wolf-api` на слоистую архитектуру (тонкий MVCS + точечные Ports&Adapters).
 
-Предыдущая карта: `.scratch/wayfinder-wolf/wolf-life-os-map.md` (релизы 0.1–0.2).
+Предыдущие карты: `.scratch/wayfinder-releases-05-07/map.md` (релизы 0.5–0.7); `.scratch/wayfinder-wolf/wolf-life-os-map.md` (релизы 0.1–0.2).
 

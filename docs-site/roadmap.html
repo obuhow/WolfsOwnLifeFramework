@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WOLF — Дорожная карта</title>
+  <style>
+    :root {
+      --ink: #1f2328;
+      --ink-soft: #57606a;
+      --ink-faint: #8b949e;
+      --rule: #e3e6ea;
+      --rule-strong: #d0d5da;
+      --bg: #ffffff;
+      --surface: #fafbfc;
+      --done: #e8f3ec;
+      --done-ink: #2f6f43;
+      --done-rule: #cfe6d6;
+      --max: 1080px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule-strong); }
+    a:hover { border-bottom-color: var(--ink); }
+
+    .layout { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
+
+    .sidebar {
+      border-right: 1px solid var(--rule);
+      padding: 2rem 1.25rem;
+      position: sticky; top: 0; align-self: start;
+      height: 100vh; overflow-y: auto;
+    }
+    .brand { font-weight: 600; letter-spacing: .02em; font-size: 1.05rem; margin: 0 0 .25rem; }
+    .brand-sub { color: var(--ink-faint); font-size: .8rem; margin: 0 0 1.75rem; }
+    .nav-group { margin-bottom: 1.4rem; }
+    .nav-title { text-transform: uppercase; font-size: .66rem; letter-spacing: .09em; color: var(--ink-faint); margin: 0 0 .5rem; }
+    .nav-group a { display: block; padding: .26rem 0; color: var(--ink-soft); border: 0; font-size: .875rem; }
+    .nav-group a:hover { color: var(--ink); }
+    .side-note { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--ink-faint); font-size: .74rem; line-height: 1.5; }
+
+    .content { padding: 3rem 3rem 6rem; max-width: var(--max); }
+    header.page-head { border-bottom: 1px solid var(--rule); padding-bottom: 1.5rem; margin-bottom: 2.25rem; }
+    header.page-head h1 { font-size: 2rem; font-weight: 600; margin: 0 0 .4rem; letter-spacing: -.01em; }
+    header.page-head p { color: var(--ink-soft); margin: 0; }
+    .stamp { margin-top: .9rem; font-family: var(--mono); font-size: .76rem; color: var(--ink-faint); }
+
+    h2 { font-size: 1.3rem; font-weight: 600; margin: 3rem 0 .5rem; padding-top: .5rem; letter-spacing: -.005em; }
+    h2 .h2-sub { display: block; font-size: .8rem; font-weight: 400; color: var(--ink-faint); letter-spacing: 0; margin-top: .2rem; }
+    h3 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; }
+    p { margin: .7rem 0; }
+    ul, ol { padding-left: 1.2rem; margin: .6rem 0; }
+    li { margin: .28rem 0; }
+
+    code { font-family: var(--mono); font-size: .84em; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: .08em .35em; }
+
+    /* ---- Полоса релизов ---- */
+    .track { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin: 1.5rem 0 .5rem; }
+    .track-cell { border: 1px solid var(--rule); padding: .6rem .7rem .7rem; background: var(--bg); }
+    .track-cell.is-done { background: var(--done); border-color: var(--done-rule); }
+    .track-cell.is-now { border-color: var(--ink); border-width: 1px; box-shadow: inset 0 -3px 0 var(--ink); }
+    .track-num { font-family: var(--mono); font-size: .95rem; font-weight: 600; letter-spacing: -.01em; }
+    .track-name { font-size: .72rem; color: var(--ink-soft); line-height: 1.35; margin-top: .18rem; min-height: 2.6em; }
+    .track-state { font-size: .66rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin-top: .35rem; }
+    .track-cell.is-done .track-state { color: var(--done-ink); }
+    .track-cell.is-now .track-state { color: var(--ink); }
+    .track-legend { font-size: .74rem; color: var(--ink-faint); display: flex; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .swatch { display: inline-block; width: .7rem; height: .7rem; border: 1px solid var(--rule-strong); margin-right: .35rem; vertical-align: -1px; }
+    .swatch.done { background: var(--done); border-color: var(--done-rule); }
+    .swatch.now { background: var(--bg); border-color: var(--ink); }
+    .swatch.next { background: var(--bg); }
+
+    /* ---- Таблицы ---- */
+    table { border-collapse: collapse; width: 100%; margin: .9rem 0 1.4rem; font-size: .875rem; }
+    th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+    th { color: var(--ink-faint); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; border-bottom-color: var(--rule-strong); }
+    tbody tr:last-child td { border-bottom: 1px solid var(--rule-strong); }
+    td.num { font-family: var(--mono); white-space: nowrap; color: var(--ink-soft); }
+    td.narrow { white-space: nowrap; }
+
+    .chip {
+      display: inline-block; font-size: .68rem; line-height: 1.5;
+      padding: .05rem .45rem; border-radius: 999px;
+      border: 1px solid var(--rule-strong); color: var(--ink-soft); background: var(--bg);
+      white-space: nowrap;
+    }
+    .chip.done { background: var(--done); color: var(--done-ink); border-color: var(--done-rule); }
+    .chip.ink { border-color: var(--ink); color: var(--ink); }
+    .chip.faint { color: var(--ink-faint); border-color: var(--rule); }
+
+    /* ---- Блоки ---- */
+    .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0; border: 1px solid var(--rule); margin: 1.25rem 0 1.5rem; }
+    .fact { padding: .8rem .9rem; border-right: 1px solid var(--rule); }
+    .fact:last-child { border-right: 0; }
+    .fact-k { font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); }
+    .fact-v { font-size: 1.05rem; font-weight: 600; margin-top: .15rem; letter-spacing: -.01em; }
+    .fact-n { font-size: .74rem; color: var(--ink-soft); margin-top: .1rem; }
+
+    .note { border-left: 2px solid var(--rule-strong); padding: .1rem 0 .1rem 1rem; margin: 1.1rem 0; color: var(--ink-soft); font-size: .9rem; }
+
+    .lane { border: 1px solid var(--rule); margin: 1.1rem 0 1.6rem; }
+    .lane-head { padding: .7rem .9rem; border-bottom: 1px solid var(--rule); display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+    .lane-title { font-weight: 600; font-size: .95rem; }
+    .lane-meta { font-size: .74rem; color: var(--ink-faint); }
+    .lane-body { padding: .3rem .9rem .8rem; }
+    .lane-body table { margin: .4rem 0 .2rem; }
+    .lane-body table tbody tr:last-child td { border-bottom: 0; }
+
+    .seq { counter-reset: step; list-style: none; padding: 0; margin: 1rem 0; }
+    .seq li { counter-increment: step; position: relative; padding: .55rem 0 .55rem 2.4rem; border-bottom: 1px solid var(--rule); }
+    .seq li:last-child { border-bottom: 0; }
+    .seq li::before {
+      content: counter(step); position: absolute; left: 0; top: .55rem;
+      font-family: var(--mono); font-size: .74rem; color: var(--ink-faint);
+      border: 1px solid var(--rule-strong); border-radius: 999px;
+      width: 1.5rem; height: 1.5rem; display: grid; place-items: center;
+    }
+    .seq b { font-weight: 600; }
+    .seq .why { display: block; color: var(--ink-soft); font-size: .85rem; margin-top: .1rem; }
+
+    footer.page-foot { margin-top: 4rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--ink-faint); font-size: .8rem; }
+
+    @media (max-width: 900px) {
+      .track { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (max-width: 720px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); }
+      .content { padding: 2rem 1.15rem 4rem; }
+      .track { grid-template-columns: repeat(2, 1fr); }
+      .fact { border-right: 0; border-bottom: 1px solid var(--rule); }
+      table { font-size: .82rem; }
+      th, td { padding: .45rem .5rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <p class="brand">WOLF</p>
+    <p class="brand-sub">Дорожная карта</p>
+
+    <nav class="nav-group">
+      <p class="nav-title">Где мы сейчас</p>
+      <a href="#now">Состояние на сегодня</a>
+      <a href="#track">Полоса релизов</a>
+      <a href="#releases">Релизы по тикетам</a>
+    </nav>
+
+    <nav class="nav-group">
+      <p class="nav-title">Правда о состоянии</p>
+      <a href="#gaps">Разрывы код ↔ трекер</a>
+      <a href="#r04">Что осталось в 0.4</a>
+    </nav>
+
+    <nav class="nav-group">
+      <p class="nav-title">В работу</p>
+      <a href="#handoff-agent">Можно отдать агенту</a>
+      <a href="#handoff-you">Нужны вы</a>
+      <a href="#blocked">Заблокировано</a>
+      <a href="#order">Рекомендуемый порядок</a>
+    </nav>
+
+    <nav class="nav-group">
+      <p class="nav-title">Дальше</p>
+      <a href="#future">Релизы 0.5 – 0.7</a>
+      <a href="#открытые">Не решено</a>
+    </nav>
+
+    <p class="side-note">
+      Карта собрана из репозитория, локального трекера <code>.scratch/</code>,
+      git-истории, схемы БД и живого стенда. Ничего не додумано:
+      каждая строка проверялась в коде или в запущенной системе.
+    </p>
+  </aside>
+
+  <main class="content">
+    <header class="page-head">
+      <h1>Дорожная карта WOLF</h1>
+      <p>Где проект находится сейчас и что прямо сегодня можно передать в работу.</p>
+      <p class="stamp">
+        develop @ cf76a68 · 192 коммита · последний 2026-08-22 · 148 Java-классов · 32 Vue-экрана · 37 миграций Flyway · 82 тикета в шести релизах
+      </p>
+    </header>
+
+    <!-- ================= СОСТОЯНИЕ ================= -->
+    <section id="now">
+      <h2>Состояние на сегодня<span class="h2-sub">Проверено запущенной системой, а не чтением кода</span></h2>
+
+      <div class="facts">
+        <div class="fact">
+          <div class="fact-k">Стенд</div>
+          <div class="fact-v">Поднят</div>
+          <div class="fact-n"><code>api</code> UP · <code>web</code> 200 · <code>db</code> healthy · <code>docs</code> 8090</div>
+        </div>
+        <div class="fact">
+          <div class="fact-k">Прод</div>
+          <div class="fact-v">Отвечает</div>
+          <div class="fact-n">wolfs.smallmba.space → 144.124.251.167 · HTTP 200</div>
+        </div>
+        <div class="fact">
+          <div class="fact-k">Отданные ассеты</div>
+          <div class="fact-v">Свежие</div>
+          <div class="fact-n"><code>index-y1FK3RJ4.js</code> совпадает с <code>web/dist</code></div>
+        </div>
+        <div class="fact">
+          <div class="fact-k">Активный релиз</div>
+          <div class="fact-v">0.4</div>
+          <div class="fact-n">Многопользовательский режим · приёмка не пройдена</div>
+        </div>
+      </div>
+
+      <p>
+        Функционально WOLF — это работающая личная Life OS: 15-минутная сетка «Сегодня», Календарь неделя/месяц,
+        Диаграмма Ганта с планом и фактом, Проекты и Дела, Цели с метриками, Идеи, Рутины, Синергия,
+        Утренний обход, Отчёт «Чек-лист», Статистика волн, импорт CSV/XLSX и полноценная Синхронизация данных
+        через версионированный workbook. Поверх всего этого лежит принятый UI-контракт 0.3 — минималистичный
+        реестр без красных состояний, процентов и прогресс-баров.
+      </p>
+      <p>
+        Незакрытая граница проходит по релизу 0.4: система <b>перестала быть однопользовательской в коде</b>,
+        но ещё не подтверждена как многопользовательская <b>в браузере и тестами</b>.
+      </p>
+    </section>
+
+    <!-- ================= ПОЛОСА ================= -->
+    <section id="track">
+      <h2>Полоса релизов</h2>
+
+      <div class="track">
+        <div class="track-cell is-done">
+          <div class="track-num">0.1</div>
+          <div class="track-name">Календарь-OS: сетка, Гант, проекты, дела</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">0.2</div>
+          <div class="track-name">Методологический слой: цели, идеи, заметки, прогноз</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">0.21</div>
+          <div class="track-name">Синхронизация данных: workbook, preview, apply</div>
+          <div class="track-state">Код готов</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">0.3</div>
+          <div class="track-name">Дизайн-система и UI-контракт «реестр 1a»</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-now">
+          <div class="track-num">0.4</div>
+          <div class="track-name">Многопользовательский режим и доступ по инвайту</div>
+          <div class="track-state">Сейчас здесь</div>
+        </div>
+        <div class="track-cell">
+          <div class="track-num">0.5</div>
+          <div class="track-name">Навигация и Документация</div>
+          <div class="track-state">Проектируется</div>
+        </div>
+        <div class="track-cell">
+          <div class="track-num">0.6 / 0.7</div>
+          <div class="track-name">Демо-профили и Знакомство · AI-импорт записей</div>
+          <div class="track-state">Проектируется</div>
+        </div>
+      </div>
+
+      <div class="track-legend">
+        <span><span class="swatch done"></span>реализовано и живёт на стенде</span>
+        <span><span class="swatch now"></span>активная работа</span>
+        <span><span class="swatch next"></span>ещё нет spec — только карта wayfinder</span>
+      </div>
+    </section>
+
+    <!-- ================= РЕЛИЗЫ ================= -->
+    <section id="releases">
+      <h2>Релизы по тикетам<span class="h2-sub">Столбец «Код» — что реально смёржено в develop; столбец «Трекер» — что записано в <code>.scratch/</code></span></h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Релиз</th>
+            <th>Содержание</th>
+            <th class="narrow">Тикетов</th>
+            <th class="narrow">Код</th>
+            <th class="narrow">Трекер</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">0.1</td>
+            <td>Календарь-OS: JWT, Области жизни → Проекты → Дела, Записи времени 15 мин, Сегодня / Неделя / Гант, бэклог, ночные часы, повторения, импорт CSV</td>
+            <td class="num">17</td>
+            <td><span class="chip done">16 в проде</span></td>
+            <td><span class="chip">3 файла не закрыты</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.2</td>
+            <td>Смысловой слой: Цели и бюджеты, Синергия, Банк идей, Заметки и агент, Утренний обход, зависимости и честный прогноз Ганта, каскад ресурсов, месяц, чек-лист, рутины, кривая нагрузки, статистика волн</td>
+            <td class="num">22</td>
+            <td><span class="chip done">22 в проде</span></td>
+            <td><span class="chip done">22 resolved</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.21</td>
+            <td>Синхронизация данных: контракт и манифест, экспорт workbook, preview импорта, атомарный upsert, легаси-совместимость, UI, сквозной round-trip</td>
+            <td class="num">8</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip ink">01–07 «Not resolved»</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.3</td>
+            <td>Дизайн-система «реестр 1a», навигационная оболочка, Сегодня, Календарь-неделя, Гант, реестры управления, месяц и бэклог периода, экраны потока</td>
+            <td class="num">9</td>
+            <td><span class="chip done">9 в проде</span></td>
+            <td><span class="chip done">9 resolved</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.4</td>
+            <td>Роли и статусы пользователя, регистрация по инвайту, изоляция арендатора, админ-API, экран инвайтов, мастер первого входа, остаток дневной нормы, аккаунт <code>obuhov</code></td>
+            <td class="num">13</td>
+            <td><span class="chip">11 смёржено</span></td>
+            <td><span class="chip ink">1 resolved, 12 open</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.5–0.7</td>
+            <td>Карта wayfinder: переименования меню и раздел Документация; три демо-профиля и Знакомство; AI-импорт свободных заметок в сущности</td>
+            <td class="num">13</td>
+            <td><span class="chip faint">кода нет</span></td>
+            <td><span class="chip">2 claimed · 10 open</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        Один тикет 0.1 (<b>16 — импорт ICS</b>) закрыт как <code>wontfix</code> и по процедуре сохранён
+        в <code>.scratch/release-cancelled/</code>, а не удалён.
+      </div>
+    </section>
+
+    <!-- ================= РАЗРЫВЫ ================= -->
+    <section id="gaps">
+      <h2>Разрывы между кодом и трекером<span class="h2-sub">Главный риск карты: по трекеру релиз 0.4 выглядит неначатым, хотя код почти весь смёржен — и наоборот, «зелёные» релизы имеют незакрытые чек-листы</span></h2>
+
+      <table>
+        <thead>
+          <tr><th style="width:34%">Что на самом деле</th><th>Проверено</th><th class="narrow">Действие</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Экрана <code>/onboarding</code> не существует</b></td>
+            <td>Бэкенд <code>OnboardingController</code> со всеми пятью эндпоинтами смёржен (<code>da5da47</code>), но во фронте нет ни маршрута, ни компонента. <code>RegisterView.vue</code> прямо содержит комментарий, что редиректит на <code>/today</code>, потому что мастера нет.</td>
+            <td><span class="chip ink">завести тикет</span></td>
+          </tr>
+          <tr>
+            <td><b>Экрана «Пользователи» не существует</b></td>
+            <td>В <code>AdminController</code> есть <code>/admin/users</code>, block, unblock, reset-password, delete. Во фронте есть только <code>/admin/invites</code>. Путь C приёмки (блокировка, сброс пароля, удаление через UI) непроходим.</td>
+            <td><span class="chip ink">завести тикет</span></td>
+          </tr>
+          <tr>
+            <td><b>Ни одного гейт-теста релиза 0.4</b></td>
+            <td>В <code>api/src/test</code> нет <code>TenantIsolationApiIT</code>, <code>UserPurgeServiceIT</code>, <code>AdminApiIT</code>, <code>OnboardingApiIT</code>, <code>TodayNormIT</code>. Есть только <code>RegistrationApiIT</code> и <code>UserModelApiIT</code>. Изоляция арендатора <i>предполагается</i>, но не доказана.</td>
+            <td><span class="chip ink">блокер релиза</span></td>
+          </tr>
+          <tr>
+            <td><b><code>admin/admin</code> всё ещё открыт</b></td>
+            <td>В БД стенда <code>admin</code> (id 1) имеет <code>status = ACTIVE</code>. Именной администратор <code>obuhov</code> (id 12, ADMIN) создан и подтверждён рабочим — то есть блокер тикета 13 снят, а сам тикет не выполнен.</td>
+            <td><span class="chip ink">делать сейчас</span></td>
+          </tr>
+          <tr>
+            <td><b>Демо-код есть, демо-режим отменён</b></td>
+            <td><code>DemoController</code>, <code>DemoFixtureGenerator</code>, <code>DemoGcService</code> смёржены, в БД лежат три аккаунта <code>demo-*</code>. Кнопки «Попробовать демо» в UI нет. Карта 0.5–0.7 отменяет анонимное демо целиком в пользу закрытого инвайт-стенда.</td>
+            <td><span class="chip ink">решить судьбу</span></td>
+          </tr>
+          <tr>
+            <td><b>Согласование 0.4 описано, но не применено</b></td>
+            <td>Тикет карты <code>WF-03</code> содержит готовый пошаговый список: закрыть 05 и 06 как <code>wontfix</code>, вычистить Demo Sandbox из <code>spec.md</code>, переформулировать 08, снять рёбра <code>Blocked by</code>. В файлах 0.4 ничего из этого пока нет.</td>
+            <td><span class="chip ink">15 минут работы</span></td>
+          </tr>
+          <tr>
+            <td><b>«Заметки / LLM Wiki» — заглушка</b></td>
+            <td>Маршрут <code>/notes</code> отдаёт <code>PlaceholderView</code>, хотя бэкенд заметок и ассистента из 0.2 реализован. Экран остаётся контрактом-заготовкой.</td>
+            <td><span class="chip">знать</span></td>
+          </tr>
+          <tr>
+            <td><b>Статусы 0.1 и 0.21 отстали от кода</b></td>
+            <td>Тикеты 0.1 <code>04</code>, <code>11-week-backlog</code>, <code>15</code> висят <code>ready-for-agent</code> с пустыми чек-боксами, хотя функциональность год как в проде. У 0.21 все семь тикетов имеют <code>## Answer: Not resolved</code> при смёрженном и работающем экране Синхронизации.</td>
+            <td><span class="chip">гигиена трекера</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ================= 0.4 ================= -->
+    <section id="r04">
+      <h2>Что осталось в релизе 0.4<span class="h2-sub">Единственный релиз, который сейчас мешает двигаться дальше: 0.5–0.7 опираются на инвайт-стенд</span></h2>
+
+      <table>
+        <thead>
+          <tr><th class="narrow">№</th><th>Тикет</th><th class="narrow">Код</th><th>Что осталось</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">01</td><td>Модель пользователя: роль, статус, тип, e-mail</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист; по решению карты — убрать <code>account_type</code> и <code>expires_at</code></td></tr>
+          <tr><td class="num">02</td><td>Регистрация по инвайт-коду</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист, есть <code>RegistrationApiIT</code></td></tr>
+          <tr><td class="num">03</td><td>Изоляция арендатора: аудит и тест-гейт</td><td><span class="chip">частично</span></td><td><b>Нет <code>TenantIsolationApiIT</code> и <code>UserPurgeServiceIT</code></b> — гейт релиза не выполнен</td></tr>
+          <tr><td class="num">04</td><td>Администрирование: пользователи и инвайты</td><td><span class="chip">только API</span></td><td>Нет экрана «Пользователи»</td></tr>
+          <tr><td class="num">05</td><td>Генератор демо-фикстур</td><td><span class="chip done">смёржен</span></td><td><b>Отменён картой</b> → перевести в <code>wontfix</code>, содержание передать в 0.6</td></tr>
+          <tr><td class="num">06</td><td>Demo Sandbox: эфемерная сессия, GC</td><td><span class="chip done">смёржен</span></td><td><b>Отменён картой</b> → <code>wontfix</code>, решить судьбу мёртвого кода и трёх demo-аккаунтов</td></tr>
+          <tr><td class="num">07</td><td>Остаток дневной нормы на «Сегодня»</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист, браузерная проверка</td></tr>
+          <tr><td class="num">08</td><td>Мастер первого входа: Проект → Цель → Норма</td><td><span class="chip">только API</span></td><td><b>Нет фронтенда <code>/onboarding</code></b> и guard-а в роутере</td></tr>
+          <tr><td class="num">09</td><td>Сквозная приёмка релиза</td><td><span class="chip faint">—</span></td><td>Три пути в браузере на задеплоенной системе. Ждёт всех остальных</td></tr>
+          <tr><td class="num">10</td><td>Фронтенд: ввод инвайт-кода</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист</td></tr>
+          <tr><td class="num">11</td><td>Фронтенд: выпуск инвайт-кодов (админ)</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист (был фикс <code>LazyInitializationException</code>)</td></tr>
+          <tr><td class="num">12</td><td>Именной админский аккаунт <code>obuhov</code></td><td><span class="chip done">resolved</span></td><td>—</td></tr>
+          <tr><td class="num">13</td><td>Закрыть доступ к seed-аккаунту <code>admin</code></td><td><span class="chip faint">—</span></td><td>Блокер снят тикетом 12. <b>Готов к работе прямо сейчас</b></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ================= ПЕРЕДАЧА ================= -->
+    <section id="handoff-agent">
+      <h2>Что можно передавать в работу<span class="h2-sub">Разложено по тому, кто может это взять: агент, вы лично, или никто пока</span></h2>
+
+      <div class="lane">
+        <div class="lane-head">
+          <span class="lane-title">Можно отдать агенту сегодня</span>
+          <span class="lane-meta">формулировка полная, блокеров нет, приёмка формальная</span>
+        </div>
+        <div class="lane-body">
+          <table>
+            <thead><tr><th class="narrow">Метка</th><th>Работа</th><th>Почему готово</th><th class="narrow">Объём</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="num">WF-03</td>
+                <td>Согласование релиза 0.4 с решениями карты</td>
+                <td>В теле тикета лежит готовый пошаговый список правок с указанием файлов. Ничем не блокируется. Снимает противоречие, из-за которого исполнитель может построить отменённую функциональность.</td>
+                <td><span class="chip">S</span></td>
+              </tr>
+              <tr>
+                <td class="num">0.4 / 13</td>
+                <td>Закрыть доступ к <code>admin/admin</code></td>
+                <td>Единственный блокер — рабочий <code>obuhov</code> — подтверждён и проверен в браузере. Процедура прописана до уровня API-вызовов, включая запрет физического удаления.</td>
+                <td><span class="chip">S</span></td>
+              </tr>
+              <tr>
+                <td class="num">0.4 / 03</td>
+                <td>Тест-гейт изоляции: <code>TenantIsolationApiIT</code> + <code>UserPurgeServiceIT</code></td>
+                <td>Аудит контроллеров уже описан, список маршрутов задан как артефакт. Без этого релиз не имеет права закрыться, а стенд — принимать чужие данные.</td>
+                <td><span class="chip">L</span></td>
+              </tr>
+              <tr>
+                <td class="num">0.4 / 08-fe</td>
+                <td>Фронтенд мастера первого входа <code>/onboarding</code></td>
+                <td>Бэкенд готов и покрыт эндпоинтами по шагам, UI-контракт 0.3 задаёт вид формы, поведение guard-а описано в spec. Нужен тикет-обёртка — содержание уже есть.</td>
+                <td><span class="chip">M</span></td>
+              </tr>
+              <tr>
+                <td class="num">0.4 / 04-fe</td>
+                <td>Экран «Пользователи» для администратора</td>
+                <td>Все шесть эндпоинтов реализованы; <code>AdminInvitesView.vue</code> — готовый образец разметки, guard-а по роли и <code>ConfirmInline</code> вместо модалок.</td>
+                <td><span class="chip">M</span></td>
+              </tr>
+              <tr>
+                <td class="num">гигиена</td>
+                <td>Синхронизация статусов 0.1 и 0.21 с реальностью</td>
+                <td>Механическая работа: проставить <code>resolved</code> и <code>## Answer</code> там, где функциональность в проде. Убирает ложные «свободные» тикеты из фронтира.</td>
+                <td><span class="chip">S</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="handoff-you">
+      <div class="lane">
+        <div class="lane-head">
+          <span class="lane-title">Требует вас лично</span>
+          <span class="lane-meta">решения и приёмка — агент не может ответить за продукт</span>
+        </div>
+        <div class="lane-body">
+          <table>
+            <thead><tr><th class="narrow">Метка</th><th>Работа</th><th>Что именно от вас</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="num">WF-04</td>
+                <td>Полная структура меню и судьба переименований</td>
+                <td><b>Корень всей карты 0.5–0.7.</b> Grilling: четыре переименования (Гант → Дорожная карта, Кривая нагрузки → План нагрузки, Сферы жизни → Диаграмма компетенций, Заметки → Личная база знаний), переезд Бэклога, Банка идей и Чек-листа в «Управление делами», судьба Синергии.</td>
+              </tr>
+              <tr>
+                <td class="num">WF-01</td>
+                <td>Правовая модель хранения чужих персданных</td>
+                <td>Research уже <code>claimed</code>. Решение о самохостинге и приёме чужих данных на своём VPS — ваше, не агентское.</td>
+              </tr>
+              <tr>
+                <td class="num">0.4 / 06</td>
+                <td>Судьба демо-кода после отмены Demo Sandbox</td>
+                <td>Удалять <code>DemoController</code>/<code>DemoGcService</code> и чистить три demo-аккаунта — или оставить как основу генератора трёх профилей 0.6.</td>
+              </tr>
+              <tr>
+                <td class="num">0.4 / 09</td>
+                <td>Сквозная приёмка релиза 0.4</td>
+                <td>Три пути в живом браузере. По вашему же правилу зелёные тесты и успешная сборка приёмкой не считаются.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="blocked">
+      <div class="lane">
+        <div class="lane-head">
+          <span class="lane-title">Заблокировано — не трогать</span>
+          <span class="lane-meta">возьмёшь раньше — построишь не то</span>
+        </div>
+        <div class="lane-body">
+          <table>
+            <thead><tr><th class="narrow">Метка</th><th>Работа</th><th>Ждёт</th></tr></thead>
+            <tbody>
+              <tr><td class="num">WF-05</td><td>Содержание трёх демо-профилей</td><td>WF-04: профиль обязан наполнять каждый пункт утверждённого меню</td></tr>
+              <tr><td class="num">WF-06</td><td>Механика Знакомства: тур и финальный выбор</td><td>WF-04: тур водит по пунктам меню</td></tr>
+              <tr><td class="num">WF-07</td><td>Манифест Siberian Wolf: правда о реализации</td><td>WF-04: манифест ссылается на переименованные экраны</td></tr>
+              <tr><td class="num">WF-08</td><td>Раздел Документация и Сценарии использования</td><td>WF-04, WF-07: иначе оглавление придётся переписывать</td></tr>
+              <tr><td class="num">WF-10</td><td>Архитектура бота импорта и каналы</td><td>WF-09: нельзя проектировать транспорт, не зная, что передаётся</td></tr>
+              <tr><td class="num">WF-11/12/13</td><td>Публикация spec релизов 0.5, 0.6, 0.7</td><td>Все grilling-тикеты своей ветки</td></tr>
+              <tr><td class="num">0.4 / 09</td><td>Приёмка релиза</td><td>03, 04-fe, 08-fe, 13</td></tr>
+            </tbody>
+          </table>
+          <p style="font-size:.85rem;color:var(--ink-soft);margin:.6rem 0 0">
+            Исключение: <b>WF-09 «Контракт разбора заметки в сущности WOLF»</b> формально не блокируется ничем
+            и может идти параллельно ветке меню — это grilling про AI-импорт, не зависящий от навигации.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ПОРЯДОК ================= -->
+    <section id="order">
+      <h2>Рекомендуемый порядок<span class="h2-sub">Сначала снять противоречия в трекере, потом закрыть 0.4, и только затем проектировать 0.5</span></h2>
+
+      <ol class="seq">
+        <li>
+          <b>WF-03 — согласовать 0.4 с картой</b>
+          <span class="why">Пока 05 и 06 висят открытыми, любой исполнитель может достроить отменённое демо. Дешевле всего и разблокирует честный подсчёт остатка.</span>
+        </li>
+        <li>
+          <b>0.4 / 13 — закрыть <code>admin/admin</code></b>
+          <span class="why">Публично известная пара логин-пароль на домене, который уже отвечает из интернета. Блокер снят, работа на полчаса.</span>
+        </li>
+        <li>
+          <b>0.4 / 03 — тест-гейт изоляции</b>
+          <span class="why">Стенд принимает чужих людей по инвайту. Изоляция сейчас держится на договорённости, а не на тесте. Это последний технический блокер релиза.</span>
+        </li>
+        <li>
+          <b>0.4 / 08-fe и 04-fe — два недостающих экрана</b>
+          <span class="why">Мастер первого входа и «Пользователи». Оба бэкенда готовы; без экранов пути A и C приёмки непроходимы в браузере.</span>
+        </li>
+        <li>
+          <b>0.4 / 09 — сквозная приёмка</b>
+          <span class="why">Три пути живьём. Только этот тикет имеет право объявить релиз готовым.</span>
+        </li>
+        <li>
+          <b>WF-04 — grilling структуры меню</b>
+          <span class="why">Корень 0.5–0.7. После него разблокируются сразу четыре тикета карты, и работу можно распараллелить.</span>
+        </li>
+        <li>
+          <b>WF-09 — контракт разбора заметки</b>
+          <span class="why">Можно вести параллельно с меню: ветка AI-импорта от навигации не зависит.</span>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ================= БУДУЩЕЕ ================= -->
+    <section id="future">
+      <h2>Релизы 0.5 – 0.7<span class="h2-sub">Пока это карта wayfinder, а не спецификации: 13 тикетов, из них 11 ещё без ответа</span></h2>
+
+      <table>
+        <thead><tr><th class="narrow">Релиз</th><th>Что войдёт</th><th>Зафиксировано при черчении карты</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="num">0.5</td>
+            <td><b>Навигация и Документация.</b> Четыре переименования экранов, новая группировка меню, раздел <code>/docs</code> внутри приложения: Манифест Siberian Wolf, Сценарии использования, Технические инструкции.</td>
+            <td>Переименования — это <b>переименования, а не новые экраны</b>. Манифест описывает только работающее: пункт без реализации не публикуется.</td>
+          </tr>
+          <tr>
+            <td class="num">0.6</td>
+            <td><b>Демо-профили и Знакомство.</b> При первом входе по инвайту — выбор одного из трёх профилей (наёмный работник / фрилансер / художник), тур подсказками, финальный выбор «Оставить или Очистить профиль», повторная загрузка в Настройках.</td>
+            <td>Анонимное демо отменено: каждый гость получает настоящий постоянный аккаунт. Профили — декларативные файлы в репозитории со сдвигом дат, правка не требует пересборки Java.</td>
+          </tr>
+          <tr>
+            <td class="num">0.7</td>
+            <td><b>AI-импорт записей.</b> Бот, превращающий свободный текст заметок в Дела, Проекты, Рутины и слоты расписания. Каналы по порядку: чат-панель в интерфейсе → Telegram → Max.</td>
+            <td>Подтверждение спрашивается только там, где разбор неуверен или слот занят. Повторяющиеся Дела хранятся правилом, а не материализацией 52 записей.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        Тихий контракт 0.3 переносится во все три релиза без изменений:
+        никаких красных состояний, процентов, прогресс-баров, стриков и упрёков.
+        Сравнение факта и плана — это контекст, а не оценка.
+      </div>
+    </section>
+
+    <section id="открытые">
+      <h2>Ещё не решено<span class="h2-sub">Явно зафиксированные пробелы — чтобы они не всплыли посреди реализации</span></h2>
+      <ul>
+        <li><b>Поведение тура на мобильном</b> — подсказки поверх выдвижного drawer-меню: механики нет в контракте 0.3.</li>
+        <li><b>Судьба гостевого аккаунта во времени</b> — истекает ли доступ по инвайту через месяц, кто чистит заброшенные профили.</li>
+        <li><b>Голосовой ввод в бота импорта</b> — <code>POST /api/v1/notes/audio</code> уже существует для заметок; распространяется ли он на импорт.</li>
+        <li><b>Существующие пользователи после переименования меню</b> — нужен ли короткий тур «что переехало».</li>
+        <li><b>Судьба экрана Синергия</b> — поглощается Диаграммой компетенций или остаётся отдельно.</li>
+        <li><b>Правовая модель хостинга</b> — оферта, политика обработки, уведомление РКН, локализация БД (зависит от WF-01).</li>
+        <li><b>Дистрибутив самохостинга</b> — одна команда <code>docker compose up</code>, готовые образы, миграция данных со стенда.</li>
+        <li><b>Лицензия</b> — <code>LICENSE.md</code> нужно привести в соответствие с намерением до публичного демо.</li>
+      </ul>
+    </section>
+
+    <footer class="page-foot">
+      WOLF · дорожная карта · источники: <code>.scratch/release-0.1 … 0.4</code>,
+      <code>.scratch/wayfinder-releases-05-07/map.md</code>, git-история develop, схема БД стенда, живые health-checks.
+      Файл отдаётся контейнером <code>wolf-docs</code> без пересборки: <code>/docs/roadmap.html</code>.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

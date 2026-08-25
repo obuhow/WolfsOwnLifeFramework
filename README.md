@@ -3,7 +3,7 @@
 Самостоятельная оцифровка своей жизни <br>
 для предпринимателей, фрилансеров, художников и разработчиков
 
-> **Статус:** `v0.1 / alpha` · **развёртывание:** self-hosted / Docker · **лицензия:** open source for personal use (AGPL-3.0)
+> **Статус:** `v0.5 / alpha` · **развёртывание:** self-hosted / Docker · **лицензия:** open source for personal use (AGPL-3.0)
 
 ### Архитектурные принципы
 
@@ -34,9 +34,16 @@ docker-compose.yml   Postgres + API + web (nginx)
 
 ## Быстрый старт
 
+Сначала соберите артефакты на хосте, затем соберите runtime-образы и запустите Compose:
+
 ```bash
-docker compose up --build
+cd api && ./gradlew bootJar --no-daemon && cd ..
+cd web && npm ci && npm run build && cd ..
+docker compose build api web
+docker compose up -d --no-build
 ```
+
+Production workflow собирает образы на VPS внутри Docker. На удалённом хосте не требуются Java, Gradle, Node.js или npm — только Docker Compose и доступ к базовым Docker-образам.
 
 - UI: http://localhost
 - API: http://localhost:8082

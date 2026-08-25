@@ -1,6 +1,6 @@
 # Расширение DemoFixtureGenerator: декларативные профили + три JSON-файла
 
-Status: open
+Status: done
 Blocked by:
 
 ## Question
