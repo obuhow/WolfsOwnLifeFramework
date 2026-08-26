@@ -54,6 +54,7 @@ Production workflow собирает образы на VPS внутри Docker. 
 ## Документация продукта
 
 - Глоссарий: [`CONTEXT.md`](CONTEXT.md)
+- Методология и техники: [`docs/method/wolf-methodology.md`](docs/method/wolf-methodology.md)
 - ADR: [`docs/adr/`](docs/adr/)
 - Release 0.1 spec: [`.scratch/release-0.1/spec.md`](.scratch/release-0.1/spec.md)
 - Тикеты: [`.scratch/release-0.1/issues/`](.scratch/release-0.1/issues/)

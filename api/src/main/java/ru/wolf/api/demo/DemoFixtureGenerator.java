@@ -195,13 +195,20 @@ public class DemoFixtureGenerator {
         return list != null ? list : List.of();
     }
 
+    /**
+     * Get-or-create по имени Области жизни.
+     *
+     * <p>Повторная загрузка профиля (релиз 0.6, тикет 05) идёт через
+     * {@code purgeProfileData}, который Области жизни намеренно <b>не</b> удаляет —
+     * это справочник, как и 9 Сфер. Безусловный {@code save} дублировал бы их при
+     * каждой перезагрузке (4 → 8 → 12), поэтому существующая Область
+     * переиспользуется, а порядок и цвет приводятся к значениям нового профиля.
+     */
     private LifeArea createLifeArea(User user, String name, int sortOrder, String color) {
-        LifeArea area = LifeArea.builder()
-                .user(user)
-                .name(name)
-                .sortOrder(sortOrder)
-                .color(color)
-                .build();
+        LifeArea area = lifeAreaRepository.findByUserAndNameIgnoreCase(user, name)
+                .orElseGet(() -> LifeArea.builder().user(user).name(name).build());
+        area.setSortOrder(sortOrder);
+        area.setColor(color);
         return lifeAreaRepository.save(area);
     }
 

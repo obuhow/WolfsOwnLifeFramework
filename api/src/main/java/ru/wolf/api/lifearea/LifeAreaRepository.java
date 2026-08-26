@@ -35,6 +35,9 @@ public interface LifeAreaRepository extends JpaRepository<LifeArea, Long> {
 
     Optional<LifeArea> findFirstByUserOrderBySortOrderAsc(User user);
 
+    /** Get-or-create по имени при повторной загрузке демо-профиля (релиз 0.6, тикет 05). */
+    Optional<LifeArea> findByUserAndNameIgnoreCase(User user, String name);
+
     @Query("SELECT COALESCE(MAX(la.sortOrder), -1) FROM LifeArea la WHERE la.user = :user")
     int findMaxSortOrderByUser(@Param("user") User user);
 

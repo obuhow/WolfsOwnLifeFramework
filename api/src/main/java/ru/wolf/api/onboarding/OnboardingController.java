@@ -261,10 +261,50 @@ public class OnboardingController {
         User user = userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        String slug = request.getSlug().trim().toLowerCase(java.util.Locale.ROOT);
-        if (!List.of("worker-class", "wise-freelancer", "free-artist").contains(slug)) {
-            throw new IllegalArgumentException("Неизвестный профиль: " + slug);
-        }
+        return ResponseEntity.ok(applyProfile(user, request.getSlug()));
+    }
+
+    /**
+     * Повторная загрузка демо-профиля из Настроек (релиз 0.6, тикет 05).
+     *
+     * <p>Отличается от {@code /load-profile} ровно одним: перед наполнением
+     * вызывается {@link ru.wolf.api.user.UserPurgeService#purgeProfileData(User)}.
+     * Это тот же путь, что и ветка «Очистить профиль» Финального выбора, — смена
+     * профиля не сливается с текущими данными, а заменяет их. Гость, который вёл
+     * свои записи, теряет их: ожидаемое поведение смены профиля, зафиксированное
+     * в тикете «Механика Знакомства» карты 05-07.
+     *
+     * <p>Повторный выбор <b>того же</b> профиля разрешён — данные пересоздаются
+     * с новыми id и пересчитанными на сегодня датами.
+     *
+     * <p>{@code onboardingCompletedAt} не трогается: пользователь уже прошёл или
+     * явно пропустил Знакомство, и смена демо-профиля не должна возвращать его в
+     * поток первого входа.
+     */
+    @PostMapping("/reload-profile")
+    @Transactional
+    public ResponseEntity<LoadProfileResponse> reloadProfile(
+            Authentication authentication,
+            @Valid @RequestBody LoadProfileRequest request
+    ) {
+        User user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        String slug = normalizeSlug(request.getSlug());
+
+        userPurgeService.purgeProfileData(user);
+        // Сброс нормы из purgeProfileData здесь не финален: applyProfile ниже
+        // выставит норму нового профиля. flush нужен, чтобы удаления легли в БД
+        // до проверок идемпотентности внутри populate — иначе они видят старые
+        // строки в persistence context и отклоняют загрузку.
+        userRepository.saveAndFlush(user);
+
+        return ResponseEntity.ok(applyProfile(user, slug));
+    }
+
+    /** Общая часть первой и повторной загрузки: читает JSON, наполняет, синхронизирует часовой пояс и норму. */
+    private LoadProfileResponse applyProfile(User user, String rawSlug) {
+        String slug = normalizeSlug(rawSlug);
 
         String resourcePath = "profiles/" + slug + ".json";
         try (InputStream is = new ClassPathResource(resourcePath).getInputStream()) {
@@ -276,10 +316,18 @@ public class OnboardingController {
                 user.setAvailableWeeklyHours(profile.weeklyHoursNorm());
             }
             userRepository.save(user);
-            return ResponseEntity.ok(new LoadProfileResponse(true, profile.displayName(), profile.weeklyHoursNorm()));
+            return new LoadProfileResponse(true, profile.displayName(), profile.weeklyHoursNorm());
         } catch (java.io.IOException e) {
             throw new IllegalStateException("Не удалось загрузить профиль: " + slug, e);
         }
+    }
+
+    private String normalizeSlug(String rawSlug) {
+        String slug = rawSlug.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!List.of("worker-class", "wise-freelancer", "free-artist").contains(slug)) {
+            throw new IllegalArgumentException("Неизвестный профиль: " + slug);
+        }
+        return slug;
     }
 
     /**

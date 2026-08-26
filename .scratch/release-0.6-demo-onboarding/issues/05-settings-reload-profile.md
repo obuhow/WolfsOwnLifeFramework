@@ -1,6 +1,6 @@
 # Повторная загрузка профиля в Настройках
 
-Status: open
+Status: claimed
 Blocked by: 04
 
 ## Question
