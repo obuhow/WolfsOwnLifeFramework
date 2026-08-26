@@ -24,6 +24,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.goal.GoalRepository;
 import ru.wolf.api.project.ProjectRepository;
+import ru.wolf.api.onboarding.dto.Step1Request;
+import ru.wolf.api.onboarding.dto.Step1Response;
+import ru.wolf.api.onboarding.dto.Step2Request;
+import ru.wolf.api.onboarding.dto.Step2Response;
+import ru.wolf.api.onboarding.dto.Step3Request;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
@@ -163,36 +168,31 @@ class OnboardingApiIT extends ApiIntegrationTest {
         User user2 = newUser("full-wizard-user");
         WebTestClient user2Client = clientFor(user2);
 
-        var step1 = new OnboardingController.Step1Request();
-        step1.setTitle("Мой первый проект");
-        OnboardingController.Step1Response projectResp = user2Client.post()
+        var step1 = new Step1Request("Мой первый проект");
+        Step1Response projectResp = user2Client.post()
                 .uri("/api/v1/onboarding/step1/project")
                 .bodyValue(step1)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(OnboardingController.Step1Response.class)
+                .expectBody(Step1Response.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(projectResp).isNotNull();
-        assertThat(projectResp.getProjectId()).isNotNull();
+        assertThat(projectResp.projectId()).isNotNull();
 
-        var step2 = new OnboardingController.Step2Request();
-        step2.setProjectId(projectResp.getProjectId());
-        step2.setTitle("Моя первая цель");
-        step2.setWeeklyHours(new BigDecimal("5"));
-        OnboardingController.Step2Response goalResp = user2Client.post()
+        var step2 = new Step2Request(projectResp.projectId(), "Моя первая цель", new BigDecimal("5"));
+        Step2Response goalResp = user2Client.post()
                 .uri("/api/v1/onboarding/step2/goal")
                 .bodyValue(step2)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(OnboardingController.Step2Response.class)
+                .expectBody(Step2Response.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(goalResp).isNotNull();
-        assertThat(goalResp.getGoalId()).isNotNull();
+        assertThat(goalResp.goalId()).isNotNull();
 
-        var step3 = new OnboardingController.Step3Request();
-        step3.setWeeklyHours(new BigDecimal("12"));
+        var step3 = new Step3Request(new BigDecimal("12"));
         user2Client.post()
                 .uri("/api/v1/onboarding/step3/weekly-hours")
                 .bodyValue(step3)
