@@ -7,6 +7,8 @@ plugins {
 group = 'ru.wolf'
 version = '0.6.0'
 
+// SPDX-License-Identifier: AGPL-3.0-only (см. LICENSE в корне репозитория)
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
