@@ -10,6 +10,11 @@ const route = useRoute()
 const token = ref(localStorage.getItem('wolf_token') || '')
 const username = ref('')
 
+// Версия сборки (релиз 0.6, тикет 08). `__APP_VERSION__` — compile-time
+// константа из web/vite.config.js, читающая web/package.json. Смена версии
+// в package.json отражается в шапке после пересборки, без правок App.vue.
+const appVersion = __APP_VERSION__
+
 // Онбординг-маршруты (релиз 0.6) — полноэкранные, без навигационной оболочки.
 const isOnboarding = computed(() => route.path.startsWith('/onboarding'))
 
@@ -251,6 +256,7 @@ onBeforeUnmount(() => {
             <div class="brand-container">
               <div class="brand-logo">WOLF</div>
               <div class="brand-tagline">Система управления потоком</div>
+              <div class="brand-version">v{{ appVersion }}</div>
             </div>
           </router-link>
 
@@ -362,6 +368,7 @@ onBeforeUnmount(() => {
               <div class="brand-container-sm">
                 <div class="brand-logo-sm">WOLF</div>
                 <div class="brand-tagline-sm">Система управления потоком</div>
+                <div class="brand-version-sm">v{{ appVersion }}</div>
               </div>
               <button type="button" class="menu-trigger" aria-label="Закрыть меню" @click="closeDrawer">
                 <span aria-hidden="true">✕</span>
