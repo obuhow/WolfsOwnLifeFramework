@@ -52,6 +52,12 @@ public class InviteService {
         return sb.toString();
     }
 
+    @Transactional(readOnly = true)
+    public User currentUser(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+    }
+
     @Transactional
     public InviteCode createInvite(User createdBy, int maxUses, Instant expiresAt, String note) {
         String code = generateCode();

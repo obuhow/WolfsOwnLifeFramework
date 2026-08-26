@@ -13,30 +13,24 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.admin;
 
-import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-import ru.wolf.api.invite.InviteCode;
-import ru.wolf.api.invite.InviteCodeRepository;
-import ru.wolf.api.invite.InviteService;
-import ru.wolf.api.user.User;
-import ru.wolf.api.user.UserRepository;
+import ru.wolf.api.admin.dto.CreateInviteCodeRequest;
+import ru.wolf.api.admin.dto.DeleteUserRequest;
+import ru.wolf.api.admin.dto.InviteCodeAdminResponse;
+import ru.wolf.api.admin.dto.ResetPasswordResponse;
+import ru.wolf.api.admin.dto.UserAdminResponse;
 
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -44,250 +38,58 @@ import java.util.stream.Collectors;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    private final UserRepository userRepository;
-    private final InviteCodeRepository inviteCodeRepository;
-    private final InviteService inviteService;
-    private final PasswordEncoder passwordEncoder;
+    private final AdminService adminService;
 
     @GetMapping("/users")
     public ResponseEntity<List<UserAdminResponse>> listUsers(
             @RequestParam(defaultValue = "false") boolean includeDemo
     ) {
-        List<User> users = includeDemo 
-                ? userRepository.findAllUsersIncludeDemo()
-                : userRepository.findAllRegularUsers();
-        
-        return ResponseEntity.ok(users.stream().map(this::toAdminResponse).collect(Collectors.toList()));
+        return ResponseEntity.ok(adminService.listUsers(includeDemo));
     }
 
     @PostMapping("/users/{id}/block")
-    @Transactional
-    public ResponseEntity<Void> blockUser(
-            Authentication authentication,
-            @PathVariable Long id
-    ) {
-        User currentUser = userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new IllegalStateException("Current user not found"));
-        
-        if (currentUser.getId().equals(id)) {
-            return ResponseEntity.badRequest().build();
-        }
-        
-        User target = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        if ("BLOCKED".equals(target.getStatus())) {
-            return ResponseEntity.badRequest().build();
-        }
-        target.setStatus("BLOCKED");
-        userRepository.save(target);
+    public ResponseEntity<Void> blockUser(Authentication authentication, @PathVariable Long id) {
+        adminService.blockUser(authentication.getName(), id);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/users/{id}/unblock")
-    @Transactional
-    public ResponseEntity<Void> unblockUser(
-            Authentication authentication,
-            @PathVariable Long id
-    ) {
-        User currentUser = userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new IllegalStateException("Current user not found"));
-        
-        if (currentUser.getId().equals(id)) {
-            return ResponseEntity.badRequest().build();
-        }
-        
-        User target = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        if ("ACTIVE".equals(target.getStatus())) {
-            return ResponseEntity.badRequest().build();
-        }
-        target.setStatus("ACTIVE");
-        userRepository.save(target);
+    public ResponseEntity<Void> unblockUser(Authentication authentication, @PathVariable Long id) {
+        adminService.unblockUser(authentication.getName(), id);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/users/{id}/reset-password")
-    @Transactional
-    public ResponseEntity<ResetPasswordResponse> resetPassword(
-            Authentication authentication,
-            @PathVariable Long id
-    ) {
-        User currentUser = userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new IllegalStateException("Current user not found"));
-        
-        if (currentUser.getId().equals(id)) {
-            return ResponseEntity.badRequest().build();
-        }
-        
-        User target = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        
-        String tempPassword = generateTempPassword();
-        target.setPasswordHash(passwordEncoder.encode(tempPassword));
-        userRepository.save(target);
-        
-        return ResponseEntity.ok(new ResetPasswordResponse(tempPassword));
+    public ResponseEntity<ResetPasswordResponse> resetPassword(Authentication authentication, @PathVariable Long id) {
+        return ResponseEntity.ok(adminService.resetPassword(authentication.getName(), id));
     }
 
     @DeleteMapping("/users/{id}")
-    @Transactional
     public ResponseEntity<Void> deleteUser(
             Authentication authentication,
             @PathVariable Long id,
-            @RequestBody DeleteUserRequest request
+            @Valid @RequestBody DeleteUserRequest request
     ) {
-        User currentUser = userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new IllegalStateException("Current user not found"));
-        
-        if (currentUser.getId().equals(id)) {
-            return ResponseEntity.badRequest().build();
-        }
-        
-        // Check if this is the last active admin
-        long activeAdminCount = userRepository.countByRoleAndStatus("ADMIN", "ACTIVE");
-        if (activeAdminCount <= 1) {
-            User target = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
-            if ("ADMIN".equals(target.getRole()) && "ACTIVE".equals(target.getStatus())) {
-                return ResponseEntity.badRequest().build(); // Cannot delete last active admin
-            }
-        }
-        
-        // Verify username confirmation
-        User target = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        if (!target.getUsername().equals(request.confirmUsername())) {
-            return ResponseEntity.badRequest().build();
-        }
-        
-        // Note: In a production system, we'd use a proper UserPurgeService.
-        // For now, rely on DB ON DELETE CASCADE for most entities.
-        // The User entity deletion will cascade to entities with proper FK constraints.
-        userRepository.delete(target);
-        
+        adminService.deleteUser(authentication.getName(), id, request);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/invite-codes")
-    @Transactional(readOnly = true)
     public ResponseEntity<List<InviteCodeAdminResponse>> listInviteCodes() {
-        List<InviteCode> codes = inviteCodeRepository.findAllByOrderByCreatedAtDesc();
-        return ResponseEntity.ok(codes.stream().map(this::toInviteAdminResponse).collect(Collectors.toList()));
+        return ResponseEntity.ok(adminService.listInviteCodes());
     }
 
     @PostMapping("/invite-codes")
-    @Transactional
     public ResponseEntity<InviteCodeAdminResponse> createInviteCode(
             Authentication authentication,
-            @RequestBody CreateInviteCodeRequest request
+            @Valid @RequestBody CreateInviteCodeRequest request
     ) {
-        User createdBy = userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new IllegalStateException("User not found"));
-        
-        InviteCode invite = inviteService.createInvite(
-                createdBy,
-                request.maxUses() != null ? request.maxUses() : 1,
-                request.expiresAt(),
-                request.note()
-        );
-        
-        return ResponseEntity.ok(toInviteAdminResponse(invite));
+        return ResponseEntity.ok(adminService.createInviteCode(authentication.getName(), request));
     }
 
     @PostMapping("/invite-codes/{id}/revoke")
-    @Transactional
-    public ResponseEntity<Void> revokeInviteCode(@PathVariable java.util.UUID id) {
-        InviteCode invite = inviteCodeRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Invite code not found"));
-        if (invite.getRevokedAt() == null) {
-            invite.setRevokedAt(java.time.Instant.now());
-            inviteCodeRepository.save(invite);
-        }
+    public ResponseEntity<Void> revokeInviteCode(@PathVariable UUID id) {
+        adminService.revokeInviteCode(id);
         return ResponseEntity.ok().build();
     }
-
-    private UserAdminResponse toAdminResponse(User user) {
-        // Count user's data - use repository queries instead of lazy collections
-        // For now return 0 counts - can be enhanced later with specific count queries
-        return new UserAdminResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getEmail(),
-                user.getRole(),
-                user.getStatus(),
-                user.getAccountType(),
-                user.getCreatedAt(),
-                user.getLastLoginAt(),
-                0,
-                0,
-                0
-        );
-    }
-
-    private InviteCodeAdminResponse toInviteAdminResponse(InviteCode code) {
-        return new InviteCodeAdminResponse(
-                code.getId(),
-                code.getCode(),
-                code.getCreatedBy().getUsername(),
-                code.getMaxUses(),
-                code.getUsedCount(),
-                code.getExpiresAt(),
-                code.getRevokedAt(),
-                code.getNote(),
-                code.getCreatedAt()
-        );
-    }
-
-    private String generateTempPassword() {
-        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        StringBuilder sb = new StringBuilder(12);
-        java.security.SecureRandom random = new java.security.SecureRandom();
-        for (int i = 0; i < 12; i++) {
-            sb.append(chars.charAt(random.nextInt(chars.length())));
-        }
-        return sb.toString();
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UserAdminResponse {
-        private Long id;
-        private String username;
-        private String email;
-        private String role;
-        private String status;
-        private String accountType;
-        private java.time.Instant createdAt;
-        private java.time.Instant lastLoginAt;
-        private long projectCount;
-        private long deloCount;
-        private long timeEntryCount;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class InviteCodeAdminResponse {
-        private java.util.UUID id;
-        private String code;
-        private String createdByUsername;
-        private Integer maxUses;
-        private Integer usedCount;
-        private java.time.Instant expiresAt;
-        private java.time.Instant revokedAt;
-        private String note;
-        private java.time.Instant createdAt;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ResetPasswordResponse {
-        private String tempPassword;
-    }
-
-    public record CreateInviteCodeRequest(
-            Integer maxUses,
-            java.time.Instant expiresAt,
-            String note
-    ) {}
-
-    public record DeleteUserRequest(
-            @NotBlank String confirmUsername
-    ) {}
 }

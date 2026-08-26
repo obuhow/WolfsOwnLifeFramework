@@ -13,14 +13,10 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.auth;
 
-import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +27,9 @@ import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
+import ru.wolf.api.auth.dto.AuthRequest;
+import ru.wolf.api.auth.dto.AuthResponse;
+import ru.wolf.api.auth.dto.MeResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -43,14 +42,14 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final UserDetailsServiceImpl userDetailsService;
-    private final ru.wolf.api.user.UserRepository userRepository;
+    private final AuthService authService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+                    new UsernamePasswordAuthenticationToken(request.username(), request.password())
             );
         } catch (DisabledException | AccountExpiredException | LockedException e) {
             // Returned directly (not thrown) to avoid Tomcat's ERROR-dispatch re-entering the
@@ -60,11 +59,7 @@ public class AuthController {
         }
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        ru.wolf.api.user.User user = userRepository.findByUsername(userDetails.getUsername())
-                .orElseThrow(() -> new IllegalStateException("User not found after authentication"));
-
-        user.setLastLoginAt(java.time.Instant.now());
-        userRepository.save(user);
+        ru.wolf.api.user.User user = authService.currentUserAfterLogin(userDetails.getUsername());
 
         String token;
         if ("DEMO".equals(user.getAccountType()) && user.getExpiresAt() != null) {
@@ -79,45 +74,6 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<MeResponse> me(Authentication authentication) {
-        ru.wolf.api.user.User user = userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new IllegalStateException("User not found"));
-        return ResponseEntity.ok(new MeResponse(
-                user.getUsername(),
-                user.getRole(),
-                user.getAccountType(),
-                user.getEmail(),
-                user.getOnboardingCompletedAt() != null,
-                user.getExpiresAt()
-        ));
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AuthRequest {
-        @NotBlank
-        private String username;
-
-        @NotBlank
-        private String password;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AuthResponse {
-        private String token;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class MeResponse {
-        private String username;
-        private String role;
-        private String accountType;
-        private String email;
-        private boolean onboardingCompleted;
-        private java.time.Instant expiresAt;
+        return ResponseEntity.ok(authService.me(authentication.getName()));
     }
 }
