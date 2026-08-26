@@ -30,7 +30,7 @@ import ru.wolf.api.goal.GoalProjectRepository;
 import ru.wolf.api.goal.GoalRepository;
 import ru.wolf.api.goal.GoalWeekBudgetRepository;
 import ru.wolf.api.idea.Idea;
-import ru.wolf.api.idea.IdeaController;
+import ru.wolf.api.idea.dto.CreateIdeaRequest;
 import ru.wolf.api.idea.IdeaRepository;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
@@ -160,7 +160,7 @@ class MorningDigestApiIT extends ApiIntegrationTest {
                         "", null, null, null))
                 .exchange().expectStatus().isOk();
         createIdea(client, "В банке", Idea.Category.PERSONAL);
-        IdeaController.CreateIdeaRequest inWork = new IdeaController.CreateIdeaRequest(
+        CreateIdeaRequest inWork = new CreateIdeaRequest(
                 "В работе", null, Idea.Category.BUSINESS, Idea.Status.IN_WORK);
         client.post().uri("/api/v1/ideas").bodyValue(inWork).exchange().expectStatus().isOk();
 
@@ -206,7 +206,7 @@ class MorningDigestApiIT extends ApiIntegrationTest {
 
     private void createIdea(WebTestClient client, String title, Idea.Category category) {
         client.post().uri("/api/v1/ideas")
-                .bodyValue(new IdeaController.CreateIdeaRequest(title, null, category, Idea.Status.BANK))
+                .bodyValue(new CreateIdeaRequest(title, null, category, Idea.Status.BANK))
                 .exchange().expectStatus().isOk();
     }
 

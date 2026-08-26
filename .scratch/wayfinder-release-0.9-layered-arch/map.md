@@ -27,7 +27,18 @@
 
 ## Decisions so far
 
-_(Заполняется по мере закрытия тикетов.)_
+- **01 (Паттерн, ADR и референсная миграция) — resolved.** Паттерн зафиксирован в
+  `docs/adr/0005-layered-architecture-mcv.md` (вариант D: тонкий MVCS + точечные порты) и
+  применён на `Idea`. Контроллер тонкий (без `Repository`), бизнес-логика + `@Transactional`
+  в `IdeaService`, DTO — records в `ru.wolf.api.idea.dto` с маппером `IdeaResponse.from(Idea)`,
+  текущий `User` резолвится в сервисе по `authentication.getName()`. Тесты `IdeaApiIT` (5/5)
+  и `MorningDigestApiIT` (2/2) зелёные. `grep` по `private final.*Repository` в
+  `api/src/main/java/ru/wolf/api/idea/*Controller.java` — пуст. Все тикеты 02–10 копируют
+  структуру `ru.wolf.api.idea`. См. Answer тикета 01.
+  - **Изменения в правилах трекера, всплывшие при 01**: DoD п.4 («*ApiIT без правок кода»)
+    на практике требует механической правки — при переезде DTO из вложенных типов контроллера
+    в `dto/` правятся только FQN типа и `getId()`→`id()` (record-accessor), проверяемое
+    поведение не меняется. Зафиксировано в ADR как «Осознанные исключения».
 
 ## Not yet specified
 
