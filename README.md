@@ -1,4 +1,4 @@
-# WOLF - Wolf's One Life Framework
+# WOLF - Wolf's Own Life Framework
 
 Самостоятельная оцифровка своей жизни <br>
 для предпринимателей, фрилансеров, художников и разработчиков

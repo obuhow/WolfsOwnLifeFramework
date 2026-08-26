@@ -1,6 +1,6 @@
 # Опечатка в заголовке README: «One» → «Own»
 
-Status: open
+Status: resolved
 Blocked by:
 
 ## Question
@@ -21,3 +21,13 @@ Blocked by:
 ## Out of Scope
 
 - Ревизия остального содержимого README (статус `v0.1 / alpha`, порты и пр.) — не трогается, только опечатка в заголовке.
+
+## Answer
+
+Правка выполнена: `README.md` строка 1 — `Wolf's One Life Framework` → `Wolf's Own Life Framework`.
+
+### Верификация
+- `grep -rn "Wolf's One"` по репозиторию (исключая `node_modules`) — совпадения остались только
+  в тексте самого тикета и в `spec.md` релиза 0.6, где опечатка цитируется как описание задачи.
+  В исходниках и документации продукта — ноль.
+- `grep -n "Wolf's Own Life Framework" README.md` → строка 1.
