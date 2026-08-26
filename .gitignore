@@ -29,3 +29,5 @@ hermes-verify-*.py
 
 .scratch/wayfinder-wolf
 .scratch/wayfinder-releases-05-07
+testing/.venv/
+testing/__pycache__/

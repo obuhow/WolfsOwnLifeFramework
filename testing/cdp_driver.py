@@ -65,7 +65,9 @@ async def connect(port=None):
     import websockets
     base = CDP_HTTP if port is None else f"http://127.0.0.1:{port}"
     # Открываем новую вкладку, чтобы не мешать другим проверкам.
-    with urllib.request.urlopen(f"{base}/json/new?about:blank", data=b"") as r:
+    # Chrome 111+ требует PUT на /json/new (POST отдаёт 405 Method Not Allowed).
+    req = urllib.request.Request(f"{base}/json/new?about:blank", method="PUT")
+    with urllib.request.urlopen(req) as r:
         tab = json.loads(r.read())
     ws = await websockets.connect(
         tab["webSocketDebuggerUrl"], max_size=50 * 1024 * 1024
