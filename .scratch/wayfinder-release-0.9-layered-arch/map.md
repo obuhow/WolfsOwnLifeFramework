@@ -40,6 +40,19 @@
     в `dto/` правятся только FQN типа и `getId()`→`id()` (record-accessor), проверяемое
     поведение не меняется. Зафиксировано в ADR как «Осознанные исключения».
 
+- **02 (Identity & Access: Auth, User, Admin, Invite, Onboarding) — resolved.** Мигрирован
+  весь кластер: 5 тонких контроллеров (без `Repository`) → сервисы `AuthService`,
+  `UserSettingsService`, `AdminService`, `OnboardingService` (+ расширен `InviteService`
+  методом `currentUser`); DTO — records в `ru.wolf.api.<feature>.dto`. `AuthManager`/`JwtUtil`
+  оставлены в `AuthController` (Security-инфраструктура, не Repository). Admin-отказы
+  (само-блок, последний админ, несовпадение username) бросаются как `IllegalArgumentException`
+  → 400 через `GlobalExceptionHandler`. Тесты кластера зелёные изолированно
+  (`AuthApiIT`, `UserModelApiIT`, `UserSettingsApiIT`, `AdminApiIT`, `RegistrationApiIT`,
+  `OnboardingApiIT`); `OnboardingApiIT` поправлен механически (FQN + конструктор records).
+  Всплыло: при пакетном прогоне IT на слабом хосте Testcontainers-postgres flaky
+  (`CannotCreateTransactionException`/таймаут логина) — лечится запуском по одному классу
+  и лимитом JVM-памяти (`-Xmx768m`). Контракт HTTP не изменился.
+
 ## Not yet specified
 
 - **Нужен ли `ImportXlsxPort`/формальный порт для datasync и легаси-нормализации workbook**, или там достаточно обычного Service (в отличие от `note/assistant`, где два реальных адаптера уже существуют, у `datasync` пока один формат хранения) — решится внутри тикета 06 при погружении в код.
