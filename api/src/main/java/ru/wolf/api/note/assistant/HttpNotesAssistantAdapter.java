@@ -27,12 +27,12 @@ import org.springframework.web.client.RestClient;
 
 @Component
 @Profile("!test")
-public class HttpNotesAssistant implements NotesAssistant {
+public class HttpNotesAssistantAdapter implements AssistantPort {
 
     private final RestClient client;
     private final NotesAssistantProperties properties;
 
-    public HttpNotesAssistant(RestClient.Builder builder, NotesAssistantProperties properties) {
+    public HttpNotesAssistantAdapter(RestClient.Builder builder, NotesAssistantProperties properties) {
         this.properties = properties;
         this.client = builder.baseUrl(properties.getUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
