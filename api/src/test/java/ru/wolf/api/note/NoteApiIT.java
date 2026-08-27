@@ -28,6 +28,8 @@ import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
+import ru.wolf.api.note.dto.NoteRequest;
+import ru.wolf.api.note.dto.NoteResponse;
 import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
@@ -67,49 +69,41 @@ class NoteApiIT extends ApiIntegrationTest {
         ProjectResponse project = createProject(client, areaId, "WOLF");
         DeloController.DeloResponse delo = createDelo(client, "Spring Security");
 
-        NoteController.NoteRequest projectRequest = new NoteController.NoteRequest();
-        projectRequest.setProjectId(project.id());
-        projectRequest.setBody("Решение по Spring Security и JWT");
-        projectRequest.setTags(List.of("security", "решение"));
-        NoteController.NoteResponse projectNote = createNote(client, projectRequest);
+        NoteRequest projectRequest = new NoteRequest(project.id(), null, null, "Решение по Spring Security и JWT", List.of("security", "решение"));
+        NoteResponse projectNote = createNote(client, projectRequest);
 
-        NoteController.NoteRequest agentRequest = new NoteController.NoteRequest();
-        agentRequest.setDeloId(delo.getId());
-        agentRequest.setAuthor(Note.Author.AGENT);
-        agentRequest.setBody("Агент нашёл справку по фильтрам");
-        agentRequest.setTags(List.of("research"));
-        NoteController.NoteResponse agentNote = createNote(client, agentRequest);
+        NoteRequest agentRequest = new NoteRequest(null, delo.getId(), Note.Author.AGENT, "Агент нашёл справку по фильтрам", List.of("research"));
+        NoteResponse agentNote = createNote(client, agentRequest);
 
-        assertThat(projectNote.getProjectId()).isEqualTo(project.id());
-        assertThat(projectNote.getDeloId()).isNull();
-        assertThat(agentNote.getDeloId()).isEqualTo(delo.getId());
-        assertThat(agentNote.getAuthor()).isEqualTo(Note.Author.AGENT);
+        assertThat(projectNote.projectId()).isEqualTo(project.id());
+        assertThat(projectNote.deloId()).isNull();
+        assertThat(agentNote.deloId()).isEqualTo(delo.getId());
+        assertThat(agentNote.author()).isEqualTo(Note.Author.AGENT);
 
         client.get().uri(uri -> uri.path("/api/v1/notes")
                         .queryParam("projectId", project.id()).build())
                 .exchange().expectStatus().isOk()
-                .expectBodyList(NoteController.NoteResponse.class).hasSize(1);
+                .expectBodyList(NoteResponse.class).hasSize(1);
 
         client.get().uri(uri -> uri.path("/api/v1/notes")
                         .queryParam("author", "AGENT").queryParam("tag", "research").build())
                 .exchange().expectStatus().isOk()
-                .expectBodyList(NoteController.NoteResponse.class).hasSize(1);
+                .expectBodyList(NoteResponse.class).hasSize(1);
 
-        List<NoteController.NoteResponse> search = client.get()
+        List<NoteResponse> search = client.get()
                 .uri(uri -> uri.path("/api/v1/notes").queryParam("q", "Spring Security").build())
                 .exchange().expectStatus().isOk()
-                .expectBodyList(NoteController.NoteResponse.class).returnResult().getResponseBody();
-        assertThat(search).extracting(NoteController.NoteResponse::getId).contains(projectNote.getId());
+                .expectBodyList(NoteResponse.class).returnResult().getResponseBody();
+        assertThat(search).extracting(NoteResponse::id).contains(projectNote.id());
 
-        projectRequest.setBody("Обновлённое решение");
-        projectRequest.setTags(List.of("updated"));
-        client.put().uri("/api/v1/notes/{id}", projectNote.getId()).bodyValue(projectRequest)
+        var updatedRequest = new NoteRequest(project.id(), null, null, "Обновлённое решение", List.of("updated"));
+        client.put().uri("/api/v1/notes/{id}", projectNote.id()).bodyValue(updatedRequest)
                 .exchange().expectStatus().isOk();
-        client.get().uri("/api/v1/notes/{id}", projectNote.getId()).exchange()
-                .expectStatus().isOk().expectBody(NoteController.NoteResponse.class)
-                .value(note -> assertThat(note.getBody()).isEqualTo("Обновлённое решение"));
+        client.get().uri("/api/v1/notes/{id}", projectNote.id()).exchange()
+                .expectStatus().isOk().expectBody(NoteResponse.class)
+                .value(note -> assertThat(note.body()).isEqualTo("Обновлённое решение"));
 
-        client.delete().uri("/api/v1/notes/{id}", agentNote.getId()).exchange()
+        client.delete().uri("/api/v1/notes/{id}", agentNote.id()).exchange()
                 .expectStatus().isNoContent();
     }
 
@@ -118,24 +112,19 @@ class NoteApiIT extends ApiIntegrationTest {
         WebTestClient client = authedAdminClient();
         DeloController.DeloResponse delo = createDelo(client, "Агентская заметка");
 
-        NoteController.NoteRequest create = new NoteController.NoteRequest();
-        create.setDeloId(delo.getId());
-        create.setAuthor(Note.Author.AGENT);
-        create.setBody("Исходная заметка агента");
-        NoteController.NoteResponse note = createNote(client, create);
+        NoteRequest create = new NoteRequest(null, delo.getId(), Note.Author.AGENT, "Исходная заметка агента", null);
+        NoteResponse note = createNote(client, create);
 
-        NoteController.NoteRequest update = new NoteController.NoteRequest();
-        update.setDeloId(delo.getId());
-        update.setBody("Обновлённая заметка агента");
-        NoteController.NoteResponse updated = client.put()
-                .uri("/api/v1/notes/{id}", note.getId())
+        NoteRequest update = new NoteRequest(null, delo.getId(), null, "Обновлённая заметка агента", null);
+        NoteResponse updated = client.put()
+                .uri("/api/v1/notes/{id}", note.id())
                 .bodyValue(update)
                 .exchange().expectStatus().isOk()
-                .expectBody(NoteController.NoteResponse.class)
+                .expectBody(NoteResponse.class)
                 .returnResult().getResponseBody();
 
-        assertThat(updated.getAuthor()).isEqualTo(Note.Author.AGENT);
-        assertThat(updated.getBody()).isEqualTo("Обновлённая заметка агента");
+        assertThat(updated.author()).isEqualTo(Note.Author.AGENT);
+        assertThat(updated.body()).isEqualTo("Обновлённая заметка агента");
     }
 
     @Test
@@ -145,22 +134,18 @@ class NoteApiIT extends ApiIntegrationTest {
         ProjectResponse project = createProject(client, areaId, "WOLF");
         DeloController.DeloResponse delo = createDelo(client, "Рутина");
 
-        NoteController.NoteRequest empty = new NoteController.NoteRequest();
-        empty.setBody("Без привязки");
+        NoteRequest empty = new NoteRequest(null, null, null, "Без привязки", null);
         client.post().uri("/api/v1/notes").bodyValue(empty).exchange()
                 .expectStatus().isBadRequest();
 
-        NoteController.NoteRequest both = new NoteController.NoteRequest();
-        both.setProjectId(project.id());
-        both.setDeloId(delo.getId());
-        both.setBody("Две привязки");
+        NoteRequest both = new NoteRequest(project.id(), delo.getId(), null, "Две привязки", null);
         client.post().uri("/api/v1/notes").bodyValue(both).exchange()
                 .expectStatus().isBadRequest();
     }
 
-    private NoteController.NoteResponse createNote(WebTestClient client, NoteController.NoteRequest request) {
+    private NoteResponse createNote(WebTestClient client, NoteRequest request) {
         return client.post().uri("/api/v1/notes").bodyValue(request).exchange()
-                .expectStatus().isOk().expectBody(NoteController.NoteResponse.class)
+                .expectStatus().isOk().expectBody(NoteResponse.class)
                 .returnResult().getResponseBody();
     }
 

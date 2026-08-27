@@ -15,16 +15,27 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-package ru.wolf.api.note.assistant;
+package ru.wolf.api.note.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import ru.wolf.api.note.Note;
 
 import java.util.List;
 
-/** Application port for LLM-backed note operations. */
-public interface NotesAssistant {
+public record NoteRequest(
 
-    String transcribe(String audioRef);
+        Long projectId,
 
-    String summarize(Long projectId, List<Long> noteIds);
+        Long deloId,
 
-    String suggest(Long projectId, List<String> topics);
+        Note.Author author,
+
+        @NotBlank
+        @Size(max = 100000)
+        String body,
+
+        @Size(max = 50)
+        List<@NotBlank @Size(max = 100) String> tags
+) {
 }

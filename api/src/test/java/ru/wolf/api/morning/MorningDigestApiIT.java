@@ -37,8 +37,8 @@ import ru.wolf.api.idea.IdeaRepository;
 import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.note.Note;
-import ru.wolf.api.note.NoteController;
 import ru.wolf.api.note.NoteRepository;
+import ru.wolf.api.note.dto.NoteRequest;
 import ru.wolf.api.project.dto.CreateProjectRequest;
 import ru.wolf.api.project.dto.ProjectResponse;
 import ru.wolf.api.project.dto.UpdateProjectRequest;
@@ -103,10 +103,8 @@ class MorningDigestApiIT extends ApiIntegrationTest {
                     .exchange().expectStatus().isOk();
         }
         for (int i = 1; i <= 5; i++) {
-            NoteController.NoteRequest request = new NoteController.NoteRequest();
-            request.setProjectId(project.id());
-            request.setAuthor(i == 5 ? Note.Author.AGENT : Note.Author.USER);
-            request.setBody("Заметка " + i);
+            NoteRequest request = new NoteRequest(project.id(), null,
+                    i == 5 ? Note.Author.AGENT : Note.Author.USER, "Заметка " + i, null);
             client.post().uri("/api/v1/notes").bodyValue(request)
                     .exchange().expectStatus().isOk();
         }

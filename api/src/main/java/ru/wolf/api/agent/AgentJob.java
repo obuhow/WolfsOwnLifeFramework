@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.note.Note;
 import ru.wolf.api.note.NoteRepository;
-import ru.wolf.api.note.assistant.NotesAssistant;
+import ru.wolf.api.note.assistant.AssistantPort;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.timeentry.TimeEntryRepository;
@@ -49,7 +49,7 @@ public class AgentJob {
     private final DeloProjectRepository deloProjectRepository;
     private final NoteRepository noteRepository;
     private final UserRepository userRepository;
-    private final NotesAssistant notesAssistant;
+    private final AssistantPort notesAssistant;
 
     public AgentJob(
             AgentRunLogService runLogService,
@@ -58,7 +58,7 @@ public class AgentJob {
             DeloProjectRepository deloProjectRepository,
             NoteRepository noteRepository,
             UserRepository userRepository,
-            NotesAssistant notesAssistant
+            AssistantPort notesAssistant
     ) {
         this.runLogService = runLogService;
         this.projectRepository = projectRepository;

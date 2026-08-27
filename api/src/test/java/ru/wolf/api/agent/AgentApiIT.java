@@ -30,7 +30,7 @@ import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.note.Note;
 import ru.wolf.api.note.NoteRepository;
-import ru.wolf.api.note.assistant.FakeNotesAssistant;
+import ru.wolf.api.note.assistant.FakeNotesAssistantAdapter;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.timeentry.TimeEntryRepository;
@@ -44,7 +44,7 @@ class AgentApiIT extends ApiIntegrationTest {
     private AgentJob agentJob;
 
     @Autowired
-    private FakeNotesAssistant fakeNotesAssistant;
+    private FakeNotesAssistantAdapter fakeNotesAssistant;
 
     @Autowired
     private NoteRepository noteRepository;

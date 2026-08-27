@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Profile("test")
-public class FakeNotesAssistant implements NotesAssistant {
+public class FakeNotesAssistantAdapter implements AssistantPort {
 
     private final AtomicReference<String> transcriptionResponse = new AtomicReference<>("Тестовая транскрипция");
     private final AtomicReference<String> summaryResponse = new AtomicReference<>("Тестовая сводка");

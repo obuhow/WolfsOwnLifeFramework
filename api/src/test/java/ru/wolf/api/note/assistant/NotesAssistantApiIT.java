@@ -39,8 +39,10 @@ import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.note.Note;
-import ru.wolf.api.note.NoteController;
 import ru.wolf.api.note.NoteRepository;
+import ru.wolf.api.note.dto.NoteRequest;
+import ru.wolf.api.note.dto.NoteResponse;
+import ru.wolf.api.note.assistant.dto.ResumeResponse;
 import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
@@ -50,7 +52,7 @@ import ru.wolf.api.support.ApiIntegrationTest;
 class NotesAssistantApiIT extends ApiIntegrationTest {
 
     @Autowired
-    private FakeNotesAssistant fakeNotesAssistant;
+    private FakeNotesAssistantAdapter fakeNotesAssistant;
 
     @Autowired
     private NoteRepository noteRepository;
@@ -92,12 +94,12 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
                 .bodyValue(parts)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(NoteController.NoteResponse.class)
+                .expectBody(NoteResponse.class)
                 .value(note -> {
-                    assertThat(note.getBody()).isEqualTo("Тестовая транскрипция");
-                    assertThat(note.getProjectId()).isEqualTo(projectId);
-                    assertThat(note.getAudioRef()).isNotBlank();
-                    assertThat(note.getTags()).containsExactly("voice");
+                    assertThat(note.body()).isEqualTo("Тестовая транскрипция");
+                    assertThat(note.projectId()).isEqualTo(projectId);
+                    assertThat(note.audioRef()).isNotBlank();
+                    assertThat(note.tags()).containsExactly("voice");
                 });
     }
 
@@ -113,7 +115,7 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
         client.get().uri(uri -> uri.path("/api/v1/projects/{id}/resume").queryParam("limit", 10).build(projectId))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectResumeController.ResumeResponse.class)
+                .expectBody(ResumeResponse.class)
                 .value(resume -> {
                     assertThat(resume.projectId()).isEqualTo(projectId);
                     assertThat(resume.noteIds()).hasSize(3);
@@ -135,9 +137,7 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
     }
 
     private void createNote(WebTestClient client, Long projectId, String body) {
-        var request = new NoteController.NoteRequest();
-        request.setProjectId(projectId);
-        request.setBody(body);
+        var request = new NoteRequest(projectId, null, null, body, null);
         client.post().uri("/api/v1/notes").bodyValue(request).exchange()
                 .expectStatus().isOk();
     }
