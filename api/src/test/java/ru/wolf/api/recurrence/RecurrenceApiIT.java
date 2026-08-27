@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.recurrence;
+import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -105,7 +106,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
 
         LocalDateTime rangeFrom = today.atStartOfDay();
         LocalDateTime rangeTo = horizonEnd.atStartOfDay();
-        List<TimeEntryController.TimeEntryResponse> inHorizon = listRange(authed, rangeFrom, rangeTo).stream()
+        List<TimeEntryResponse> inHorizon = listRange(authed, rangeFrom, rangeTo).stream()
                 .filter(e -> deloId.equals(e.getDeloId()))
                 .toList();
 
@@ -120,7 +121,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
                 .toList();
         assertThat(createdDays).containsExactlyElementsOf(expectedDays);
 
-        List<TimeEntryController.TimeEntryResponse> beyond = listRange(
+        List<TimeEntryResponse> beyond = listRange(
                 authed,
                 horizonEnd.atStartOfDay(),
                 horizonEnd.plusWeeks(2).atStartOfDay()
@@ -136,7 +137,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         LocalDate lastWednesday = LocalDate.now(MOSCOW).with(java.time.temporal.TemporalAdjusters.previous(DayOfWeek.WEDNESDAY));
         LocalDateTime doneStart = lastWednesday.atTime(9, 0);
         LocalDateTime doneEnd = lastWednesday.atTime(10, 0);
-        TimeEntryController.TimeEntryResponse historical = putEntry(authed, Map.of(
+        TimeEntryResponse historical = putEntry(authed, Map.of(
                 "startAt", doneStart.toString(),
                 "endAt", doneEnd.toString(),
                 "deloId", deloId,
@@ -147,7 +148,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
 
         LocalDate nextWednesday = LocalDate.now(MOSCOW).with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.WEDNESDAY));
         LocalDateTime futureDoneStart = nextWednesday.atTime(9, 0);
-        TimeEntryController.TimeEntryResponse futureDone = putEntry(authed, Map.of(
+        TimeEntryResponse futureDone = putEntry(authed, Map.of(
                 "startAt", futureDoneStart.toString(),
                 "endAt", nextWednesday.atTime(10, 0).toString(),
                 "deloId", deloId,
@@ -167,7 +168,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         int expectedCreated = (int) expectedFuture.stream().filter(d -> !d.equals(nextWednesday)).count();
         assertThat(applied.created()).isEqualTo(expectedCreated);
 
-        TimeEntryController.TimeEntryResponse stillDone = listRange(authed, doneStart, doneEnd.plusMinutes(1)).stream()
+        TimeEntryResponse stillDone = listRange(authed, doneStart, doneEnd.plusMinutes(1)).stream()
                 .filter(e -> historicalId.equals(e.getId()))
                 .findFirst()
                 .orElseThrow();
@@ -176,7 +177,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(normalize(stillDone.getEndAt())).isEqualTo(normalize(doneEnd.toString()));
         assertThat(stillDone.getDeloId()).isEqualTo(deloId);
 
-        TimeEntryController.TimeEntryResponse futureStillDone = listRange(authed, futureDoneStart, futureDoneStart.plusHours(1)).stream()
+        TimeEntryResponse futureStillDone = listRange(authed, futureDoneStart, futureDoneStart.plusHours(1)).stream()
                 .filter(e -> futureDone.getId().equals(e.getId()))
                 .findFirst()
                 .orElseThrow();
@@ -231,15 +232,15 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(saturdays).isNotEmpty();
         assertThat(applied.created()).isEqualTo(tuesdays.size() + saturdays.size());
 
-        List<TimeEntryController.TimeEntryResponse> inHorizon = listRange(authed, today.atStartOfDay(), horizonEnd.atStartOfDay())
+        List<TimeEntryResponse> inHorizon = listRange(authed, today.atStartOfDay(), horizonEnd.atStartOfDay())
                 .stream()
                 .filter(e -> deloId.equals(e.getDeloId()))
                 .toList();
 
-        List<TimeEntryController.TimeEntryResponse> tueEntries = inHorizon.stream()
+        List<TimeEntryResponse> tueEntries = inHorizon.stream()
                 .filter(e -> LocalDateTime.parse(normalize(e.getStartAt())).getDayOfWeek() == DayOfWeek.TUESDAY)
                 .toList();
-        List<TimeEntryController.TimeEntryResponse> satEntries = inHorizon.stream()
+        List<TimeEntryResponse> satEntries = inHorizon.stream()
                 .filter(e -> LocalDateTime.parse(normalize(e.getStartAt())).getDayOfWeek() == DayOfWeek.SATURDAY)
                 .toList();
 
@@ -292,12 +293,12 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         return new ApplyResult(applied.getCreated());
     }
 
-    private List<TimeEntryController.TimeEntryResponse> listRange(
+    private List<TimeEntryResponse> listRange(
             WebTestClient client,
             LocalDateTime from,
             LocalDateTime to
     ) {
-        List<TimeEntryController.TimeEntryResponse> all = new ArrayList<>();
+        List<TimeEntryResponse> all = new ArrayList<>();
         LocalDateTime cursor = from;
         while (cursor.isBefore(to)) {
             LocalDateTime next = cursor.plusDays(7);
@@ -306,7 +307,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
             }
             LocalDateTime chunkFrom = cursor;
             LocalDateTime chunkTo = next;
-            List<TimeEntryController.TimeEntryResponse> chunk = client.get()
+            List<TimeEntryResponse> chunk = client.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/v1/time-entries")
                             .queryParam("from", chunkFrom.toString())
@@ -314,7 +315,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
                             .build())
                     .exchange()
                     .expectStatus().isOk()
-                    .expectBodyList(TimeEntryController.TimeEntryResponse.class)
+                    .expectBodyList(TimeEntryResponse.class)
                     .returnResult()
                     .getResponseBody();
             if (chunk != null) {
@@ -325,13 +326,13 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         return all;
     }
 
-    private TimeEntryController.TimeEntryResponse putEntry(WebTestClient client, Map<String, Object> body) {
+    private TimeEntryResponse putEntry(WebTestClient client, Map<String, Object> body) {
         return client.put()
                 .uri("/api/v1/time-entries")
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult()
                 .getResponseBody();
     }

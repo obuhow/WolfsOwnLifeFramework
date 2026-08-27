@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.routine;
+import ru.wolf.api.routine.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -72,13 +73,13 @@ class RoutineApiIT extends ApiIntegrationTest {
                 .getResponseBody();
         Long goalId = ((Number) goal.get("id")).longValue();
 
-        RoutineController.RoutineResponse routine = authed.post()
+        RoutineResponse routine = authed.post()
                 .uri("/api/v1/routines")
                 .bodyValue(Map.of("title", "Сон", "description", "Ночной отдых", "weeklyHours", 56,
                         "color", "#6B7280", "icon", "moon"))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(RoutineController.RoutineResponse.class)
+                .expectBody(RoutineResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -87,21 +88,21 @@ class RoutineApiIT extends ApiIntegrationTest {
         assertThat(routine.getWeeklyHours()).isEqualByComparingTo("56.00");
         assertThat(routine.isArchived()).isFalse();
 
-        RoutineController.ScheduleResponse schedule = authed.post()
+        ScheduleResponse schedule = authed.post()
                 .uri("/api/v1/routines/{id}/schedules", routine.getId())
                 .bodyValue(Map.of("dayOfWeek", "MONDAY", "startTime", "09:00", "endTime", "10:30"))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(RoutineController.ScheduleResponse.class)
+                .expectBody(ScheduleResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(schedule.getDayOfWeek()).isEqualTo("MONDAY");
 
-        RoutineController.GoalLinkResponse goalLink = authed.post()
+        GoalLinkResponse goalLink = authed.post()
                 .uri("/api/v1/routines/{id}/goals/{goalId}", routine.getId(), goalId)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(RoutineController.GoalLinkResponse.class)
+                .expectBody(GoalLinkResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(goalLink.getGoalId()).isEqualTo(goalId);
@@ -125,11 +126,11 @@ class RoutineApiIT extends ApiIntegrationTest {
                 .getResponseBody();
         assertThat(synergy.getRoutineId()).isEqualTo(routine.getId());
 
-        List<RoutineController.RoutineResponse> routines = authed.get()
+        List<RoutineResponse> routines = authed.get()
                 .uri("/api/v1/routines")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(RoutineController.RoutineResponse.class)
+                .expectBodyList(RoutineResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(routines).anyMatch(item -> item.getId().equals(routine.getId())
@@ -158,12 +159,12 @@ class RoutineApiIT extends ApiIntegrationTest {
                 .exchange()
                 .expectStatus().isBadRequest();
 
-        RoutineController.RoutineResponse routine = authed.post()
+        RoutineResponse routine = authed.post()
                 .uri("/api/v1/routines")
                 .bodyValue(Map.of("title", "Проверка расписания", "weeklyHours", 1))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(RoutineController.RoutineResponse.class)
+                .expectBody(RoutineResponse.class)
                 .returnResult()
                 .getResponseBody();
 

@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.timeentry;
+import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -87,7 +88,7 @@ class TodayNormIT extends ApiIntegrationTest {
         userRepository.save(admin);
         WebTestClient authed = authedAdminClient();
 
-        TimeEntryController.TodayResponse body = todayFor(authed, LocalDate.now());
+        TodayResponse body = todayFor(authed, LocalDate.now());
 
         assertThat(body.getDayNormMinutes()).isZero();
     }
@@ -99,7 +100,7 @@ class TodayNormIT extends ApiIntegrationTest {
         userRepository.save(admin);
         WebTestClient authed = authedAdminClient();
 
-        TimeEntryController.TodayResponse body = todayFor(authed, LocalDate.now());
+        TodayResponse body = todayFor(authed, LocalDate.now());
 
         assertThat(body.getDayNormMinutes()).isEqualTo(255);
     }
@@ -113,7 +114,7 @@ class TodayNormIT extends ApiIntegrationTest {
         LocalDateTime start = day.atTime(10, 0);
         putDone(authed, start, start.plusMinutes(45), deloId);
 
-        TimeEntryController.TodayResponse body = todayFor(authed, day);
+        TodayResponse body = todayFor(authed, day);
 
         assertThat(body.getDayNormMinutes()).isEqualTo(240);
         assertThat(body.getDayFactMinutes()).isEqualTo(45);
@@ -129,7 +130,7 @@ class TodayNormIT extends ApiIntegrationTest {
         LocalDateTime start = day.atTime(6, 0);
         putDone(authed, start, start.plusMinutes(330), deloId);
 
-        TimeEntryController.TodayResponse body = todayFor(authed, day);
+        TodayResponse body = todayFor(authed, day);
 
         assertThat(body.getDayFactMinutes()).isEqualTo(330);
         assertThat(body.getRemainingMinutes()).isEqualTo(-90);
@@ -148,7 +149,7 @@ class TodayNormIT extends ApiIntegrationTest {
         LocalDateTime sleepStart = day.atTime(2, 0);
         putDone(authed, sleepStart, sleepStart.plusHours(8), sleepId);
 
-        TimeEntryController.TodayResponse body = todayFor(authed, day);
+        TodayResponse body = todayFor(authed, day);
 
         assertThat(body.getDayFactMinutes()).isEqualTo(60);
     }
@@ -176,7 +177,7 @@ class TodayNormIT extends ApiIntegrationTest {
                 .build());
         // Union of [10:00,11:00) and [10:30,11:30) = 90 minutes, not 60+60=120.
 
-        TimeEntryController.TodayResponse body = todayFor(authed, day);
+        TodayResponse body = todayFor(authed, day);
 
         assertThat(body.getDayFactMinutes()).isEqualTo(90);
     }
@@ -190,8 +191,8 @@ class TodayNormIT extends ApiIntegrationTest {
         LocalDateTime postMidnight = logicalDay.plusDays(1).atTime(0, 30);
         putDone(authed, postMidnight, postMidnight.plusMinutes(45), deloId);
 
-        TimeEntryController.TodayResponse sameLogicalDay = todayFor(authed, logicalDay);
-        TimeEntryController.TodayResponse nextLogicalDay = todayFor(authed, logicalDay.plusDays(1));
+        TodayResponse sameLogicalDay = todayFor(authed, logicalDay);
+        TodayResponse nextLogicalDay = todayFor(authed, logicalDay.plusDays(1));
 
         assertThat(sameLogicalDay.getDayFactMinutes()).isEqualTo(45);
         assertThat(nextLogicalDay.getDayFactMinutes()).isZero();
@@ -204,7 +205,7 @@ class TodayNormIT extends ApiIntegrationTest {
         return LocalDate.now(java.time.ZoneId.of(user.getTimezone())).minusDays(3);
     }
 
-    private TimeEntryController.TodayResponse todayFor(WebTestClient client, LocalDate date) {
+    private TodayResponse todayFor(WebTestClient client, LocalDate date) {
         return client.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/today")
@@ -212,7 +213,7 @@ class TodayNormIT extends ApiIntegrationTest {
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
     }

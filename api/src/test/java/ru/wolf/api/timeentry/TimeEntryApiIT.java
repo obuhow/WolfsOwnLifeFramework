@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.timeentry;
+import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -93,11 +94,11 @@ class TimeEntryApiIT extends ApiIntegrationTest {
     void today_empty_for_new_user() {
         WebTestClient authed = authedAdminClient();
 
-        TimeEntryController.TodayResponse body = authed.get()
+        TodayResponse body = authed.get()
                 .uri("/api/v1/time-entries/today")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -115,7 +116,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         Long deloId = createDelo(authed, "Код");
         LocalDateTime future = nextAlignedSlot(LocalDateTime.now(MOSCOW).plusHours(3));
 
-        TimeEntryController.TimeEntryResponse created = putEntry(authed, future, Map.of("deloId", deloId));
+        TimeEntryResponse created = putEntry(authed, future, Map.of("deloId", deloId));
 
         assertThat(created.getStatus()).isEqualTo(TimeEntry.Status.PLANNED);
         assertThat(created.getDeloId()).isEqualTo(deloId);
@@ -131,7 +132,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         Long deloId = createDelo(authed, "Вчерашний бег");
         LocalDateTime past = nextAlignedSlot(LocalDateTime.now(MOSCOW).minusHours(2));
 
-        TimeEntryController.TimeEntryResponse created = putEntry(authed, past, Map.of("deloId", deloId));
+        TimeEntryResponse created = putEntry(authed, past, Map.of("deloId", deloId));
 
         assertThat(created.getStatus()).isEqualTo(TimeEntry.Status.DONE);
         assertThat(created.getDeloId()).isEqualTo(deloId);
@@ -142,7 +143,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         WebTestClient authed = authedAdminClient();
         LocalDateTime past = nextAlignedSlot(LocalDateTime.now(MOSCOW).minusHours(1));
 
-        TimeEntryController.TimeEntryResponse created = putEntry(authed, past, Map.of("adHocText", "Позвонить маме"));
+        TimeEntryResponse created = putEntry(authed, past, Map.of("adHocText", "Позвонить маме"));
 
         assertThat(created.getDeloId()).isNull();
         assertThat(created.getAdHocText()).isEqualTo("Позвонить маме");
@@ -158,7 +159,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         LocalDateTime slot = nextAlignedSlot(LocalDateTime.now(MOSCOW).plusHours(1));
 
         putEntry(authed, slot, Map.of("deloId", d1));
-        TimeEntryController.TimeEntryResponse replaced = putEntry(authed, slot, Map.of("deloId", d2));
+        TimeEntryResponse replaced = putEntry(authed, slot, Map.of("deloId", d2));
 
         assertThat(replaced.getDeloId()).isEqualTo(d2);
         Long adminId = userRepository.findByUsername("admin").orElseThrow().getId();
@@ -190,14 +191,14 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 .exchange()
                 .expectStatus().isNoContent();
 
-        TimeEntryController.TodayResponse today = authed.get()
+        TodayResponse today = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/today")
                         .queryParam("date", future.toLocalDate().toString())
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -265,14 +266,14 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         body.put("status", "PLANNED");
         putEntryRaw(authed, body);
 
-        TimeEntryController.TodayResponse sameDay = authed.get()
+        TodayResponse sameDay = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/today")
                         .queryParam("date", day.toString())
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(sameDay.getEntries()).extracting(e -> normalize(e.getStartAt()))
@@ -280,19 +281,19 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         assertThat(sameDay.getDayStart()).isEqualTo(day.atStartOfDay().toString());
         assertThat(sameDay.getDayEnd()).isEqualTo(day.plusDays(1).atStartOfDay().toString());
 
-        TimeEntryController.TodayResponse nextDay = authed.get()
+        TodayResponse nextDay = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/today")
                         .queryParam("date", day.plusDays(1).toString())
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(nextDay.getEntries()).isEmpty();
 
-        List<TimeEntryController.TimeEntryResponse> range = authed.get()
+        List<TimeEntryResponse> range = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries")
                         .queryParam("from", day.atStartOfDay().toString())
@@ -300,7 +301,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(TimeEntryController.TimeEntryResponse.class)
+                .expectBodyList(TimeEntryResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(range).hasSize(1);
@@ -317,7 +318,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         body.put("deloId", deloId);
         body.put("status", "PLANNED");
 
-        TimeEntryController.TimeEntryResponse created = putEntryRaw(authed, body);
+        TimeEntryResponse created = putEntryRaw(authed, body);
         assertThat(created.getStatus()).isEqualTo(TimeEntry.Status.PLANNED);
     }
 
@@ -341,27 +342,27 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         Long delo2 = createDelo(client2, "Дело user2");
         putEntry(client2, slot, Map.of("deloId", delo2));
 
-        TimeEntryController.TodayResponse adminToday = admin.get()
+        TodayResponse adminToday = admin.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/today")
                         .queryParam("date", slot.toLocalDate().toString())
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(adminToday.getEntries()).hasSize(1);
         assertThat(adminToday.getEntries().get(0).getDeloTitle()).isEqualTo("Секрет admin");
 
-        TimeEntryController.TodayResponse u2Today = client2.get()
+        TodayResponse u2Today = client2.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/today")
                         .queryParam("date", slot.toLocalDate().toString())
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(u2Today.getEntries()).hasSize(1);
@@ -440,14 +441,14 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         putEntryRaw(authed, body);
 
         // Re-fetch via today — still planned (no background auto-done).
-        TimeEntryController.TodayResponse today = authed.get()
+        TodayResponse today = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/today")
                         .queryParam("date", past.toLocalDate().toString())
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -467,12 +468,12 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         body.put("status", "PLANNED");
         putEntryRaw(authed, body);
 
-        TimeEntryController.TimeEntryResponse confirmed = authed.post()
+        TimeEntryResponse confirmed = authed.post()
                 .uri("/api/v1/time-entries/confirm")
                 .bodyValue(Map.of("startAt", past.toString()))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -481,12 +482,12 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         assertThat(confirmed.getDeloId()).isEqualTo(deloId);
 
         // Idempotent second confirm
-        TimeEntryController.TimeEntryResponse again = authed.post()
+        TimeEntryResponse again = authed.post()
                 .uri("/api/v1/time-entries/confirm")
                 .bodyValue(Map.of("startAt", past.toString()))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(again.getStatus()).isEqualTo(TimeEntry.Status.DONE);
@@ -539,7 +540,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         LocalDateTime from = day.atStartOfDay();
         LocalDateTime to = day.plusDays(2).atStartOfDay();
 
-        TimeEntryController.ConfirmAllResponse result = authed.post()
+        ConfirmAllResponse result = authed.post()
                 .uri("/api/v1/time-entries/confirm-all")
                 .bodyValue(Map.of(
                         "from", from.toString(),
@@ -547,7 +548,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 ))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.ConfirmAllResponse.class)
+                .expectBody(ConfirmAllResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -556,7 +557,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         assertThat(result.getEntries()).hasSize(2);
         assertThat(result.getEntries()).allMatch(e -> e.getStatus() == TimeEntry.Status.DONE);
 
-        List<TimeEntryController.TimeEntryResponse> range = authed.get()
+        List<TimeEntryResponse> range = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries")
                         .queryParam("from", from.toString())
@@ -564,7 +565,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(TimeEntryController.TimeEntryResponse.class)
+                .expectBodyList(TimeEntryResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -583,7 +584,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         WebTestClient authed = authedAdminClient();
         LocalDate day = LocalDate.now(MOSCOW);
 
-        TimeEntryController.ConfirmAllResponse result = authed.post()
+        ConfirmAllResponse result = authed.post()
                 .uri("/api/v1/time-entries/confirm-all")
                 .bodyValue(Map.of(
                         "from", day.atStartOfDay().toString(),
@@ -591,7 +592,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 ))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.ConfirmAllResponse.class)
+                .expectBody(ConfirmAllResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -624,17 +625,17 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         LocalDateTime from = day.atStartOfDay();
         LocalDateTime to = day.plusDays(1).atStartOfDay();
 
-        TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
+        EnsureSleepResponse result = ensureSleep(authed, from, to);
 
         assertThat(result.getFilledCount()).isEqualTo(1);
         assertThat(result.getEntries()).hasSize(1);
-        TimeEntryController.TimeEntryResponse sleep = result.getEntries().get(0);
+        TimeEntryResponse sleep = result.getEntries().get(0);
         assertThat(sleep.getDeloTitle()).isEqualTo("Сон");
         assertThat(normalize(sleep.getStartAt())).isEqualTo(normalize(day.atTime(0, 0).toString()));
         assertThat(normalize(sleep.getEndAt())).isEqualTo(normalize(day.atTime(9, 0).toString()));
         assertThat(sleep.getStatus()).isEqualTo(TimeEntry.Status.DONE);
 
-        TimeEntryController.EnsureSleepResponse again = ensureSleep(authed, from, to);
+        EnsureSleepResponse again = ensureSleep(authed, from, to);
         assertThat(again.getFilledCount()).isZero();
         assertThat(listRange(authed, from, to)).hasSize(1);
     }
@@ -653,9 +654,9 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 "status", "DONE"
         ));
 
-        TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
+        EnsureSleepResponse result = ensureSleep(authed, from, to);
         assertThat(result.getFilledCount()).isZero();
-        List<TimeEntryController.TimeEntryResponse> range = listRange(authed, from, to);
+        List<TimeEntryResponse> range = listRange(authed, from, to);
         assertThat(range).hasSize(1);
         assertThat(range.get(0).getDeloTitle()).isEqualTo("Ночная работа");
     }
@@ -674,9 +675,9 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         LocalDateTime from = day.atTime(2, 0);
         LocalDateTime to = day.plusDays(1).atTime(2, 0);
 
-        TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
+        EnsureSleepResponse result = ensureSleep(authed, from, to);
         assertThat(result.getFilledCount()).isEqualTo(1);
-        TimeEntryController.TimeEntryResponse sleep = result.getEntries().get(0);
+        TimeEntryResponse sleep = result.getEntries().get(0);
         assertThat(normalize(sleep.getStartAt())).isEqualTo(normalize(day.atTime(2, 0).toString()));
         assertThat(normalize(sleep.getEndAt())).isEqualTo(normalize(day.atTime(9, 0).toString()));
     }
@@ -688,7 +689,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         LocalDateTime from = day.atStartOfDay();
         LocalDateTime to = day.plusDays(1).atStartOfDay();
 
-        TimeEntryController.EnsureSleepResponse result = ensureSleep(authed, from, to);
+        EnsureSleepResponse result = ensureSleep(authed, from, to);
         assertThat(result.getFilledCount()).isEqualTo(1);
         assertThat(result.getEntries().get(0).getStatus()).isEqualTo(TimeEntry.Status.PLANNED);
     }
@@ -719,19 +720,19 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         ));
 
         // Shrink end: click 08:45
-        TimeEntryController.GridClickResponse shrink = gridClick(authed, day.atTime(8, 45).toString());
+        GridClickResponse shrink = gridClick(authed, day.atTime(8, 45).toString());
         assertThat(shrink.getAction()).isEqualTo("SHRINK");
         assertThat(normalize(shrink.getEntries().get(0).getEndAt()))
                 .isEqualTo(normalize(day.atTime(8, 45).toString()));
 
         // Extend end: click empty 08:45 (after shrink end is 08:45)
-        TimeEntryController.GridClickResponse extend = gridClick(authed, day.atTime(8, 45).toString());
+        GridClickResponse extend = gridClick(authed, day.atTime(8, 45).toString());
         assertThat(extend.getAction()).isEqualTo("EXTEND");
         assertThat(normalize(extend.getEntries().get(0).getEndAt()))
                 .isEqualTo(normalize(day.atTime(9, 0).toString()));
 
         // Split middle: click 06:00
-        TimeEntryController.GridClickResponse split = gridClick(authed, day.atTime(6, 0).toString());
+        GridClickResponse split = gridClick(authed, day.atTime(6, 0).toString());
         assertThat(split.getAction()).isEqualTo("SPLIT");
         assertThat(split.getEntries()).hasSize(2);
         assertThat(normalize(split.getEntries().get(0).getStartAt()))
@@ -761,14 +762,14 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 "status", "DONE"
         ));
 
-        TimeEntryController.TodayResponse body = authed.get()
+        TodayResponse body = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/today")
                         .queryParam("date", day.toString())
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TodayResponse.class)
+                .expectBody(TodayResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -810,14 +811,14 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         b3.put("status", "PLANNED");
         putEntryRaw(authed, b3);
 
-        TimeEntryController.WeekResponse week = authed.get()
+        WeekResponse week = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/week")
                         .queryParam("date", wednesday.toString())
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.WeekResponse.class)
+                .expectBody(WeekResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -852,11 +853,11 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         int isoWeek = today.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear());
         int isoYear = today.get(java.time.temporal.WeekFields.ISO.weekBasedYear());
 
-        TimeEntryController.WeekResponse week = authed.get()
+        WeekResponse week = authed.get()
                 .uri("/api/v1/time-entries/week")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.WeekResponse.class)
+                .expectBody(WeekResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -872,7 +873,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
     void week_by_iso_year_and_week_number() {
         WebTestClient authed = authedAdminClient();
         // ISO 2025-W01 starts Monday 2024-12-30
-        TimeEntryController.WeekResponse week = authed.get()
+        WeekResponse week = authed.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/time-entries/week")
                         .queryParam("isoYear", 2025)
@@ -880,7 +881,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.WeekResponse.class)
+                .expectBody(WeekResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -913,18 +914,18 @@ class TimeEntryApiIT extends ApiIntegrationTest {
     }
 
 
-    private TimeEntryController.GridClickResponse gridClick(WebTestClient client, String slotStart) {
+    private GridClickResponse gridClick(WebTestClient client, String slotStart) {
         return client.post()
                 .uri("/api/v1/time-entries/grid-click")
                 .bodyValue(Map.of("slotStart", slotStart))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.GridClickResponse.class)
+                .expectBody(GridClickResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
 
-    private TimeEntryController.EnsureSleepResponse ensureSleep(
+    private EnsureSleepResponse ensureSleep(
             WebTestClient client,
             LocalDateTime from,
             LocalDateTime to
@@ -937,12 +938,12 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 ))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.EnsureSleepResponse.class)
+                .expectBody(EnsureSleepResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
 
-    private List<TimeEntryController.TimeEntryResponse> listRange(
+    private List<TimeEntryResponse> listRange(
             WebTestClient client,
             LocalDateTime from,
             LocalDateTime to
@@ -955,7 +956,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                         .build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(TimeEntryController.TimeEntryResponse.class)
+                .expectBodyList(TimeEntryResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
@@ -975,7 +976,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         return created.getId();
     }
 
-    private TimeEntryController.TimeEntryResponse putEntry(
+    private TimeEntryResponse putEntry(
             WebTestClient client,
             LocalDateTime startAt,
             Map<String, ?> fields
@@ -986,7 +987,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         return putEntryRaw(client, body);
     }
 
-    private TimeEntryController.TimeEntryResponse putEntryRaw(
+    private TimeEntryResponse putEntryRaw(
             WebTestClient client,
             Map<String, Object> body
     ) {
@@ -995,7 +996,7 @@ class TimeEntryApiIT extends ApiIntegrationTest {
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult()
                 .getResponseBody();
     }

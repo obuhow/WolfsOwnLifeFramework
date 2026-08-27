@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.gantt;
+import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -541,7 +542,7 @@ class GanttApiIT extends ApiIntegrationTest {
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult();
     }
 
@@ -562,7 +563,7 @@ class GanttApiIT extends ApiIntegrationTest {
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult();
     }
 }
