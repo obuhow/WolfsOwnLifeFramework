@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.timeentry;
+
+import ru.wolf.api.delo.dto.*;
 import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +28,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.Delo;
-import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaRepository;
@@ -832,9 +833,9 @@ class TimeEntryApiIT extends ApiIntegrationTest {
         assertThat(week.getIsoWeek()).isEqualTo(11);
         assertThat(week.getDays()).hasSize(7);
         assertThat(week.getDays().get(0).getDate()).isEqualTo(monday.toString());
-        assertThat(week.getDays().get(0).getWeekday()).isEqualTo("MONDAY");
+        assertThat(week.getDays().get(0).weekday()).isEqualTo("MONDAY");
         assertThat(week.getDays().get(6).getDate()).isEqualTo(LocalDate.of(2026, 3, 15).toString());
-        assertThat(week.getDays().get(6).getWeekday()).isEqualTo("SUNDAY");
+        assertThat(week.getDays().get(6).weekday()).isEqualTo("SUNDAY");
 
         assertThat(week.getEntries()).extracting(e -> normalize(e.getStartAt()))
                 .containsExactlyInAnyOrder(
@@ -962,18 +963,16 @@ class TimeEntryApiIT extends ApiIntegrationTest {
     }
 
     private Long createDelo(WebTestClient client, String title) {
-        var req = new DeloController.CreateDeloRequest();
-        req.setTitle(title);
-        req.setExecutionMode(Delo.ExecutionMode.SELF);
-        DeloController.DeloResponse created = client.post()
+        var req = new CreateDeloRequest(title, null, Delo.ExecutionMode.SELF, null, null);
+        DeloResponse created = client.post()
                 .uri("/api/v1/delos")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloController.DeloResponse.class)
+                .expectBody(DeloResponse.class)
                 .returnResult()
                 .getResponseBody();
-        return created.getId();
+        return created.id();
     }
 
     private TimeEntryResponse putEntry(

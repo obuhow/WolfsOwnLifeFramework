@@ -17,12 +17,13 @@
  */
 package ru.wolf.api.goal;
 
+import ru.wolf.api.delo.dto.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.goal.dto.BudgetRequest;
@@ -195,13 +196,10 @@ class GoalApiIT extends ApiIntegrationTest {
     }
 
     private Long createDelo(WebTestClient client, String title, List<Long> projects, Long primary) {
-        DeloController.CreateDeloRequest request = new DeloController.CreateDeloRequest();
-        request.setTitle(title);
-        request.setProjectIds(projects);
-        request.setPrimaryProjectId(primary);
+        CreateDeloRequest request = new CreateDeloRequest(title, null, null, projects, primary);
         return client.post().uri("/api/v1/delos").bodyValue(request)
                 .exchange().expectStatus().isOk()
-                .expectBody(DeloController.DeloResponse.class).returnResult().getResponseBody().getId();
+                .expectBody(DeloResponse.class).returnResult().getResponseBody().id();
     }
 
     private void putDoneEntry(WebTestClient client, Long deloId, String start, String end) {

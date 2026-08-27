@@ -17,13 +17,14 @@
  */
 package ru.wolf.api.note;
 
+import ru.wolf.api.delo.dto.*;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.dto.*;
@@ -67,17 +68,17 @@ class NoteApiIT extends ApiIntegrationTest {
         WebTestClient client = authedAdminClient();
         Long areaId = createLifeArea(client, "Работа");
         ProjectResponse project = createProject(client, areaId, "WOLF");
-        DeloController.DeloResponse delo = createDelo(client, "Spring Security");
+        DeloResponse delo = createDelo(client, "Spring Security");
 
         NoteRequest projectRequest = new NoteRequest(project.id(), null, null, "Решение по Spring Security и JWT", List.of("security", "решение"));
         NoteResponse projectNote = createNote(client, projectRequest);
 
-        NoteRequest agentRequest = new NoteRequest(null, delo.getId(), Note.Author.AGENT, "Агент нашёл справку по фильтрам", List.of("research"));
+        NoteRequest agentRequest = new NoteRequest(null, delo.id(), Note.Author.AGENT, "Агент нашёл справку по фильтрам", List.of("research"));
         NoteResponse agentNote = createNote(client, agentRequest);
 
         assertThat(projectNote.projectId()).isEqualTo(project.id());
         assertThat(projectNote.deloId()).isNull();
-        assertThat(agentNote.deloId()).isEqualTo(delo.getId());
+        assertThat(agentNote.deloId()).isEqualTo(delo.id());
         assertThat(agentNote.author()).isEqualTo(Note.Author.AGENT);
 
         client.get().uri(uri -> uri.path("/api/v1/notes")
@@ -110,12 +111,12 @@ class NoteApiIT extends ApiIntegrationTest {
     @Test
     void editing_agent_note_preserves_attribution() {
         WebTestClient client = authedAdminClient();
-        DeloController.DeloResponse delo = createDelo(client, "Агентская заметка");
+        DeloResponse delo = createDelo(client, "Агентская заметка");
 
-        NoteRequest create = new NoteRequest(null, delo.getId(), Note.Author.AGENT, "Исходная заметка агента", null);
+        NoteRequest create = new NoteRequest(null, delo.id(), Note.Author.AGENT, "Исходная заметка агента", null);
         NoteResponse note = createNote(client, create);
 
-        NoteRequest update = new NoteRequest(null, delo.getId(), null, "Обновлённая заметка агента", null);
+        NoteRequest update = new NoteRequest(null, delo.id(), null, "Обновлённая заметка агента", null);
         NoteResponse updated = client.put()
                 .uri("/api/v1/notes/{id}", note.id())
                 .bodyValue(update)
@@ -132,13 +133,13 @@ class NoteApiIT extends ApiIntegrationTest {
         WebTestClient client = authedAdminClient();
         Long areaId = createLifeArea(client, "Работа");
         ProjectResponse project = createProject(client, areaId, "WOLF");
-        DeloController.DeloResponse delo = createDelo(client, "Рутина");
+        DeloResponse delo = createDelo(client, "Рутина");
 
         NoteRequest empty = new NoteRequest(null, null, null, "Без привязки", null);
         client.post().uri("/api/v1/notes").bodyValue(empty).exchange()
                 .expectStatus().isBadRequest();
 
-        NoteRequest both = new NoteRequest(project.id(), delo.getId(), null, "Две привязки", null);
+        NoteRequest both = new NoteRequest(project.id(), delo.id(), null, "Две привязки", null);
         client.post().uri("/api/v1/notes").bodyValue(both).exchange()
                 .expectStatus().isBadRequest();
     }
@@ -163,11 +164,10 @@ class NoteApiIT extends ApiIntegrationTest {
                 .returnResult().getResponseBody();
     }
 
-    private DeloController.DeloResponse createDelo(WebTestClient client, String title) {
-        var request = new DeloController.CreateDeloRequest();
-        request.setTitle(title);
+    private DeloResponse createDelo(WebTestClient client, String title) {
+        var request = new CreateDeloRequest(title, null, null, null, null);
         return client.post().uri("/api/v1/delos").bodyValue(request).exchange()
-                .expectStatus().isOk().expectBody(DeloController.DeloResponse.class)
+                .expectStatus().isOk().expectBody(DeloResponse.class)
                 .returnResult().getResponseBody();
     }
 }

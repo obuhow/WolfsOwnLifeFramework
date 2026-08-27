@@ -17,11 +17,12 @@
  */
 package ru.wolf.api.morning;
 
+import ru.wolf.api.delo.dto.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.backlog.BacklogItemRepository;
@@ -194,14 +195,11 @@ class MorningDigestApiIT extends ApiIntegrationTest {
     }
 
     private Long createDelo(WebTestClient client, String title, List<Long> projectIds) {
-        DeloController.CreateDeloRequest request = new DeloController.CreateDeloRequest();
-        request.setTitle(title);
-        request.setProjectIds(projectIds);
-        request.setPrimaryProjectId(projectIds.get(0));
+        CreateDeloRequest request = new CreateDeloRequest(title, null, null, projectIds, projectIds.get(0));
         return client.post().uri("/api/v1/delos").bodyValue(request)
                 .exchange().expectStatus().isOk()
-                .expectBody(DeloController.DeloResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectBody(DeloResponse.class)
+                .returnResult().getResponseBody().id();
     }
 
     private void createIdea(WebTestClient client, String title, Idea.Category category) {
