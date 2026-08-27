@@ -2,8 +2,15 @@ package ru.wolf.api.focus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
-import ru.wolf.api.focus.dto.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import ru.wolf.api.focus.dto.AllocationRequest;
+import ru.wolf.api.focus.dto.PreviewResponse;
+import ru.wolf.api.focus.dto.ReviewResponse;
 @RestController @RequestMapping("/api/v1/focus") @RequiredArgsConstructor
 public class FocusReviewController {
     private final FocusReviewService service;
