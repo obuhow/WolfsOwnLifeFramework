@@ -26,7 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.web.reactive.function.BodyInserters;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.backlog.BacklogItemRepository;
 import ru.wolf.api.project.dto.*;
@@ -458,18 +458,16 @@ class DeloApiIT extends ApiIntegrationTest {
     }
 
     private Long createLifeArea(WebTestClient client, String name) {
-        var req = new LifeAreaController.CreateLifeAreaRequest();
-        req.setName(name);
-        req.setColor("#3d5a4a");
-        LifeAreaController.LifeAreaResponse created = client.post()
+        var req = new CreateLifeAreaRequest(name, "#3d5a4a");
+        LifeAreaResponse created = client.post()
                 .uri("/api/v1/life-areas")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
+                .expectBody(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
-        return created.getId();
+        return created.id();
     }
 
     private ProjectResponse createProject(WebTestClient client, Long lifeAreaId, String title) {

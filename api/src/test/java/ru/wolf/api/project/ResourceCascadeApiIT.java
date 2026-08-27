@@ -24,7 +24,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.goal.GoalProjectRepository;
 import ru.wolf.api.goal.GoalRepository;
 import ru.wolf.api.goal.GoalWeekBudgetRepository;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.project.dto.*;
 import ru.wolf.api.goal.dto.GoalResponse;
@@ -69,10 +69,10 @@ class ResourceCascadeApiIT extends ApiIntegrationTest {
     void plan_shift_preview_reports_linked_goal_deficit_without_changing_project() {
         WebTestClient client = authedAdminClient();
         Long areaId = client.post().uri("/api/v1/life-areas")
-                .bodyValue(new LifeAreaController.CreateLifeAreaRequest("Работа", "#123456"))
+                .bodyValue(new CreateLifeAreaRequest("Работа", "#123456"))
                 .exchange().expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectBody(LifeAreaResponse.class)
+                .returnResult().getResponseBody().id();
         LocalDate oldEnd = LocalDate.now().plusDays(7);
         ProjectResponse project = client.post().uri("/api/v1/projects")
                 .bodyValue(Map.of(

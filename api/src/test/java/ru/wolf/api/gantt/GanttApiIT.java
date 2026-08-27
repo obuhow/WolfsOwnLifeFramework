@@ -31,7 +31,7 @@ import ru.wolf.api.delo.Delo;
 import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
@@ -448,15 +448,15 @@ class GanttApiIT extends ApiIntegrationTest {
     }
 
     private Long createLifeArea(WebTestClient client, String name) {
-        LifeAreaController.LifeAreaResponse created = client.post()
+        LifeAreaResponse created = client.post()
                 .uri("/api/v1/life-areas")
                 .bodyValue(Map.of("name", name, "color", "#3d5a4a"))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
+                .expectBody(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
-        return created.getId();
+        return created.id();
     }
 
     private ProjectResponse createProject(

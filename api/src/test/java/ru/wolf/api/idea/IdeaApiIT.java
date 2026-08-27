@@ -17,6 +17,8 @@
  */
 package ru.wolf.api.idea;
 
+import ru.wolf.api.lifesphere.dto.*;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -122,23 +124,20 @@ class IdeaApiIT extends ApiIntegrationTest {
         WebTestClient client = authedAdminClient();
         IdeaResponse idea = create(client, "Идея", Idea.Category.PERSONAL, Idea.Status.BANK);
 
-        var request = new SynergyController.CreateSynergyRequest();
-        request.setIdeaId(idea.id());
-        request.setSphereId(health.getId());
-        request.setImpact(Synergy.Impact.POSITIVE);
+        var request = new CreateSynergyRequest(health.getId(), null, idea.id(), null, Synergy.Impact.POSITIVE);
 
         client.post().uri("/api/v1/synergies").bodyValue(request)
                 .exchange().expectStatus().isOk();
 
-        List<SynergyController.SynergyResponse> synergies = client.get()
+        List<SynergyResponse> synergies = client.get()
                 .uri(uri -> uri.path("/api/v1/synergies").queryParam("ideaId", idea.id()).build())
                 .exchange().expectStatus().isOk()
-                .expectBodyList(SynergyController.SynergyResponse.class)
+                .expectBodyList(SynergyResponse.class)
                 .returnResult().getResponseBody();
 
         assertThat(synergies).hasSize(1);
-        assertThat(synergies.get(0).getIdeaId()).isEqualTo(idea.id());
-        assertThat(synergies.get(0).getSphereName()).isEqualTo("Здоровье");
+        assertThat(synergies.get(0).ideaId()).isEqualTo(idea.id());
+        assertThat(synergies.get(0).sphereName()).isEqualTo("Здоровье");
     }
 
     @Test
@@ -217,10 +216,7 @@ class IdeaApiIT extends ApiIntegrationTest {
 
     private void createIdeaSynergy(
             WebTestClient client, Long ideaId, Long sphereId, Synergy.Impact impact) {
-        var request = new SynergyController.CreateSynergyRequest();
-        request.setIdeaId(ideaId);
-        request.setSphereId(sphereId);
-        request.setImpact(impact);
+        var request = new CreateSynergyRequest(sphereId, null, ideaId, null, impact);
         client.post().uri("/api/v1/synergies").bodyValue(request)
                 .exchange().expectStatus().isOk();
     }

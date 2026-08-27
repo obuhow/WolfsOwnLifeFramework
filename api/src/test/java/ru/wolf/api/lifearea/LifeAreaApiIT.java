@@ -26,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.user.User;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.user.UserRepository;
 
 import java.util.List;
@@ -58,7 +59,7 @@ class LifeAreaApiIT extends ApiIntegrationTest {
                 .uri("/api/v1/life-areas")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(LifeAreaController.LifeAreaResponse.class)
+                .expectBodyList(LifeAreaResponse.class)
                 .hasSize(0);
     }
 
@@ -66,69 +67,58 @@ class LifeAreaApiIT extends ApiIntegrationTest {
     void create_life_area_persists_and_returns() {
         WebTestClient authed = authedAdminClient();
 
-        var request = new LifeAreaController.CreateLifeAreaRequest();
-        request.setName("Работа");
-        request.setColor("#3d5a4a");
+        var request = new CreateLifeAreaRequest("Работа", "#3d5a4a");
 
-        LifeAreaController.LifeAreaResponse created = authed.post()
+        LifeAreaResponse created = authed.post()
                 .uri("/api/v1/life-areas")
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
+                .expectBody(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(created).isNotNull();
-        assertThat(created.getId()).isNotNull();
-        assertThat(created.getName()).isEqualTo("Работа");
-        assertThat(created.getColor()).isEqualTo("#3d5a4a");
-        assertThat(created.getSortOrder()).isEqualTo(0);
+        assertThat(created.id()).isNotNull();
+        assertThat(created.name()).isEqualTo("Работа");
+        assertThat(created.color()).isEqualTo("#3d5a4a");
+        assertThat(created.sortOrder()).isEqualTo(0);
     }
 
     @Test
     void create_multiple_life_areas_gets_sequential_sort_order() {
         WebTestClient authed = authedAdminClient();
 
-        var req1 = new LifeAreaController.CreateLifeAreaRequest();
-        req1.setName("Работа");
-        req1.setColor("#3d5a4a");
-
-        var req2 = new LifeAreaController.CreateLifeAreaRequest();
-        req2.setName("Здоровье");
-        req2.setColor("#8a4b2f");
-
-        var req3 = new LifeAreaController.CreateLifeAreaRequest();
-        req3.setName("Семья");
-        req3.setColor("#a89a88");
+        var req1 = new CreateLifeAreaRequest("Работа", "#3d5a4a");
+        var req2 = new CreateLifeAreaRequest("Здоровье", "#8a4b2f");
+        var req3 = new CreateLifeAreaRequest("Семья", "#a89a88");
 
         authed.post().uri("/api/v1/life-areas").bodyValue(req1).exchange().expectStatus().isOk();
         authed.post().uri("/api/v1/life-areas").bodyValue(req2).exchange().expectStatus().isOk();
         authed.post().uri("/api/v1/life-areas").bodyValue(req3).exchange().expectStatus().isOk();
 
-        List<LifeAreaController.LifeAreaResponse> all = authed.get()
+        List<LifeAreaResponse> all = authed.get()
                 .uri("/api/v1/life-areas")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(LifeAreaController.LifeAreaResponse.class)
+                .expectBodyList(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(all).hasSize(3);
-        assertThat(all.get(0).getName()).isEqualTo("Работа");
-        assertThat(all.get(0).getSortOrder()).isEqualTo(0);
-        assertThat(all.get(1).getName()).isEqualTo("Здоровье");
-        assertThat(all.get(1).getSortOrder()).isEqualTo(1);
-        assertThat(all.get(2).getName()).isEqualTo("Семья");
-        assertThat(all.get(2).getSortOrder()).isEqualTo(2);
+        assertThat(all.get(0).name()).isEqualTo("Работа");
+        assertThat(all.get(0).sortOrder()).isEqualTo(0);
+        assertThat(all.get(1).name()).isEqualTo("Здоровье");
+        assertThat(all.get(1).sortOrder()).isEqualTo(1);
+        assertThat(all.get(2).name()).isEqualTo("Семья");
+        assertThat(all.get(2).sortOrder()).isEqualTo(2);
     }
 
     @Test
     void duplicate_name_rejected() {
         WebTestClient authed = authedAdminClient();
 
-        var request = new LifeAreaController.CreateLifeAreaRequest();
-        request.setName("Работа");
+        var request = new CreateLifeAreaRequest("Работа", null);
 
         authed.post().uri("/api/v1/life-areas").bodyValue(request).exchange().expectStatus().isOk();
 
@@ -139,117 +129,105 @@ class LifeAreaApiIT extends ApiIntegrationTest {
     void update_life_area_changes_name_and_color() {
         WebTestClient authed = authedAdminClient();
 
-        var createReq = new LifeAreaController.CreateLifeAreaRequest();
-        createReq.setName("Работа");
-        createReq.setColor("#3d5a4a");
+        var createReq = new CreateLifeAreaRequest("Работа", "#3d5a4a");
 
-        LifeAreaController.LifeAreaResponse created = authed.post()
+        LifeAreaResponse created = authed.post()
                 .uri("/api/v1/life-areas")
                 .bodyValue(createReq)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
+                .expectBody(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        var updateReq = new LifeAreaController.UpdateLifeAreaRequest();
-        updateReq.setName("Карьера");
-        updateReq.setColor("#8a4b2f");
+        var updateReq = new UpdateLifeAreaRequest("Карьера", "#8a4b2f");
 
-        LifeAreaController.LifeAreaResponse updated = authed.put()
-                .uri("/api/v1/life-areas/{id}", created.getId())
+        LifeAreaResponse updated = authed.put()
+                .uri("/api/v1/life-areas/{id}", created.id())
                 .bodyValue(updateReq)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
+                .expectBody(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(updated.getName()).isEqualTo("Карьера");
-        assertThat(updated.getColor()).isEqualTo("#8a4b2f");
-        assertThat(updated.getId()).isEqualTo(created.getId());
+        assertThat(updated.name()).isEqualTo("Карьера");
+        assertThat(updated.color()).isEqualTo("#8a4b2f");
+        assertThat(updated.id()).isEqualTo(created.id());
     }
 
     @Test
     void update_duplicate_name_rejected() {
         WebTestClient authed = authedAdminClient();
 
-        var req1 = new LifeAreaController.CreateLifeAreaRequest();
-        req1.setName("Работа");
+        var req1 = new CreateLifeAreaRequest("Работа", null);
         authed.post().uri("/api/v1/life-areas").bodyValue(req1).exchange().expectStatus().isOk();
 
-        var req2 = new LifeAreaController.CreateLifeAreaRequest();
-        req2.setName("Здоровье");
-        LifeAreaController.LifeAreaResponse area2 = authed.post()
+        var req2 = new CreateLifeAreaRequest("Здоровье", null);
+        LifeAreaResponse area2 = authed.post()
                 .uri("/api/v1/life-areas")
                 .bodyValue(req2)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
+                .expectBody(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        var updateReq = new LifeAreaController.UpdateLifeAreaRequest();
-        updateReq.setName("Работа"); // duplicate
-        authed.put().uri("/api/v1/life-areas/{id}", area2.getId()).bodyValue(updateReq).exchange().expectStatus().isBadRequest();
+        var updateReq = new UpdateLifeAreaRequest("Работа", null); // duplicate
+        authed.put().uri("/api/v1/life-areas/{id}", area2.id()).bodyValue(updateReq).exchange().expectStatus().isBadRequest();
     }
 
     @Test
     void delete_life_area_removes_it() {
         WebTestClient authed = authedAdminClient();
 
-        var createReq = new LifeAreaController.CreateLifeAreaRequest();
-        createReq.setName("Работа");
+        var createReq = new CreateLifeAreaRequest("Работа", null);
 
-        LifeAreaController.LifeAreaResponse created = authed.post()
+        LifeAreaResponse created = authed.post()
                 .uri("/api/v1/life-areas")
                 .bodyValue(createReq)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
+                .expectBody(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        authed.delete().uri("/api/v1/life-areas/{id}", created.getId()).exchange().expectStatus().isNoContent();
+        authed.delete().uri("/api/v1/life-areas/{id}", created.id()).exchange().expectStatus().isNoContent();
 
-        authed.get().uri("/api/v1/life-areas").exchange().expectStatus().isOk().expectBodyList(LifeAreaController.LifeAreaResponse.class).hasSize(0);
+        authed.get().uri("/api/v1/life-areas").exchange().expectStatus().isOk().expectBodyList(LifeAreaResponse.class).hasSize(0);
     }
 
     @Test
     void move_life_area_reorders() {
         WebTestClient authed = authedAdminClient();
 
-        var req1 = new LifeAreaController.CreateLifeAreaRequest();
-        req1.setName("Работа");
-        LifeAreaController.LifeAreaResponse a1 = authed.post().uri("/api/v1/life-areas").bodyValue(req1).exchange().expectStatus().isOk().expectBody(LifeAreaController.LifeAreaResponse.class).returnResult().getResponseBody();
+        var req1 = new CreateLifeAreaRequest("Работа", null);
+        LifeAreaResponse a1 = authed.post().uri("/api/v1/life-areas").bodyValue(req1).exchange().expectStatus().isOk().expectBody(LifeAreaResponse.class).returnResult().getResponseBody();
 
-        var req2 = new LifeAreaController.CreateLifeAreaRequest();
-        req2.setName("Здоровье");
-        LifeAreaController.LifeAreaResponse a2 = authed.post().uri("/api/v1/life-areas").bodyValue(req2).exchange().expectStatus().isOk().expectBody(LifeAreaController.LifeAreaResponse.class).returnResult().getResponseBody();
+        var req2 = new CreateLifeAreaRequest("Здоровье", null);
+        LifeAreaResponse a2 = authed.post().uri("/api/v1/life-areas").bodyValue(req2).exchange().expectStatus().isOk().expectBody(LifeAreaResponse.class).returnResult().getResponseBody();
 
-        var req3 = new LifeAreaController.CreateLifeAreaRequest();
-        req3.setName("Семья");
-        LifeAreaController.LifeAreaResponse a3 = authed.post().uri("/api/v1/life-areas").bodyValue(req3).exchange().expectStatus().isOk().expectBody(LifeAreaController.LifeAreaResponse.class).returnResult().getResponseBody();
+        var req3 = new CreateLifeAreaRequest("Семья", null);
+        LifeAreaResponse a3 = authed.post().uri("/api/v1/life-areas").bodyValue(req3).exchange().expectStatus().isOk().expectBody(LifeAreaResponse.class).returnResult().getResponseBody();
 
         // Move "Семья" (index 2) to index 0
-        var moveReq = new LifeAreaController.MoveLifeAreaRequest();
-        moveReq.setNewIndex(0);
-        authed.put().uri("/api/v1/life-areas/{id}/move", a3.getId()).bodyValue(moveReq).exchange().expectStatus().isOk();
+        var moveReq = new MoveLifeAreaRequest(0);
+        authed.put().uri("/api/v1/life-areas/{id}/move", a3.id()).bodyValue(moveReq).exchange().expectStatus().isOk();
 
-        List<LifeAreaController.LifeAreaResponse> all = authed.get()
+        List<LifeAreaResponse> all = authed.get()
                 .uri("/api/v1/life-areas")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(LifeAreaController.LifeAreaResponse.class)
+                .expectBodyList(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(all.get(0).getName()).isEqualTo("Семья");
-        assertThat(all.get(0).getSortOrder()).isEqualTo(0);
-        assertThat(all.get(1).getName()).isEqualTo("Работа");
-        assertThat(all.get(1).getSortOrder()).isEqualTo(1);
-        assertThat(all.get(2).getName()).isEqualTo("Здоровье");
-        assertThat(all.get(2).getSortOrder()).isEqualTo(2);
+        assertThat(all.get(0).name()).isEqualTo("Семья");
+        assertThat(all.get(0).sortOrder()).isEqualTo(0);
+        assertThat(all.get(1).name()).isEqualTo("Работа");
+        assertThat(all.get(1).sortOrder()).isEqualTo(1);
+        assertThat(all.get(2).name()).isEqualTo("Здоровье");
+        assertThat(all.get(2).sortOrder()).isEqualTo(2);
     }
 
     @Test
@@ -270,23 +248,22 @@ class LifeAreaApiIT extends ApiIntegrationTest {
                 .build();
 
         // user2 creates an area
-        var req = new LifeAreaController.CreateLifeAreaRequest();
-        req.setName("Работа user2");
+        var req = new CreateLifeAreaRequest("Работа user2", null);
         user2Client.post().uri("/api/v1/life-areas").bodyValue(req).exchange().expectStatus().isOk();
 
         // admin should not see user2's area
         WebTestClient adminClient = authedAdminClient();
-        adminClient.get().uri("/api/v1/life-areas").exchange().expectStatus().isOk().expectBodyList(LifeAreaController.LifeAreaResponse.class).hasSize(0);
+        adminClient.get().uri("/api/v1/life-areas").exchange().expectStatus().isOk().expectBodyList(LifeAreaResponse.class).hasSize(0);
 
         // user2 sees their area
-        user2Client.get().uri("/api/v1/life-areas").exchange().expectStatus().isOk().expectBodyList(LifeAreaController.LifeAreaResponse.class).hasSize(1);
+        user2Client.get().uri("/api/v1/life-areas").exchange().expectStatus().isOk().expectBodyList(LifeAreaResponse.class).hasSize(1);
     }
 
     @Test
     void unauthenticated_access_rejected() {
         webTestClient.get().uri("/api/v1/life-areas").exchange().expectStatus().isForbidden();
-        webTestClient.post().uri("/api/v1/life-areas").bodyValue(new LifeAreaController.CreateLifeAreaRequest()).exchange().expectStatus().isForbidden();
-        webTestClient.put().uri("/api/v1/life-areas/1").bodyValue(new LifeAreaController.UpdateLifeAreaRequest()).exchange().expectStatus().isForbidden();
+        webTestClient.post().uri("/api/v1/life-areas").bodyValue(new CreateLifeAreaRequest(null, null)).exchange().expectStatus().isForbidden();
+        webTestClient.put().uri("/api/v1/life-areas/1").bodyValue(new UpdateLifeAreaRequest(null, null)).exchange().expectStatus().isForbidden();
         webTestClient.delete().uri("/api/v1/life-areas/1").exchange().expectStatus().isForbidden();
     }
 }

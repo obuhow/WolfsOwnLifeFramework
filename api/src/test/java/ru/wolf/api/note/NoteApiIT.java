@@ -26,7 +26,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
@@ -165,12 +165,10 @@ class NoteApiIT extends ApiIntegrationTest {
     }
 
     private Long createLifeArea(WebTestClient client, String name) {
-        var request = new LifeAreaController.CreateLifeAreaRequest();
-        request.setName(name);
-        request.setColor("#3d5a4a");
+        var request = new CreateLifeAreaRequest(name, "#3d5a4a");
         return client.post().uri("/api/v1/life-areas").bodyValue(request).exchange()
-                .expectStatus().isOk().expectBody(LifeAreaController.LifeAreaResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectStatus().isOk().expectBody(LifeAreaResponse.class)
+                .returnResult().getResponseBody().id();
     }
 
     private ProjectResponse createProject(WebTestClient client, Long areaId, String title) {
