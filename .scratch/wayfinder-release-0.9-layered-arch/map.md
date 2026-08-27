@@ -98,6 +98,8 @@
 
 - **05 (Roadmap & Load: Gantt, PlanningCapacity, LoadCurve) — resolved.** Три контроллера мигрированы на thin MVCS; DTO вынесены в feature-specific `dto/` records; `GanttForecastService` оставлен отдельной зависимостью. `clean compileJava compileTestJava` и структурные проверки зелёные. Полный IT gate отложен до завершения релиза.
 
+- **08 (Competency & Life Structure: LifeArea, LifeSphere, Synergy) — resolved.** Три контроллера (`LifeArea`, `LifeSphere`, `Synergy`) переведены на thin MVCS; бизнес-логика (проверки дублей имён, reorder/sortOrder, archive-toggle, валидация «ровно один владелец синергии», изоляция по пользователю) перенесена в сервисы `LifeAreaService`/`LifeSphereService`/`SynergyService`; 11 DTO вынесены в `ru.wolf.api.lifearea.dto` и `ru.wolf.api.lifesphere.dto` как records (`from(...)` на самих record'ах). `clean compileJava compileTestJava` — BUILD SUCCESSFUL; structural scan: целевые контроллеры без поля `Repository`, сервисы без веб-аннотаций, все DTO — records. Соседние `*ApiIT`, ссылавшиеся на вложенные `LifeAreaController.*`, поправлены механически (FQN + `getX()`→`x()` + конструкторы records) без изменения поведения. Полные `*ApiIT` отложены до release-gate 0.9.
+
 ## Текущее состояние дорожной карты
 
 **Текущий фронтир: тикет 06 — `Import/Export` (`Status: open`).**
@@ -134,7 +136,7 @@ checkout не дали проверенного результата: проме
 05. 🔶 **open / текущий фронтир** — Roadmap & Load: Gantt, PlanningCapacity, LoadCurve
 06. ⏳ **open** — Import/Export (порты): DataSync, ImportXlsx, Delo, DeloImport
 07. ⏳ **open** — Daily Rituals & Stats: Checklist, ChecklistReport, Today*, Focus, FocusReview, MorningDigest, WaveStats
-08. ⏳ **open** — Competency & Life Structure: LifeArea, LifeSphere, Synergy
+08. ✅ **resolved** — Competency & Life Structure: LifeArea, LifeSphere, Synergy
 09. ⏳ **open** — Notes & Assistant (формализация существующего порта): Note, NotesAssistant, ProjectResume
 10. ⏳ **open** — Agent Jobs: Agent, AgentRunLog
 11. ⏳ **open** — Сквозной аудит и обновление CONTEXT.md/AGENTS.md — блокируется тикетами 02–10
