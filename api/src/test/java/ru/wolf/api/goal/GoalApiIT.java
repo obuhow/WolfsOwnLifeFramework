@@ -33,7 +33,7 @@ import ru.wolf.api.goal.dto.GoalDetailResponse;
 import ru.wolf.api.goal.dto.GoalResponse;
 import ru.wolf.api.goal.dto.MetricRequest;
 import ru.wolf.api.goal.dto.PriorityRequest;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.goal.GoalRepository;
 import ru.wolf.api.goal.GoalMetricRepository;
 import ru.wolf.api.goal.GoalWeekBudgetRepository;
@@ -185,9 +185,9 @@ class GoalApiIT extends ApiIntegrationTest {
 
     private Long createProject(WebTestClient client, String areaName, String title) {
         Long areaId = client.post().uri("/api/v1/life-areas")
-                .bodyValue(new LifeAreaController.CreateLifeAreaRequest(areaName, "#123456"))
+                .bodyValue(new CreateLifeAreaRequest(areaName, "#123456"))
                 .exchange().expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class).returnResult().getResponseBody().getId();
+                .expectBody(LifeAreaResponse.class).returnResult().getResponseBody().id();
         CreateProjectRequest request = new CreateProjectRequest(areaId, null, title, null, null, null, null, null, null);
         return client.post().uri("/api/v1/projects").bodyValue(request)
                 .exchange().expectStatus().isOk()

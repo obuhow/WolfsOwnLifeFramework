@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.routine;
+
+import ru.wolf.api.lifesphere.dto.*;
 import ru.wolf.api.routine.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -116,15 +118,15 @@ class RoutineApiIT extends ApiIntegrationTest {
                 .getResponseBody();
         Long sphereId = ((Number) spheres.get(0).get("id")).longValue();
 
-        SynergyController.SynergyResponse synergy = authed.post()
+        SynergyResponse synergy = authed.post()
                 .uri("/api/v1/synergies")
                 .bodyValue(Map.of("routineId", routine.getId(), "sphereId", sphereId, "impact", "POSITIVE"))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(SynergyController.SynergyResponse.class)
+                .expectBody(SynergyResponse.class)
                 .returnResult()
                 .getResponseBody();
-        assertThat(synergy.getRoutineId()).isEqualTo(routine.getId());
+        assertThat(synergy.routineId()).isEqualTo(routine.getId());
 
         List<RoutineResponse> routines = authed.get()
                 .uri("/api/v1/routines")

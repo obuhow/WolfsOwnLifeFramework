@@ -36,7 +36,7 @@ import org.springframework.util.MultiValueMap;
 import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.note.Note;
 import ru.wolf.api.note.NoteController;
@@ -123,12 +123,10 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
 
 
     private ProjectResponse createProject(WebTestClient client, String title) {
-        var areaRequest = new LifeAreaController.CreateLifeAreaRequest();
-        areaRequest.setName("Работа");
-        areaRequest.setColor("#3d5a4a");
+        var areaRequest = new CreateLifeAreaRequest("Работа", "#3d5a4a");
         Long areaId = client.post().uri("/api/v1/life-areas").bodyValue(areaRequest).exchange()
-                .expectStatus().isOk().expectBody(LifeAreaController.LifeAreaResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectStatus().isOk().expectBody(LifeAreaResponse.class)
+                .returnResult().getResponseBody().id();
 
         var projectRequest = new CreateProjectRequest(areaId, title);
         return client.post().uri("/api/v1/projects").bodyValue(projectRequest).exchange()

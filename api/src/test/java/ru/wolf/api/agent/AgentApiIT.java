@@ -17,6 +17,8 @@
  */
 package ru.wolf.api.agent;
 
+import ru.wolf.api.lifearea.dto.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -109,13 +111,11 @@ class AgentApiIT extends ApiIntegrationTest {
     }
 
     private Long createProject(WebTestClient client) {
-        var area = new ru.wolf.api.lifearea.LifeAreaController.CreateLifeAreaRequest();
-        area.setName("Работа");
-        area.setColor("#3d5a4a");
+        var area = new CreateLifeAreaRequest("Работа", "#3d5a4a");
         Long areaId = client.post().uri("/api/v1/life-areas").bodyValue(area).exchange()
                 .expectStatus().isOk()
-                .expectBody(ru.wolf.api.lifearea.LifeAreaController.LifeAreaResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectBody(LifeAreaResponse.class)
+                .returnResult().getResponseBody().id();
 
         var project = new ru.wolf.api.project.dto.CreateProjectRequest(
                 areaId, null, "WOLF", null, null, java.time.LocalDate.now().minusDays(1), null, null, null);

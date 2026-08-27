@@ -34,7 +34,7 @@ import ru.wolf.api.goal.GoalWeekBudgetRepository;
 import ru.wolf.api.idea.Idea;
 import ru.wolf.api.idea.dto.CreateIdeaRequest;
 import ru.wolf.api.idea.IdeaRepository;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.note.Note;
 import ru.wolf.api.note.NoteController;
@@ -181,10 +181,10 @@ class MorningDigestApiIT extends ApiIntegrationTest {
 
     private Long createLifeArea(WebTestClient client, String name) {
         return client.post().uri("/api/v1/life-areas")
-                .bodyValue(new LifeAreaController.CreateLifeAreaRequest(name, "#123456"))
+                .bodyValue(new CreateLifeAreaRequest(name, "#123456"))
                 .exchange().expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectBody(LifeAreaResponse.class)
+                .returnResult().getResponseBody().id();
     }
 
     private ProjectResponse createProject(WebTestClient client, Long areaId, String title) {
