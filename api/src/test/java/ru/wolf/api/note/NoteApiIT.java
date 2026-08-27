@@ -28,7 +28,7 @@ import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
-import ru.wolf.api.project.ProjectController;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 
@@ -64,11 +64,11 @@ class NoteApiIT extends ApiIntegrationTest {
     void crud_notes_for_project_and_delo_with_filters() {
         WebTestClient client = authedAdminClient();
         Long areaId = createLifeArea(client, "Работа");
-        ProjectController.ProjectResponse project = createProject(client, areaId, "WOLF");
+        ProjectResponse project = createProject(client, areaId, "WOLF");
         DeloController.DeloResponse delo = createDelo(client, "Spring Security");
 
         NoteController.NoteRequest projectRequest = new NoteController.NoteRequest();
-        projectRequest.setProjectId(project.getId());
+        projectRequest.setProjectId(project.id());
         projectRequest.setBody("Решение по Spring Security и JWT");
         projectRequest.setTags(List.of("security", "решение"));
         NoteController.NoteResponse projectNote = createNote(client, projectRequest);
@@ -80,13 +80,13 @@ class NoteApiIT extends ApiIntegrationTest {
         agentRequest.setTags(List.of("research"));
         NoteController.NoteResponse agentNote = createNote(client, agentRequest);
 
-        assertThat(projectNote.getProjectId()).isEqualTo(project.getId());
+        assertThat(projectNote.getProjectId()).isEqualTo(project.id());
         assertThat(projectNote.getDeloId()).isNull();
         assertThat(agentNote.getDeloId()).isEqualTo(delo.getId());
         assertThat(agentNote.getAuthor()).isEqualTo(Note.Author.AGENT);
 
         client.get().uri(uri -> uri.path("/api/v1/notes")
-                        .queryParam("projectId", project.getId()).build())
+                        .queryParam("projectId", project.id()).build())
                 .exchange().expectStatus().isOk()
                 .expectBodyList(NoteController.NoteResponse.class).hasSize(1);
 
@@ -142,7 +142,7 @@ class NoteApiIT extends ApiIntegrationTest {
     void note_requires_exactly_one_parent() {
         WebTestClient client = authedAdminClient();
         Long areaId = createLifeArea(client, "Работа");
-        ProjectController.ProjectResponse project = createProject(client, areaId, "WOLF");
+        ProjectResponse project = createProject(client, areaId, "WOLF");
         DeloController.DeloResponse delo = createDelo(client, "Рутина");
 
         NoteController.NoteRequest empty = new NoteController.NoteRequest();
@@ -151,7 +151,7 @@ class NoteApiIT extends ApiIntegrationTest {
                 .expectStatus().isBadRequest();
 
         NoteController.NoteRequest both = new NoteController.NoteRequest();
-        both.setProjectId(project.getId());
+        both.setProjectId(project.id());
         both.setDeloId(delo.getId());
         both.setBody("Две привязки");
         client.post().uri("/api/v1/notes").bodyValue(both).exchange()
@@ -173,12 +173,10 @@ class NoteApiIT extends ApiIntegrationTest {
                 .returnResult().getResponseBody().getId();
     }
 
-    private ProjectController.ProjectResponse createProject(WebTestClient client, Long areaId, String title) {
-        var request = new ProjectController.CreateProjectRequest();
-        request.setLifeAreaId(areaId);
-        request.setTitle(title);
+    private ProjectResponse createProject(WebTestClient client, Long areaId, String title) {
+        var request = new CreateProjectRequest(areaId, title);
         return client.post().uri("/api/v1/projects").bodyValue(request).exchange()
-                .expectStatus().isOk().expectBody(ProjectController.ProjectResponse.class)
+                .expectStatus().isOk().expectBody(ProjectResponse.class)
                 .returnResult().getResponseBody();
     }
 

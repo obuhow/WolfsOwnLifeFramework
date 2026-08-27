@@ -21,12 +21,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import ru.wolf.api.goal.GoalController;
 import ru.wolf.api.goal.GoalProjectRepository;
 import ru.wolf.api.goal.GoalRepository;
 import ru.wolf.api.goal.GoalWeekBudgetRepository;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
+import ru.wolf.api.project.dto.*;
+import ru.wolf.api.goal.dto.GoalResponse;
+import ru.wolf.api.goal.dto.CreateGoalRequest;
+import ru.wolf.api.goal.dto.BudgetRequest;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.user.UserRepository;
 
@@ -71,37 +74,37 @@ class ResourceCascadeApiIT extends ApiIntegrationTest {
                 .expectBody(LifeAreaController.LifeAreaResponse.class)
                 .returnResult().getResponseBody().getId();
         LocalDate oldEnd = LocalDate.now().plusDays(7);
-        ProjectController.ProjectResponse project = client.post().uri("/api/v1/projects")
+        ProjectResponse project = client.post().uri("/api/v1/projects")
                 .bodyValue(Map.of(
                         "lifeAreaId", areaId,
                         "title", "Проект каскада",
                         "startDate", LocalDate.now().minusDays(7).toString(),
                         "endDate", oldEnd.toString()))
                 .exchange().expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult().getResponseBody();
-        GoalController.GoalResponse goal = client.post().uri("/api/v1/goals")
-                .bodyValue(new GoalController.CreateGoalRequest("Цель каскада", null, 1))
+        GoalResponse goal = client.post().uri("/api/v1/goals")
+                .bodyValue(new CreateGoalRequest("Цель каскада", null, 1))
                 .exchange().expectStatus().isOk()
-                .expectBody(GoalController.GoalResponse.class)
+                .expectBody(GoalResponse.class)
                 .returnResult().getResponseBody();
-        GoalController.GoalResponse unrelatedGoal = client.post().uri("/api/v1/goals")
-                .bodyValue(new GoalController.CreateGoalRequest("Другая цель", null, 2))
+        GoalResponse unrelatedGoal = client.post().uri("/api/v1/goals")
+                .bodyValue(new CreateGoalRequest("Другая цель", null, 2))
                 .exchange().expectStatus().isOk()
-                .expectBody(GoalController.GoalResponse.class)
+                .expectBody(GoalResponse.class)
                 .returnResult().getResponseBody();
 
         LocalDate affectedWeekDate = oldEnd.plusDays(7);
         String week = "%04d-W%02d".formatted(
                 affectedWeekDate.get(WeekFields.ISO.weekBasedYear()),
                 affectedWeekDate.get(WeekFields.ISO.weekOfWeekBasedYear()));
-        client.post().uri("/api/v1/goals/{id}/budget", goal.getId())
-                .bodyValue(new GoalController.BudgetRequest(week, new BigDecimal("20")))
+        client.post().uri("/api/v1/goals/{id}/budget", goal.id())
+                .bodyValue(new BudgetRequest(week, new BigDecimal("20")))
                 .exchange().expectStatus().isOk();
-        client.post().uri("/api/v1/goals/{id}/budget", unrelatedGoal.getId())
-                .bodyValue(new GoalController.BudgetRequest(week, new BigDecimal("20")))
+        client.post().uri("/api/v1/goals/{id}/budget", unrelatedGoal.id())
+                .bodyValue(new BudgetRequest(week, new BigDecimal("20")))
                 .exchange().expectStatus().isOk();
-        client.post().uri("/api/v1/goals/{id}/projects/{projectId}", goal.getId(), project.getId())
+        client.post().uri("/api/v1/goals/{id}/projects/{projectId}", goal.id(), project.id())
                 .exchange().expectStatus().isNoContent();
         client.put().uri("/api/v1/settings")
                 .bodyValue(Map.of(
@@ -113,7 +116,7 @@ class ResourceCascadeApiIT extends ApiIntegrationTest {
                 .exchange().expectStatus().isOk();
 
         ResourceCascadeService.Preview preview = client.post()
-                .uri("/api/v1/projects/{id}/plan-shift-preview", project.getId())
+                .uri("/api/v1/projects/{id}/plan-shift-preview", project.id())
                 .bodyValue(Map.of("newEnd", oldEnd.plusDays(14).toString()))
                 .exchange().expectStatus().isOk()
                 .expectBody(ResourceCascadeService.Preview.class)
@@ -124,11 +127,11 @@ class ResourceCascadeApiIT extends ApiIntegrationTest {
         assertThat(preview.totalDeficit()).isEqualByComparingTo("10.00");
         assertThat(preview.affectedGoals().get(0).deficit()).isEqualByComparingTo("5.00");
 
-        ProjectController.ProjectDetailResponse unchanged = client.get()
-                .uri("/api/v1/projects/{id}", project.getId())
+        ProjectDetailResponse unchanged = client.get()
+                .uri("/api/v1/projects/{id}", project.id())
                 .exchange().expectStatus().isOk()
-                .expectBody(ProjectController.ProjectDetailResponse.class)
+                .expectBody(ProjectDetailResponse.class)
                 .returnResult().getResponseBody();
-        assertThat(unchanged.getEndDate()).isEqualTo(oldEnd);
+        assertThat(unchanged.endDate()).isEqualTo(oldEnd);
     }
 }

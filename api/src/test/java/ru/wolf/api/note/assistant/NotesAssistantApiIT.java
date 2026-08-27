@@ -41,7 +41,7 @@ import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.note.Note;
 import ru.wolf.api.note.NoteController;
 import ru.wolf.api.note.NoteRepository;
-import ru.wolf.api.project.ProjectController;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 
@@ -80,7 +80,7 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
     @Test
     void uploading_audio_creates_note_with_fake_transcription_and_attachment() {
         WebTestClient client = authedAdminClient();
-        Long projectId = createProject(client, "WOLF").getId();
+        Long projectId = createProject(client, "WOLF").id();
 
         MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
         parts.add("file", new NamedByteArrayResource("voice memo".getBytes(StandardCharsets.UTF_8), "memo.webm"));
@@ -104,7 +104,7 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
     @Test
     void resume_summarizes_latest_project_notes_through_fake() {
         WebTestClient client = authedAdminClient();
-        Long projectId = createProject(client, "WOLF").getId();
+        Long projectId = createProject(client, "WOLF").id();
         createNote(client, projectId, "Решили оставить JWT фильтр");
         createNote(client, projectId, "Остановился на проверке Spring Security");
         createNote(client, projectId, "Следом нужно добавить интеграционный тест");
@@ -122,7 +122,7 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
     }
 
 
-    private ProjectController.ProjectResponse createProject(WebTestClient client, String title) {
+    private ProjectResponse createProject(WebTestClient client, String title) {
         var areaRequest = new LifeAreaController.CreateLifeAreaRequest();
         areaRequest.setName("Работа");
         areaRequest.setColor("#3d5a4a");
@@ -130,11 +130,9 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
                 .expectStatus().isOk().expectBody(LifeAreaController.LifeAreaResponse.class)
                 .returnResult().getResponseBody().getId();
 
-        var projectRequest = new ProjectController.CreateProjectRequest();
-        projectRequest.setLifeAreaId(areaId);
-        projectRequest.setTitle(title);
+        var projectRequest = new CreateProjectRequest(areaId, title);
         return client.post().uri("/api/v1/projects").bodyValue(projectRequest).exchange()
-                .expectStatus().isOk().expectBody(ProjectController.ProjectResponse.class)
+                .expectStatus().isOk().expectBody(ProjectResponse.class)
                 .returnResult().getResponseBody();
     }
 

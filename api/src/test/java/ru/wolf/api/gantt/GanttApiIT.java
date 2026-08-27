@@ -30,7 +30,7 @@ import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
-import ru.wolf.api.project.ProjectController;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.timeentry.TimeEntry;
@@ -133,7 +133,7 @@ class GanttApiIT extends ApiIntegrationTest {
     void week_plan_upsert_and_read_on_gantt() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long projectId = createProject(authed, areaId, null, "План-тест").getId();
+        Long projectId = createProject(authed, areaId, null, "План-тест").id();
 
         LocalDate monday = LocalDate.of(2026, 3, 9); // ISO week 2026-W11
         int isoYear = monday.get(WeekFields.ISO.weekBasedYear());
@@ -205,8 +205,8 @@ class GanttApiIT extends ApiIntegrationTest {
     void fact_primary_only_counts_primary_project() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, null, "Primary").getId();
-        Long p2 = createProject(authed, areaId, null, "Secondary").getId();
+        Long p1 = createProject(authed, areaId, null, "Primary").id();
+        Long p2 = createProject(authed, areaId, null, "Secondary").id();
 
         Long deloId = createDelo(authed, "Код", List.of(p1, p2), p1);
 
@@ -234,8 +234,8 @@ class GanttApiIT extends ApiIntegrationTest {
         });
 
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, null, "A").getId();
-        Long p2 = createProject(authed, areaId, null, "B").getId();
+        Long p1 = createProject(authed, areaId, null, "A").id();
+        Long p2 = createProject(authed, areaId, null, "B").id();
         Long deloId = createDelo(authed, "Общее", List.of(p1, p2), p1);
 
         LocalDate monday = LocalDate.of(2026, 3, 9);
@@ -257,7 +257,7 @@ class GanttApiIT extends ApiIntegrationTest {
     void ad_hoc_excluded_from_project_fact() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, null, "Проект").getId();
+        Long p1 = createProject(authed, areaId, null, "Проект").id();
         Long deloId = createDelo(authed, "Связанное", List.of(p1), p1);
 
         LocalDate monday = LocalDate.of(2026, 3, 9);
@@ -277,7 +277,7 @@ class GanttApiIT extends ApiIntegrationTest {
     void planned_entries_not_counted_as_fact() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, null, "План").getId();
+        Long p1 = createProject(authed, areaId, null, "План").id();
         Long deloId = createDelo(authed, "Будущее", List.of(p1), p1);
 
         LocalDate monday = LocalDate.of(2026, 3, 9);
@@ -297,9 +297,9 @@ class GanttApiIT extends ApiIntegrationTest {
         Long work = createLifeArea(authed, "Работа");
         Long health = createLifeArea(authed, "Здоровье");
 
-        Long pWork = createProject(authed, work, null, "Код").getId();
+        Long pWork = createProject(authed, work, null, "Код").id();
         Long pHealthDated = createProjectWithDates(authed, health, null, "Бег",
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)).getId();
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)).id();
         createProject(authed, health, null, "Без сроков"); // undated health
 
         // Filter life area = health
@@ -318,8 +318,8 @@ class GanttApiIT extends ApiIntegrationTest {
     void nested_projects_have_depth() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long root = createProject(authed, areaId, null, "Корень").getId();
-        Long child = createProject(authed, areaId, root, "Дочка").getId();
+        Long root = createProject(authed, areaId, null, "Корень").id();
+        Long child = createProject(authed, areaId, root, "Дочка").id();
 
         GanttController.GanttResponse gantt = getGantt(authed, "weeks=4");
         Map<Long, GanttController.ProjectRow> byId = new HashMap<>();
@@ -335,7 +335,7 @@ class GanttApiIT extends ApiIntegrationTest {
     void week_plan_foreign_project_rejected() {
         WebTestClient admin = authedAdminClient();
         Long areaId = createLifeArea(admin, "Работа");
-        Long adminProject = createProject(admin, areaId, null, "Чужой").getId();
+        Long adminProject = createProject(admin, areaId, null, "Чужой").id();
 
         User user2 = new User();
         user2.setUsername("user2");
@@ -394,9 +394,9 @@ class GanttApiIT extends ApiIntegrationTest {
     void forecast_uses_four_completed_weeks_and_clamps_remaining_work() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse project = createProjectWithDatesAndHours(
+        ProjectResponse project = createProjectWithDatesAndHours(
                 authed, areaId, "Прогноз", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 8, 31), 60);
-        Long deloId = createDelo(authed, "Код", List.of(project.getId()), project.getId());
+        Long deloId = createDelo(authed, "Код", List.of(project.id()), project.id());
 
         LocalDate currentMonday = LocalDate.now(MOSCOW)
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
@@ -411,7 +411,7 @@ class GanttApiIT extends ApiIntegrationTest {
                 .expectBodyList(GanttController.ForecastResponse.class)
                 .returnResult().getResponseBody();
         GanttController.ForecastResponse forecast = response.stream()
-                .filter(item -> item.getProjectId().equals(project.getId())).findFirst().orElseThrow();
+                .filter(item -> item.getProjectId().equals(project.id())).findFirst().orElseThrow();
         assertThat(forecast.getWeeklyAvg()).isEqualByComparingTo("5.00");
         assertThat(forecast.getRemaining()).isEqualByComparingTo("40.00");
         assertThat(forecast.getForecastEnd()).isEqualTo(currentMonday.plusWeeks(8));
@@ -456,7 +456,7 @@ class GanttApiIT extends ApiIntegrationTest {
         return created.getId();
     }
 
-    private ProjectController.ProjectResponse createProject(
+    private ProjectResponse createProject(
             WebTestClient client, Long areaId, Long parentId, String title
     ) {
         Map<String, Object> body = new HashMap<>();
@@ -468,12 +468,12 @@ class GanttApiIT extends ApiIntegrationTest {
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
 
-    private ProjectController.ProjectResponse createProjectWithDates(
+    private ProjectResponse createProjectWithDates(
             WebTestClient client, Long areaId, Long parentId, String title,
             LocalDate start, LocalDate end
     ) {
@@ -488,12 +488,12 @@ class GanttApiIT extends ApiIntegrationTest {
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
 
-    private ProjectController.ProjectResponse createProjectWithDatesAndHours(
+    private ProjectResponse createProjectWithDatesAndHours(
             WebTestClient client, Long areaId, String title, LocalDate start, LocalDate end, int hours
     ) {
         Map<String, Object> body = new HashMap<>();
@@ -503,7 +503,7 @@ class GanttApiIT extends ApiIntegrationTest {
         body.put("endDate", end.toString());
         body.put("totalPlanHours", hours);
         return client.post().uri("/api/v1/projects").bodyValue(body).exchange()
-                .expectStatus().isOk().expectBody(ProjectController.ProjectResponse.class)
+                .expectStatus().isOk().expectBody(ProjectResponse.class)
                 .returnResult().getResponseBody();
     }
 

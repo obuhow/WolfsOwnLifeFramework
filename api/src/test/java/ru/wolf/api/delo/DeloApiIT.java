@@ -29,7 +29,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.backlog.BacklogItemRepository;
-import ru.wolf.api.project.ProjectController;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.timeentry.TimeEntryRepository;
@@ -121,14 +121,14 @@ class DeloApiIT extends ApiIntegrationTest {
     void create_delo_with_projects_sets_primary() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse p1 = createProject(authed, areaId, "WOLF");
-        ProjectController.ProjectResponse p2 = createProject(authed, areaId, "API");
+        ProjectResponse p1 = createProject(authed, areaId, "WOLF");
+        ProjectResponse p2 = createProject(authed, areaId, "API");
 
         var req = new DeloController.CreateDeloRequest();
         req.setTitle("Код-ревью");
         req.setExecutionMode(Delo.ExecutionMode.DELEGATABLE);
-        req.setProjectIds(List.of(p1.getId(), p2.getId()));
-        req.setPrimaryProjectId(p2.getId());
+        req.setProjectIds(List.of(p1.id(), p2.id()));
+        req.setPrimaryProjectId(p2.id());
 
         DeloController.DeloResponse created = authed.post()
                 .uri("/api/v1/delos")
@@ -139,8 +139,8 @@ class DeloApiIT extends ApiIntegrationTest {
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(created.getProjectIds()).containsExactlyInAnyOrder(p1.getId(), p2.getId());
-        assertThat(created.getPrimaryProjectId()).isEqualTo(p2.getId());
+        assertThat(created.getProjectIds()).containsExactlyInAnyOrder(p1.id(), p2.id());
+        assertThat(created.getPrimaryProjectId()).isEqualTo(p2.id());
         assertThat(created.getExecutionMode()).isEqualTo(Delo.ExecutionMode.DELEGATABLE);
     }
 
@@ -148,12 +148,12 @@ class DeloApiIT extends ApiIntegrationTest {
     void create_delo_with_projects_without_primary_defaults_to_first() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse p1 = createProject(authed, areaId, "WOLF");
-        ProjectController.ProjectResponse p2 = createProject(authed, areaId, "API");
+        ProjectResponse p1 = createProject(authed, areaId, "WOLF");
+        ProjectResponse p2 = createProject(authed, areaId, "API");
 
         var req = new DeloController.CreateDeloRequest();
         req.setTitle("Планирование");
-        req.setProjectIds(List.of(p1.getId(), p2.getId()));
+        req.setProjectIds(List.of(p1.id(), p2.id()));
 
         DeloController.DeloResponse created = authed.post()
                 .uri("/api/v1/delos")
@@ -164,18 +164,18 @@ class DeloApiIT extends ApiIntegrationTest {
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(created.getPrimaryProjectId()).isEqualTo(p1.getId());
+        assertThat(created.getPrimaryProjectId()).isEqualTo(p1.id());
     }
 
     @Test
     void reject_primary_without_projects() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse p1 = createProject(authed, areaId, "WOLF");
+        ProjectResponse p1 = createProject(authed, areaId, "WOLF");
 
         var req = new DeloController.CreateDeloRequest();
         req.setTitle("Сломанное");
-        req.setPrimaryProjectId(p1.getId());
+        req.setPrimaryProjectId(p1.id());
 
         authed.post()
                 .uri("/api/v1/delos")
@@ -188,13 +188,13 @@ class DeloApiIT extends ApiIntegrationTest {
     void reject_primary_not_in_project_list() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse p1 = createProject(authed, areaId, "WOLF");
-        ProjectController.ProjectResponse p2 = createProject(authed, areaId, "API");
+        ProjectResponse p1 = createProject(authed, areaId, "WOLF");
+        ProjectResponse p2 = createProject(authed, areaId, "API");
 
         var req = new DeloController.CreateDeloRequest();
         req.setTitle("Сломанное");
-        req.setProjectIds(List.of(p1.getId()));
-        req.setPrimaryProjectId(p2.getId());
+        req.setProjectIds(List.of(p1.id()));
+        req.setPrimaryProjectId(p2.id());
 
         authed.post()
                 .uri("/api/v1/delos")
@@ -207,9 +207,9 @@ class DeloApiIT extends ApiIntegrationTest {
     void get_detail_includes_project_links() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse p1 = createProject(authed, areaId, "WOLF");
+        ProjectResponse p1 = createProject(authed, areaId, "WOLF");
 
-        DeloController.DeloResponse created = createDelo(authed, "Релиз", List.of(p1.getId()), p1.getId());
+        DeloController.DeloResponse created = createDelo(authed, "Релиз", List.of(p1.id()), p1.id());
 
         DeloController.DeloDetailResponse detail = authed.get()
                 .uri("/api/v1/delos/{id}", created.getId())
@@ -222,7 +222,7 @@ class DeloApiIT extends ApiIntegrationTest {
         assertThat(detail).isNotNull();
         assertThat(detail.getTitle()).isEqualTo("Релиз");
         assertThat(detail.getProjects()).hasSize(1);
-        assertThat(detail.getProjects().get(0).getId()).isEqualTo(p1.getId());
+        assertThat(detail.getProjects().get(0).getId()).isEqualTo(p1.id());
         assertThat(detail.getProjects().get(0).getTitle()).isEqualTo("WOLF");
         assertThat(detail.getProjects().get(0).getIsPrimary()).isTrue();
     }
@@ -231,17 +231,17 @@ class DeloApiIT extends ApiIntegrationTest {
     void update_delo_fields_and_links() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse p1 = createProject(authed, areaId, "WOLF");
-        ProjectController.ProjectResponse p2 = createProject(authed, areaId, "API");
+        ProjectResponse p1 = createProject(authed, areaId, "WOLF");
+        ProjectResponse p2 = createProject(authed, areaId, "API");
 
-        DeloController.DeloResponse created = createDelo(authed, "Старое", List.of(p1.getId()), p1.getId());
+        DeloController.DeloResponse created = createDelo(authed, "Старое", List.of(p1.id()), p1.id());
 
         var update = new DeloController.UpdateDeloRequest();
         update.setTitle("Новое");
         update.setDescription("обновлено");
         update.setExecutionMode(Delo.ExecutionMode.AUTOMATABLE);
-        update.setProjectIds(List.of(p2.getId()));
-        update.setPrimaryProjectId(p2.getId());
+        update.setProjectIds(List.of(p2.id()));
+        update.setPrimaryProjectId(p2.id());
 
         DeloController.DeloResponse updated = authed.put()
                 .uri("/api/v1/delos/{id}", created.getId())
@@ -255,78 +255,78 @@ class DeloApiIT extends ApiIntegrationTest {
         assertThat(updated.getTitle()).isEqualTo("Новое");
         assertThat(updated.getDescription()).isEqualTo("обновлено");
         assertThat(updated.getExecutionMode()).isEqualTo(Delo.ExecutionMode.AUTOMATABLE);
-        assertThat(updated.getProjectIds()).containsExactly(p2.getId());
-        assertThat(updated.getPrimaryProjectId()).isEqualTo(p2.getId());
+        assertThat(updated.getProjectIds()).containsExactly(p2.id());
+        assertThat(updated.getPrimaryProjectId()).isEqualTo(p2.id());
     }
 
     @Test
     void link_unlink_and_set_primary() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse p1 = createProject(authed, areaId, "WOLF");
-        ProjectController.ProjectResponse p2 = createProject(authed, areaId, "API");
+        ProjectResponse p1 = createProject(authed, areaId, "WOLF");
+        ProjectResponse p2 = createProject(authed, areaId, "API");
 
         DeloController.DeloResponse delo = createDelo(authed, "Связи", List.of(), null);
 
         DeloController.DeloResponse linked1 = authed.post()
-                .uri("/api/v1/delos/{deloId}/link/{projectId}", delo.getId(), p1.getId())
+                .uri("/api/v1/delos/{deloId}/link/{projectId}", delo.getId(), p1.id())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(DeloController.DeloResponse.class)
                 .returnResult()
                 .getResponseBody();
-        assertThat(linked1.getProjectIds()).containsExactly(p1.getId());
-        assertThat(linked1.getPrimaryProjectId()).isEqualTo(p1.getId());
+        assertThat(linked1.getProjectIds()).containsExactly(p1.id());
+        assertThat(linked1.getPrimaryProjectId()).isEqualTo(p1.id());
 
         DeloController.DeloResponse linked2 = authed.post()
-                .uri("/api/v1/delos/{deloId}/link/{projectId}", delo.getId(), p2.getId())
+                .uri("/api/v1/delos/{deloId}/link/{projectId}", delo.getId(), p2.id())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(DeloController.DeloResponse.class)
                 .returnResult()
                 .getResponseBody();
-        assertThat(linked2.getProjectIds()).containsExactlyInAnyOrder(p1.getId(), p2.getId());
-        assertThat(linked2.getPrimaryProjectId()).isEqualTo(p1.getId());
+        assertThat(linked2.getProjectIds()).containsExactlyInAnyOrder(p1.id(), p2.id());
+        assertThat(linked2.getPrimaryProjectId()).isEqualTo(p1.id());
 
         DeloController.DeloResponse primary = authed.put()
-                .uri("/api/v1/delos/{deloId}/primary/{projectId}", delo.getId(), p2.getId())
+                .uri("/api/v1/delos/{deloId}/primary/{projectId}", delo.getId(), p2.id())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(DeloController.DeloResponse.class)
                 .returnResult()
                 .getResponseBody();
-        assertThat(primary.getPrimaryProjectId()).isEqualTo(p2.getId());
+        assertThat(primary.getPrimaryProjectId()).isEqualTo(p2.id());
 
         DeloController.DeloResponse unlinked = authed.delete()
-                .uri("/api/v1/delos/{deloId}/link/{projectId}", delo.getId(), p2.getId())
+                .uri("/api/v1/delos/{deloId}/link/{projectId}", delo.getId(), p2.id())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(DeloController.DeloResponse.class)
                 .returnResult()
                 .getResponseBody();
-        assertThat(unlinked.getProjectIds()).containsExactly(p1.getId());
-        assertThat(unlinked.getPrimaryProjectId()).isEqualTo(p1.getId());
+        assertThat(unlinked.getProjectIds()).containsExactly(p1.id());
+        assertThat(unlinked.getPrimaryProjectId()).isEqualTo(p1.id());
     }
 
     @Test
     void project_detail_lists_attached_delos() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse project = createProject(authed, areaId, "WOLF");
-        DeloController.DeloResponse delo = createDelo(authed, "Тикет 06", List.of(project.getId()), project.getId());
+        ProjectResponse project = createProject(authed, areaId, "WOLF");
+        DeloController.DeloResponse delo = createDelo(authed, "Тикет 06", List.of(project.id()), project.id());
 
-        ProjectController.ProjectDetailResponse detail = authed.get()
-                .uri("/api/v1/projects/{id}", project.getId())
+        ProjectDetailResponse detail = authed.get()
+                .uri("/api/v1/projects/{id}", project.id())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectDetailResponse.class)
+                .expectBody(ProjectDetailResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(detail.getDelos()).hasSize(1);
-        assertThat(detail.getDelos().get(0).getId()).isEqualTo(delo.getId());
-        assertThat(detail.getDelos().get(0).getTitle()).isEqualTo("Тикет 06");
-        assertThat(detail.getDelos().get(0).getIsPrimary()).isTrue();
+        assertThat(detail.delos()).hasSize(1);
+        assertThat(detail.delos().get(0).id()).isEqualTo(delo.getId());
+        assertThat(detail.delos().get(0).title()).isEqualTo("Тикет 06");
+        assertThat(detail.delos().get(0).isPrimary()).isTrue();
     }
 
     @Test
@@ -351,8 +351,8 @@ class DeloApiIT extends ApiIntegrationTest {
     void isolation_between_users() {
         WebTestClient admin = authedAdminClient();
         Long adminArea = createLifeArea(admin, "Работа admin");
-        ProjectController.ProjectResponse adminProject = createProject(admin, adminArea, "Секрет");
-        DeloController.DeloResponse adminDelo = createDelo(admin, "Секретное Дело", List.of(adminProject.getId()), adminProject.getId());
+        ProjectResponse adminProject = createProject(admin, adminArea, "Секрет");
+        DeloController.DeloResponse adminDelo = createDelo(admin, "Секретное Дело", List.of(adminProject.id()), adminProject.id());
 
         User user2 = new User();
         user2.setUsername("user2");
@@ -369,8 +369,8 @@ class DeloApiIT extends ApiIntegrationTest {
                 .build();
 
         Long area2 = createLifeArea(client2, "Работа user2");
-        ProjectController.ProjectResponse p2 = createProject(client2, area2, "Проект user2");
-        createDelo(client2, "Дело user2", List.of(p2.getId()), p2.getId());
+        ProjectResponse p2 = createProject(client2, area2, "Проект user2");
+        createDelo(client2, "Дело user2", List.of(p2.id()), p2.id());
 
         client2.get()
                 .uri("/api/v1/delos")
@@ -393,7 +393,7 @@ class DeloApiIT extends ApiIntegrationTest {
                 .expectStatus().isBadRequest();
 
         client2.post()
-                .uri("/api/v1/delos/{deloId}/link/{projectId}", adminDelo.getId(), p2.getId())
+                .uri("/api/v1/delos/{deloId}/link/{projectId}", adminDelo.getId(), p2.id())
                 .exchange()
                 .expectStatus().isBadRequest();
 
@@ -438,9 +438,9 @@ class DeloApiIT extends ApiIntegrationTest {
 
         authed.get().uri("/api/v1/backlog/week")
                 .exchange().expectStatus().isOk()
-                .expectBody(ru.wolf.api.backlog.WeekBacklogController.WeekBacklogResponse.class)
-                .value(response -> assertThat(response.getDelos())
-                        .extracting(ru.wolf.api.backlog.WeekBacklogController.DeloResponse::getTitle)
+                .expectBody(ru.wolf.api.backlog.dto.WeekBacklogResponse.class)
+                .value(response -> assertThat(response.delos())
+                        .extracting(ru.wolf.api.backlog.dto.DeloResponse::title)
                         .containsExactly("Импорт 1", "Импорт 2"));
     }
 
@@ -472,16 +472,14 @@ class DeloApiIT extends ApiIntegrationTest {
         return created.getId();
     }
 
-    private ProjectController.ProjectResponse createProject(WebTestClient client, Long lifeAreaId, String title) {
-        var req = new ProjectController.CreateProjectRequest();
-        req.setLifeAreaId(lifeAreaId);
-        req.setTitle(title);
+    private ProjectResponse createProject(WebTestClient client, Long lifeAreaId, String title) {
+        var req = new CreateProjectRequest(lifeAreaId, title);
         return client.post()
                 .uri("/api/v1/projects")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
     }

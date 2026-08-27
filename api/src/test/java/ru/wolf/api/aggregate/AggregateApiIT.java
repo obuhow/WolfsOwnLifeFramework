@@ -30,7 +30,7 @@ import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaController;
 import ru.wolf.api.lifearea.LifeAreaRepository;
-import ru.wolf.api.project.ProjectController;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.timeentry.TimeEntry;
@@ -85,8 +85,8 @@ class AggregateApiIT extends ApiIntegrationTest {
     void project_detail_aggregates_primary_only_by_day() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, "Primary").getId();
-        Long p2 = createProject(authed, areaId, "Secondary").getId();
+        Long p1 = createProject(authed, areaId, "Primary").id();
+        Long p2 = createProject(authed, areaId, "Secondary").id();
         Long deloId = createDelo(authed, "Код", List.of(p1, p2), p1);
 
         LocalDate d1 = LocalDate.of(2026, 3, 9);
@@ -95,20 +95,20 @@ class AggregateApiIT extends ApiIntegrationTest {
         putEntry(authed, d2.atTime(14, 0), d2.atTime(15, 30), deloId, TimeEntry.Status.DONE); // 1.5h
         putEntry(authed, d1.atTime(16, 0), d1.atTime(17, 0), deloId, TimeEntry.Status.PLANNED); // not fact
 
-        ProjectController.ProjectDetailResponse detail = getProject(authed, p1);
-        assertThat(detail.getAggregates()).isNotNull();
-        assertThat(detail.getAggregates().getTotalFactHours()).isEqualByComparingTo("3.50");
-        assertThat(detail.getAggregates().getHourAccountingMode()).isEqualTo("PRIMARY_ONLY");
-        assertThat(detail.getAggregates().getByDay()).hasSize(2);
-        assertThat(detail.getAggregates().getByDay().get(0).getDate()).isEqualTo(d1.toString());
-        assertThat(detail.getAggregates().getByDay().get(0).getHours()).isEqualByComparingTo("2.00");
-        assertThat(detail.getAggregates().getByDay().get(1).getDate()).isEqualTo(d2.toString());
-        assertThat(detail.getAggregates().getByDay().get(1).getHours()).isEqualByComparingTo("1.50");
+        ProjectDetailResponse detail = getProject(authed, p1);
+        assertThat(detail.aggregates()).isNotNull();
+        assertThat(detail.aggregates().getTotalFactHours()).isEqualByComparingTo("3.50");
+        assertThat(detail.aggregates().getHourAccountingMode()).isEqualTo("PRIMARY_ONLY");
+        assertThat(detail.aggregates().getByDay()).hasSize(2);
+        assertThat(detail.aggregates().getByDay().get(0).getDate()).isEqualTo(d1.toString());
+        assertThat(detail.aggregates().getByDay().get(0).getHours()).isEqualByComparingTo("2.00");
+        assertThat(detail.aggregates().getByDay().get(1).getDate()).isEqualTo(d2.toString());
+        assertThat(detail.aggregates().getByDay().get(1).getHours()).isEqualByComparingTo("1.50");
 
         // Secondary gets nothing under PRIMARY_ONLY
-        ProjectController.ProjectDetailResponse secondary = getProject(authed, p2);
-        assertThat(secondary.getAggregates().getTotalFactHours()).isEqualByComparingTo("0.00");
-        assertThat(secondary.getAggregates().getByDay()).isEmpty();
+        ProjectDetailResponse secondary = getProject(authed, p2);
+        assertThat(secondary.aggregates().getTotalFactHours()).isEqualByComparingTo("0.00");
+        assertThat(secondary.aggregates().getByDay()).isEmpty();
     }
 
     @Test
@@ -120,25 +120,25 @@ class AggregateApiIT extends ApiIntegrationTest {
         });
 
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, "A").getId();
-        Long p2 = createProject(authed, areaId, "B").getId();
+        Long p1 = createProject(authed, areaId, "A").id();
+        Long p2 = createProject(authed, areaId, "B").id();
         Long deloId = createDelo(authed, "Общее", List.of(p1, p2), p1);
 
         LocalDate d = LocalDate.of(2026, 3, 9);
         putEntry(authed, d.atTime(14, 0), d.atTime(15, 30), deloId, TimeEntry.Status.DONE);
 
-        ProjectController.ProjectDetailResponse a = getProject(authed, p1);
-        ProjectController.ProjectDetailResponse b = getProject(authed, p2);
-        assertThat(a.getAggregates().getHourAccountingMode()).isEqualTo("ALL_PROJECTS");
-        assertThat(a.getAggregates().getTotalFactHours()).isEqualByComparingTo("1.50");
-        assertThat(b.getAggregates().getTotalFactHours()).isEqualByComparingTo("1.50");
+        ProjectDetailResponse a = getProject(authed, p1);
+        ProjectDetailResponse b = getProject(authed, p2);
+        assertThat(a.aggregates().getHourAccountingMode()).isEqualTo("ALL_PROJECTS");
+        assertThat(a.aggregates().getTotalFactHours()).isEqualByComparingTo("1.50");
+        assertThat(b.aggregates().getTotalFactHours()).isEqualByComparingTo("1.50");
     }
 
     @Test
     void project_detail_excludes_ad_hoc_and_unlinked_delo() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, "Проект").getId();
+        Long p1 = createProject(authed, areaId, "Проект").id();
         Long deloLinked = createDelo(authed, "Связанное", List.of(p1), p1);
         Long deloOther = createDelo(authed, "Другое", List.of(), null);
 
@@ -147,9 +147,9 @@ class AggregateApiIT extends ApiIntegrationTest {
         putEntry(authed, d.atTime(11, 0), d.atTime(12, 0), deloLinked, TimeEntry.Status.DONE);
         putEntry(authed, d.atTime(13, 0), d.atTime(14, 0), deloOther, TimeEntry.Status.DONE);
 
-        ProjectController.ProjectDetailResponse detail = getProject(authed, p1);
-        assertThat(detail.getAggregates().getTotalFactHours()).isEqualByComparingTo("1.00");
-        assertThat(detail.getAggregates().getByDay()).hasSize(1);
+        ProjectDetailResponse detail = getProject(authed, p1);
+        assertThat(detail.aggregates().getTotalFactHours()).isEqualByComparingTo("1.00");
+        assertThat(detail.aggregates().getByDay()).hasSize(1);
     }
 
     @Test
@@ -161,7 +161,7 @@ class AggregateApiIT extends ApiIntegrationTest {
         });
 
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, "Ночной").getId();
+        Long p1 = createProject(authed, areaId, "Ночной").id();
         Long deloId = createDelo(authed, "Спринт", List.of(p1), p1);
 
         // 01:00–02:00 wall on Mar 10 belongs to logical day Mar 9 when dayEnd=02:00
@@ -169,18 +169,18 @@ class AggregateApiIT extends ApiIntegrationTest {
         LocalDateTime end = LocalDateTime.of(2026, 3, 10, 2, 0);
         putEntry(authed, start, end, deloId, TimeEntry.Status.DONE);
 
-        ProjectController.ProjectDetailResponse detail = getProject(authed, p1);
-        assertThat(detail.getAggregates().getTotalFactHours()).isEqualByComparingTo("1.00");
-        assertThat(detail.getAggregates().getByDay()).hasSize(1);
-        assertThat(detail.getAggregates().getByDay().get(0).getDate()).isEqualTo("2026-03-09");
-        assertThat(detail.getAggregates().getByDay().get(0).getHours()).isEqualByComparingTo("1.00");
+        ProjectDetailResponse detail = getProject(authed, p1);
+        assertThat(detail.aggregates().getTotalFactHours()).isEqualByComparingTo("1.00");
+        assertThat(detail.aggregates().getByDay()).hasSize(1);
+        assertThat(detail.aggregates().getByDay().get(0).getDate()).isEqualTo("2026-03-09");
+        assertThat(detail.aggregates().getByDay().get(0).getHours()).isEqualByComparingTo("1.00");
     }
 
     @Test
     void delo_detail_aggregates_done_hours_by_day() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, "WOLF").getId();
+        Long p1 = createProject(authed, areaId, "WOLF").id();
         Long deloId = createDelo(authed, "Релиз", List.of(p1), p1);
 
         LocalDate d1 = LocalDate.of(2026, 3, 9);
@@ -214,15 +214,15 @@ class AggregateApiIT extends ApiIntegrationTest {
     void project_aggregate_matches_gantt_week_fact_sum() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        Long p1 = createProject(authed, areaId, "Сверка").getId();
+        Long p1 = createProject(authed, areaId, "Сверка").id();
         Long deloId = createDelo(authed, "Задача", List.of(p1), p1);
 
         LocalDate monday = LocalDate.of(2026, 3, 9);
         putEntry(authed, monday.atTime(10, 0), monday.atTime(12, 0), deloId, TimeEntry.Status.DONE);
         putEntry(authed, monday.plusDays(2).atTime(9, 0), monday.plusDays(2).atTime(10, 30), deloId, TimeEntry.Status.DONE);
 
-        ProjectController.ProjectDetailResponse detail = getProject(authed, p1);
-        assertThat(detail.getAggregates().getTotalFactHours()).isEqualByComparingTo("3.50");
+        ProjectDetailResponse detail = getProject(authed, p1);
+        assertThat(detail.aggregates().getTotalFactHours()).isEqualByComparingTo("3.50");
 
         // Gantt week cell should equal sum of by-day for that ISO week
         Map<?, ?> gantt = authed.get()
@@ -242,17 +242,17 @@ class AggregateApiIT extends ApiIntegrationTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> cells = (List<Map<String, Object>>) row.get("cells");
         BigDecimal fact = new BigDecimal(cells.get(0).get("factHours").toString());
-        assertThat(fact).isEqualByComparingTo(detail.getAggregates().getTotalFactHours());
+        assertThat(fact).isEqualByComparingTo(detail.aggregates().getTotalFactHours());
     }
 
     // --- helpers ---
 
-    private ProjectController.ProjectDetailResponse getProject(WebTestClient client, Long id) {
+    private ProjectDetailResponse getProject(WebTestClient client, Long id) {
         return client.get()
                 .uri("/api/v1/projects/{id}", id)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectDetailResponse.class)
+                .expectBody(ProjectDetailResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
@@ -279,7 +279,7 @@ class AggregateApiIT extends ApiIntegrationTest {
                 .getId();
     }
 
-    private ProjectController.ProjectResponse createProject(WebTestClient client, Long areaId, String title) {
+    private ProjectResponse createProject(WebTestClient client, Long areaId, String title) {
         Map<String, Object> body = new HashMap<>();
         body.put("lifeAreaId", areaId);
         body.put("title", title);
@@ -288,7 +288,7 @@ class AggregateApiIT extends ApiIntegrationTest {
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
