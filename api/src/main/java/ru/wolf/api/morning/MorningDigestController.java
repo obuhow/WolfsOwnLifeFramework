@@ -1,103 +1,15 @@
-/*
- * WOLF — Wolf's Own Life Framework
- * Copyright (C) 2025 Pavel Obukhov
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- */
 package ru.wolf.api.morning;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import ru.wolf.api.idea.Idea;
-import ru.wolf.api.note.Note;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
+import ru.wolf.api.morning.dto.MorningDigestResponse;
 
 @RestController
 @RequestMapping("/api/v1/morning-digest")
 @RequiredArgsConstructor
 public class MorningDigestController {
-
-    private final MorningDigestService morningDigestService;
-
-    @GetMapping
-    @Transactional(readOnly = true)
-    public ResponseEntity<MorningDigestResponse> get(Authentication authentication) {
-        return ResponseEntity.ok(morningDigestService.build(authentication.getName()));
-    }
-
-    @Data
-    @AllArgsConstructor
-    public static class MorningDigestResponse {
-        private String weekId;
-        private List<ProjectDigest> projects;
-        private List<IdeaDigest> ideas;
-        private List<GoalFactDigest> goalsFact;
-    }
-
-    @Data
-    @AllArgsConstructor
-    public static class ProjectDigest {
-        private Long id;
-        private String title;
-        private List<NoteDigest> lastNotes;
-        private List<DeloDigest> topDelos;
-    }
-
-    @Data
-    @AllArgsConstructor
-    public static class NoteDigest {
-        private Long id;
-        private Note.Author author;
-        private String body;
-        private String[] tags;
-        private Instant createdAt;
-        private Instant updatedAt;
-    }
-
-    @Data
-    @AllArgsConstructor
-    public static class DeloDigest {
-        private Long id;
-        private String title;
-    }
-
-    @Data
-    @AllArgsConstructor
-    public static class IdeaDigest {
-        private Long id;
-        private String title;
-        private String description;
-        private Idea.Category category;
-    }
-
-    @Data
-    @AllArgsConstructor
-    public static class GoalFactDigest {
-        private Long goalId;
-        private String title;
-        private BigDecimal budgetHours;
-        private BigDecimal factHours;
-        private String weekId;
-    }
+ private final MorningDigestService morningDigestService;
+ @GetMapping public ResponseEntity<MorningDigestResponse> get(Authentication authentication) { return ResponseEntity.ok(morningDigestService.build(authentication.getName())); }
 }

@@ -37,6 +37,7 @@ import ru.wolf.api.note.NoteRepository;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.user.User;
+import ru.wolf.api.morning.dto.*;
 import ru.wolf.api.user.UserRepository;
 
 import java.math.BigDecimal;
@@ -69,27 +70,27 @@ public class MorningDigestService {
     private final GoalFactService goalFactService;
 
     @Transactional(readOnly = true)
-    public MorningDigestController.MorningDigestResponse build(String username) {
+    public MorningDigestResponse build(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalStateException("User not found"));
         String weekId = currentIsoWeek(user);
         GoalFactService.IsoWeek week = goalFactService.parseWeek(weekId);
 
-        List<MorningDigestController.ProjectDigest> projects = projectRepository.findByUserOrderByTitleAsc(user).stream()
+        List<ProjectDigest> projects = projectRepository.findByUserOrderByTitleAsc(user).stream()
                 .filter(project -> project.getStatus() == Project.Status.IN_PROGRESS)
                 .map(project -> projectDigest(project, user, week))
                 .toList();
 
-        return new MorningDigestController.MorningDigestResponse(
+        return new MorningDigestResponse(
                 weekId, projects, selectIdeas(user), goalFactDigest(user, weekId, week));
     }
 
-    private MorningDigestController.ProjectDigest projectDigest(
+    private ProjectDigest projectDigest(
             Project project, User user, GoalFactService.IsoWeek week) {
         List<Note> notes = noteRepository.findByUserAndProjectIdOrderByCreatedAtDesc(
                 project.getUser(), project.getId(), PageRequest.of(0, 5));
-        List<MorningDigestController.NoteDigest> noteResponses = notes.stream()
-                .map(note -> new MorningDigestController.NoteDigest(
+        List<NoteDigest> noteResponses = notes.stream()
+                .map(note -> new NoteDigest(
                         note.getId(), note.getAuthor(), note.getBody(), note.getTags(),
                         note.getCreatedAt(), note.getUpdatedAt()))
                 .toList();
@@ -98,7 +99,7 @@ public class MorningDigestService {
         Set<Long> queuedDeloIds = backlogItemRepository.findPeriod(user, BacklogItem.Scope.WEEK, period).stream()
                 .map(item -> item.getDelo().getId()).collect(Collectors.toSet());
 
-        List<MorningDigestController.DeloDigest> delos = deloProjectRepository.findByProjectId(project.getId()).stream()
+        List<DeloDigest> delos = deloProjectRepository.findByProjectId(project.getId()).stream()
                 .map(DeloProject::getDelo)
                 .filter(delo -> queuedDeloIds.contains(delo.getId()))
                 .collect(Collectors.toMap(
@@ -106,12 +107,12 @@ public class MorningDigestService {
                 .values().stream()
                 .sorted(Comparator.comparing(delo -> delo.getTitle().toLowerCase()))
                 .limit(3)
-                .map(delo -> new MorningDigestController.DeloDigest(delo.getId(), delo.getTitle()))
+                .map(delo -> new DeloDigest(delo.getId(), delo.getTitle()))
                 .toList();
-        return new MorningDigestController.ProjectDigest(project.getId(), project.getTitle(), noteResponses, delos);
+        return new ProjectDigest(project.getId(), project.getTitle(), noteResponses, delos);
     }
 
-    private List<MorningDigestController.IdeaDigest> selectIdeas(User user) {
+    private List<IdeaDigest> selectIdeas(User user) {
         List<Idea> bank = new ArrayList<>(ideaRepository.findForUser(user, null, Idea.Status.BANK));
         Collections.shuffle(bank);
 
@@ -126,12 +127,12 @@ public class MorningDigestService {
             if (!selected.contains(idea)) selected.add(idea);
         }
         return selected.stream()
-                .map(idea -> new MorningDigestController.IdeaDigest(
+                .map(idea -> new IdeaDigest(
                         idea.getId(), idea.getTitle(), idea.getDescription(), idea.getCategory()))
                 .toList();
     }
 
-    private List<MorningDigestController.GoalFactDigest> goalFactDigest(
+    private List<GoalFactDigest> goalFactDigest(
             User user, String weekId, GoalFactService.IsoWeek week) {
         List<Goal> goals = goalRepository.findByUserAndArchivedOrderByPriorityAsc(user, false);
         Map<Long, GoalWeekBudget> budgets = goals.isEmpty()
@@ -142,7 +143,7 @@ public class MorningDigestService {
                 .collect(Collectors.toMap(budget -> budget.getGoal().getId(), Function.identity()));
 
         return goals.stream()
-                .map(goal -> new MorningDigestController.GoalFactDigest(
+                .map(goal -> new GoalFactDigest(
                         goal.getId(), goal.getTitle(),
                         budgetHours(budgets.get(goal.getId())),
                         goalFactService.calculate(user, goal, weekId), weekId))

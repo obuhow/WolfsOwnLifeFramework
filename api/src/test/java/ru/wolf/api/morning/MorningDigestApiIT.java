@@ -130,26 +130,26 @@ class MorningDigestApiIT extends ApiIntegrationTest {
                         "status", "DONE"))
                 .exchange().expectStatus().isOk();
 
-        MorningDigestController.MorningDigestResponse response = client.get()
+        ru.wolf.api.morning.dto.MorningDigestResponse response = client.get()
                 .uri("/api/v1/morning-digest")
                 .exchange().expectStatus().isOk()
-                .expectBody(MorningDigestController.MorningDigestResponse.class)
+                .expectBody(ru.wolf.api.morning.dto.MorningDigestResponse.class)
                 .returnResult().getResponseBody();
 
         assertThat(response).isNotNull();
-        assertThat(response.getWeekId()).isEqualTo(week);
-        assertThat(response.getProjects()).hasSize(1);
-        assertThat(response.getProjects().get(0).getLastNotes()).hasSize(5);
-        assertThat(response.getProjects().get(0).getTopDelos()).hasSize(3);
-        assertThat(response.getProjects().get(0).getLastNotes())
-                .extracting(MorningDigestController.NoteDigest::getBody)
+        assertThat(response.weekId()).isEqualTo(week);
+        assertThat(response.projects()).hasSize(1);
+        assertThat(response.projects().get(0).lastNotes()).hasSize(5);
+        assertThat(response.projects().get(0).topDelos()).hasSize(3);
+        assertThat(response.projects().get(0).lastNotes())
+                .extracting(ru.wolf.api.morning.dto.NoteDigest::body)
                 .containsExactly("Заметка 5", "Заметка 4", "Заметка 3", "Заметка 2", "Заметка 1");
-        assertThat(response.getIdeas()).hasSize(3);
-        assertThat(response.getIdeas()).extracting(MorningDigestController.IdeaDigest::getCategory)
+        assertThat(response.ideas()).hasSize(3);
+        assertThat(response.ideas()).extracting(ru.wolf.api.morning.dto.IdeaDigest::category)
                 .doesNotHaveDuplicates();
-        assertThat(response.getGoalsFact()).singleElement()
-                .extracting(MorningDigestController.GoalFactDigest::getBudgetHours,
-                        MorningDigestController.GoalFactDigest::getFactHours)
+        assertThat(response.goalsFact()).singleElement()
+                .extracting(ru.wolf.api.morning.dto.GoalFactDigest::budgetHours,
+                        ru.wolf.api.morning.dto.GoalFactDigest::factHours)
                 .containsExactly(new BigDecimal("8.00"), new BigDecimal("2.00"));
     }
 
@@ -168,14 +168,14 @@ class MorningDigestApiIT extends ApiIntegrationTest {
                 "В работе", null, Idea.Category.BUSINESS, Idea.Status.IN_WORK);
         client.post().uri("/api/v1/ideas").bodyValue(inWork).exchange().expectStatus().isOk();
 
-        MorningDigestController.MorningDigestResponse response = client.get()
+        ru.wolf.api.morning.dto.MorningDigestResponse response = client.get()
                 .uri("/api/v1/morning-digest")
                 .exchange().expectStatus().isOk()
-                .expectBody(MorningDigestController.MorningDigestResponse.class)
+                .expectBody(ru.wolf.api.morning.dto.MorningDigestResponse.class)
                 .returnResult().getResponseBody();
 
-        assertThat(response.getProjects()).isEmpty();
-        assertThat(response.getIdeas()).extracting(MorningDigestController.IdeaDigest::getTitle)
+        assertThat(response.projects()).isEmpty();
+        assertThat(response.ideas()).extracting(ru.wolf.api.morning.dto.IdeaDigest::title)
                 .containsExactly("В банке");
     }
 
