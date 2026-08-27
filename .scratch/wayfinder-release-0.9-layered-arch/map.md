@@ -53,6 +53,21 @@
   (`CannotCreateTransactionException`/таймаут логина) — лечится запуском по одному классу
   и лимитом JVM-памяти (`-Xmx768m`). Контракт HTTP не изменился.
 
+- **03 (Planning & Priorities: Goal, Project, ProjectDependency, Backlog, WeekBacklog) — resolved.**
+  5 тонких контроллеров → `GoalService`, `ProjectService`, `ProjectDependencyService`,
+  `BacklogService`, `WeekBacklogService`; 28 DTO-records в `goal/dto`, `project/dto`,
+  `backlog/dto`. **Закрыт вопрос из Not yet specified**: существующие сервисы
+  (`GoalFactService`, `ResourceCascadeService`, `PlanDistributionService`,
+  `FactAggregateService`) **не поглощаются** — становятся зависимостями сервисов фичи;
+  их публичные типы (`Preview`, `DistributionResult`) возвращаются наружу как есть.
+  Тесты кластера и смежных зелёные изолированно. `AgentApiIT`/`NotesAssistantApiIT`
+  падают из-за **предсуществующего** бага (H2-драйвер vs Testcontainers-postgres) —
+  проверено на чистом `develop` откатом изменений; нужен отдельный тикет.
+  Всплыло при массовой правке тестов: (1) одноимённые DTO в разных пакетах
+  (`ProjectResponse` в `goal/dto` и `project/dto`) ломают wildcard-импорт — нужны явные
+  импорты; (2) одноимённые переменные разных типов (`detail`, `created`) требуют
+  отслеживать объявленный тип при замене `getX()`→`x()`, иначе правка задевает чужой класс.
+
 ## Not yet specified
 
 - **Нужен ли `ImportXlsxPort`/формальный порт для datasync и легаси-нормализации workbook**, или там достаточно обычного Service (в отличие от `note/assistant`, где два реальных адаптера уже существуют, у `datasync` пока один формат хранения) — решится внутри тикета 06 при погружении в код.

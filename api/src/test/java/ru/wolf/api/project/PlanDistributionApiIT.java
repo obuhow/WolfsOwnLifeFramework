@@ -32,6 +32,7 @@ import ru.wolf.api.gantt.WeekPlan;
 import ru.wolf.api.gantt.WeekPlanRepository;
 import ru.wolf.api.lifearea.LifeArea;
 import ru.wolf.api.lifearea.LifeAreaRepository;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
@@ -62,10 +63,10 @@ class PlanDistributionApiIT extends ApiIntegrationTest {
         WebTestClient client = authedAdminClient();
         Map body = Map.of("lifeAreaId", area.getId(), "title", "Проект", "startDate", "2026-03-02",
                 "endDate", "2026-03-27", "totalPlanHours", 40);
-        ProjectController.ProjectResponse project = client.post().uri("/api/v1/projects").bodyValue(body)
-                .exchange().expectStatus().isOk().expectBody(ProjectController.ProjectResponse.class).returnResult().getResponseBody();
+        ProjectResponse project = client.post().uri("/api/v1/projects").bodyValue(body)
+                .exchange().expectStatus().isOk().expectBody(ProjectResponse.class).returnResult().getResponseBody();
 
-        Map result = client.post().uri("/api/v1/projects/{id}/plan-distribution", project.getId())
+        Map result = client.post().uri("/api/v1/projects/{id}/plan-distribution", project.id())
                 .bodyValue(Map.of("mode", "even_weekdays")).exchange().expectStatus().isOk()
                 .expectBody(Map.class).returnResult().getResponseBody();
         List<Map> weeks = (List<Map>) result.get("weeks");

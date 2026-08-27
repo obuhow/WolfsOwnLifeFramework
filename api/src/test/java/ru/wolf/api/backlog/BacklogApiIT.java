@@ -23,6 +23,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import ru.wolf.api.backlog.dto.*;
 import ru.wolf.api.support.ApiIntegrationTest;
 
 class BacklogApiIT extends ApiIntegrationTest {
@@ -35,12 +36,12 @@ class BacklogApiIT extends ApiIntegrationTest {
         Long deloId = delo.getId();
         String month = "2026-08";
         client.post().uri("/api/v1/backlog").contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("deloId", deloId, "scope", "MONTH", "period", month, "plannedHours", 3.5)).exchange().expectStatus().isCreated();
-        client.get().uri("/api/v1/backlog?scope=month&period=2026-08").exchange().expectStatus().isOk().expectBodyList(BacklogController.Response.class).value(list -> assertThat(list).singleElement().satisfies(item -> { assertThat(item.scope()).isEqualTo("month"); assertThat(item.plannedHours()).isEqualByComparingTo("3.5"); }));
-        client.get().uri("/api/v1/backlog?scope=week&period=2026-W34").exchange().expectStatus().isOk().expectBodyList(BacklogController.Response.class).value(list -> assertThat(list).isEmpty());
-        BacklogController.Response monthItem = client.get().uri("/api/v1/backlog?scope=month&period=2026-08").exchange().expectBodyList(BacklogController.Response.class).returnResult().getResponseBody().get(0);
+        client.get().uri("/api/v1/backlog?scope=month&period=2026-08").exchange().expectStatus().isOk().expectBodyList(Response.class).value(list -> assertThat(list).singleElement().satisfies(item -> { assertThat(item.scope()).isEqualTo("month"); assertThat(item.plannedHours()).isEqualByComparingTo("3.5"); }));
+        client.get().uri("/api/v1/backlog?scope=week&period=2026-W34").exchange().expectStatus().isOk().expectBodyList(Response.class).value(list -> assertThat(list).isEmpty());
+        Response monthItem = client.get().uri("/api/v1/backlog?scope=month&period=2026-08").exchange().expectBodyList(Response.class).returnResult().getResponseBody().get(0);
         client.post().uri("/api/v1/backlog/{id}/move-to-week", monthItem.id()).contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("week", "2026-W34")).exchange().expectStatus().isOk();
-        client.get().uri("/api/v1/backlog?scope=week&period=2026-W34").exchange().expectStatus().isOk().expectBodyList(BacklogController.Response.class).value(list -> assertThat(list).hasSize(1));
-        client.get().uri("/api/v1/backlog?scope=month&period=2026-08").exchange().expectStatus().isOk().expectBodyList(BacklogController.Response.class).value(list -> assertThat(list.get(0).movedToWeek()).isEqualTo("2026-W34"));
+        client.get().uri("/api/v1/backlog?scope=week&period=2026-W34").exchange().expectStatus().isOk().expectBodyList(Response.class).value(list -> assertThat(list).hasSize(1));
+        client.get().uri("/api/v1/backlog?scope=month&period=2026-08").exchange().expectStatus().isOk().expectBodyList(Response.class).value(list -> assertThat(list.get(0).movedToWeek()).isEqualTo("2026-W34"));
         client.post().uri("/api/v1/backlog").contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("deloId", deloId, "scope", "MONTH", "period", month)).exchange().expectStatus().isEqualTo(409);
     }
 }

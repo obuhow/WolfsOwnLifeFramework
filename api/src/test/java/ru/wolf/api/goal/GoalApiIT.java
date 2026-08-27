@@ -25,9 +25,21 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
+import ru.wolf.api.goal.dto.BudgetRequest;
+import ru.wolf.api.goal.dto.BudgetResponse;
+import ru.wolf.api.goal.dto.CreateGoalRequest;
+import ru.wolf.api.goal.dto.FactResponse;
+import ru.wolf.api.goal.dto.GoalDetailResponse;
+import ru.wolf.api.goal.dto.GoalResponse;
+import ru.wolf.api.goal.dto.MetricRequest;
+import ru.wolf.api.goal.dto.PriorityRequest;
 import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.goal.GoalRepository;
+import ru.wolf.api.goal.GoalMetricRepository;
+import ru.wolf.api.goal.GoalWeekBudgetRepository;
+import ru.wolf.api.goal.GoalProjectRepository;
 import ru.wolf.api.lifearea.LifeAreaRepository;
-import ru.wolf.api.project.ProjectController;
+import ru.wolf.api.project.dto.CreateProjectRequest;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.timeentry.TimeEntryRepository;
@@ -80,53 +92,53 @@ class GoalApiIT extends ApiIntegrationTest {
     void create_goal_budget_metric_and_project_link() {
         WebTestClient client = authedAdminClient();
         Long projectId = createProject(client, "Работа", "WOLF");
-        GoalController.GoalResponse goal = createGoal(client, "ISTQB", 1);
+        GoalResponse goal = createGoal(client, "ISTQB", 1);
 
-        client.post().uri("/api/v1/goals/{id}/budget", goal.getId())
-                .bodyValue(new GoalController.BudgetRequest("2026-W11", new BigDecimal("10")))
+        client.post().uri("/api/v1/goals/{id}/budget", goal.id())
+                .bodyValue(new BudgetRequest("2026-W11", new BigDecimal("10")))
                 .exchange().expectStatus().isOk()
-                .expectBody(GoalController.BudgetResponse.class)
-                .value(budget -> assertThat(budget.getHours()).isEqualByComparingTo("10.00"));
+                .expectBody(BudgetResponse.class)
+                .value(budget -> assertThat(budget.hours()).isEqualByComparingTo("10.00"));
 
-        client.post().uri("/api/v1/goals/{id}/metrics", goal.getId())
-                .bodyValue(new GoalController.MetricRequest("projects", new BigDecimal("5"), LocalDateTime.of(2026, 3, 10, 12, 0)))
+        client.post().uri("/api/v1/goals/{id}/metrics", goal.id())
+                .bodyValue(new MetricRequest("projects", new BigDecimal("5"), LocalDateTime.of(2026, 3, 10, 12, 0)))
                 .exchange().expectStatus().isOk();
 
-        client.post().uri("/api/v1/goals/{id}/projects/{projectId}", goal.getId(), projectId)
+        client.post().uri("/api/v1/goals/{id}/projects/{projectId}", goal.id(), projectId)
                 .exchange().expectStatus().isNoContent();
 
-        GoalController.GoalDetailResponse detail = client.get()
-                .uri(uri -> uri.path("/api/v1/goals/{id}").queryParam("week", "2026-W11").build(goal.getId()))
+        GoalDetailResponse detail = client.get()
+                .uri(uri -> uri.path("/api/v1/goals/{id}").queryParam("week", "2026-W11").build(goal.id()))
                 .exchange().expectStatus().isOk()
-                .expectBody(GoalController.GoalDetailResponse.class).returnResult().getResponseBody();
+                .expectBody(GoalDetailResponse.class).returnResult().getResponseBody();
 
         assertThat(detail).isNotNull();
-        assertThat(detail.getGoal().getTitle()).isEqualTo("ISTQB");
-        assertThat(detail.getProjects()).extracting(GoalController.ProjectResponse::getId).containsExactly(projectId);
-        assertThat(detail.getMetrics()).hasSize(1);
-        assertThat(detail.getBudget().getHours()).isEqualByComparingTo("10.00");
+        assertThat(detail.goal().title()).isEqualTo("ISTQB");
+        assertThat(detail.projects()).extracting(ru.wolf.api.goal.dto.ProjectResponse::id).containsExactly(projectId);
+        assertThat(detail.metrics()).hasSize(1);
+        assertThat(detail.budget().hours()).isEqualByComparingTo("10.00");
     }
 
     @Test
     void duplicate_priority_returns_conflict_and_reorder_changes_order() {
         WebTestClient client = authedAdminClient();
-        GoalController.GoalResponse first = createGoal(client, "Первая", 1);
+        GoalResponse first = createGoal(client, "Первая", 1);
 
         client.post().uri("/api/v1/goals")
-                .bodyValue(new GoalController.CreateGoalRequest("Дубликат", null, 1))
+                .bodyValue(new CreateGoalRequest("Дубликат", null, 1))
                 .exchange().expectStatus().isEqualTo(409);
 
-        GoalController.GoalResponse second = createGoal(client, "Вторая", 2);
-        client.put().uri("/api/v1/goals/{id}/priority", second.getId())
-                .bodyValue(new GoalController.PriorityRequest(1))
+        GoalResponse second = createGoal(client, "Вторая", 2);
+        client.put().uri("/api/v1/goals/{id}/priority", second.id())
+                .bodyValue(new PriorityRequest(1))
                 .exchange().expectStatus().isOk();
 
-        List<GoalController.GoalResponse> goals = client.get().uri("/api/v1/goals")
+        List<GoalResponse> goals = client.get().uri("/api/v1/goals")
                 .exchange().expectStatus().isOk()
-                .expectBodyList(GoalController.GoalResponse.class).returnResult().getResponseBody();
-        assertThat(goals).extracting(GoalController.GoalResponse::getId)
-                .containsExactly(second.getId(), first.getId());
-        assertThat(goals).extracting(GoalController.GoalResponse::getPriority)
+                .expectBodyList(GoalResponse.class).returnResult().getResponseBody();
+        assertThat(goals).extracting(GoalResponse::id)
+                .containsExactly(second.id(), first.id());
+        assertThat(goals).extracting(GoalResponse::priority)
                 .containsExactly(1, 2);
     }
 
@@ -137,33 +149,33 @@ class GoalApiIT extends ApiIntegrationTest {
         Long p2 = createProject(client, "Музыка", "Второй");
         Long deloId = createDelo(client, "Код", List.of(p1, p2), p1);
         putDoneEntry(client, deloId, "2026-03-10T10:00:00", "2026-03-10T12:30:00");
-        GoalController.GoalResponse goal = createGoal(client, "Релиз", 1);
-        linkProject(client, goal.getId(), p1);
-        linkProject(client, goal.getId(), p2);
+        GoalResponse goal = createGoal(client, "Релиз", 1);
+        linkProject(client, goal.id(), p1);
+        linkProject(client, goal.id(), p2);
 
-        GoalController.FactResponse primary = fact(client, goal.getId());
-        assertThat(primary.getHours()).isEqualByComparingTo("2.50");
+        FactResponse primary = fact(client, goal.id());
+        assertThat(primary.hours()).isEqualByComparingTo("2.50");
 
         User admin = userRepository.findByUsername("admin").orElseThrow();
         admin.setHourAccountingMode("ALL_PROJECTS");
         userRepository.save(admin);
 
-        GoalController.FactResponse allProjects = fact(client, goal.getId());
-        assertThat(allProjects.getHours()).isEqualByComparingTo("2.50");
+        FactResponse allProjects = fact(client, goal.id());
+        assertThat(allProjects.hours()).isEqualByComparingTo("2.50");
     }
 
-    private GoalController.FactResponse fact(WebTestClient client, Long goalId) {
+    private FactResponse fact(WebTestClient client, Long goalId) {
         return client.get().uri(uri -> uri.path("/api/v1/goals/{id}/fact")
                         .queryParam("week", "2026-W11").build(goalId))
                 .exchange().expectStatus().isOk()
-                .expectBody(GoalController.FactResponse.class).returnResult().getResponseBody();
+                .expectBody(FactResponse.class).returnResult().getResponseBody();
     }
 
-    private GoalController.GoalResponse createGoal(WebTestClient client, String title, Integer priority) {
+    private GoalResponse createGoal(WebTestClient client, String title, Integer priority) {
         return client.post().uri("/api/v1/goals")
-                .bodyValue(new GoalController.CreateGoalRequest(title, null, priority))
+                .bodyValue(new CreateGoalRequest(title, null, priority))
                 .exchange().expectStatus().isOk()
-                .expectBody(GoalController.GoalResponse.class).returnResult().getResponseBody();
+                .expectBody(GoalResponse.class).returnResult().getResponseBody();
     }
 
     private void linkProject(WebTestClient client, Long goalId, Long projectId) {
@@ -176,12 +188,10 @@ class GoalApiIT extends ApiIntegrationTest {
                 .bodyValue(new LifeAreaController.CreateLifeAreaRequest(areaName, "#123456"))
                 .exchange().expectStatus().isOk()
                 .expectBody(LifeAreaController.LifeAreaResponse.class).returnResult().getResponseBody().getId();
-        ProjectController.CreateProjectRequest request = new ProjectController.CreateProjectRequest();
-        request.setLifeAreaId(areaId);
-        request.setTitle(title);
+        CreateProjectRequest request = new CreateProjectRequest(areaId, null, title, null, null, null, null, null, null);
         return client.post().uri("/api/v1/projects").bodyValue(request)
                 .exchange().expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class).returnResult().getResponseBody().getId();
+                .expectBody(ru.wolf.api.project.dto.ProjectResponse.class).returnResult().getResponseBody().id();
     }
 
     private Long createDelo(WebTestClient client, String title, List<Long> projects, Long primary) {

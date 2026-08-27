@@ -117,13 +117,11 @@ class AgentApiIT extends ApiIntegrationTest {
                 .expectBody(ru.wolf.api.lifearea.LifeAreaController.LifeAreaResponse.class)
                 .returnResult().getResponseBody().getId();
 
-        var project = new ru.wolf.api.project.ProjectController.CreateProjectRequest();
-        project.setLifeAreaId(areaId);
-        project.setTitle("WOLF");
-        project.setStartDate(java.time.LocalDate.now().minusDays(1));
+        var project = new ru.wolf.api.project.dto.CreateProjectRequest(
+                areaId, null, "WOLF", null, null, java.time.LocalDate.now().minusDays(1), null, null, null);
         return client.post().uri("/api/v1/projects").bodyValue(project).exchange()
                 .expectStatus().isOk()
-                .expectBody(ru.wolf.api.project.ProjectController.ProjectResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectBody(ru.wolf.api.project.dto.ProjectResponse.class)
+                .returnResult().getResponseBody().id();
     }
 }
