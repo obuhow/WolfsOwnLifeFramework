@@ -1,5 +1,5 @@
 package ru.wolf.api.planning;
-import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Service; import org.springframework.http.ResponseEntity; import ru.wolf.api.routine.*; import ru.wolf.api.user.*; import ru.wolf.api.gantt.*; import ru.wolf.api.loadcurve.*; import ru.wolf.api.project.*; import ru.wolf.api.planning.dto.CapacityResponse; import java.util.*; import java.math.*; import java.time.*; import java.time.temporal.*;
+import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import ru.wolf.api.routine.*; import ru.wolf.api.user.*; import ru.wolf.api.gantt.*; import ru.wolf.api.loadcurve.*; import ru.wolf.api.project.*; import ru.wolf.api.planning.dto.CapacityResponse; import java.util.*; import java.math.*; import java.time.*; import java.time.temporal.*;
 @Service @RequiredArgsConstructor public class PlanningCapacityService {
 
 
@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Ser
     private final WeekPlanRepository weekPlanRepository;
     private final LoadCurveEntryRepository loadCurveRepository;
 
-    public ResponseEntity<List<CapacityResponse>> capacity(
+    @Transactional(readOnly = true)
+    public List<CapacityResponse> capacity(
             String username,
             LocalDate from,
             LocalDate to) {
@@ -52,7 +53,7 @@ import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Ser
                     available.subtract(planned).setScale(2, RoundingMode.HALF_UP)
             ));
         }
-        return ResponseEntity.ok(response);
+        return response;
     }
 
 }

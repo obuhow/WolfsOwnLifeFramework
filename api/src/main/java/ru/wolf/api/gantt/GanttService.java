@@ -1,15 +1,11 @@
 package ru.wolf.api.gantt;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.delo.DeloProject;
 import ru.wolf.api.delo.DeloProjectRepository;
@@ -64,12 +60,13 @@ public class GanttService {
      * <p>Default range: Monday of previous week → {@code weeks} columns (default 16).
      * Filters: {@code lifeAreaIds} (comma-separated), {@code onlyWithDates}.
      */
-    public ResponseEntity<GanttResponse> getGantt(
+    @Transactional(readOnly = true)
+    public GanttResponse getGantt(
             String username,
-            @RequestParam(value = "from", required = false) String from,
-            @RequestParam(value = "weeks", required = false) Integer weeks,
-            @RequestParam(value = "lifeAreaIds", required = false) String lifeAreaIds,
-            @RequestParam(value = "onlyWithDates", required = false, defaultValue = "false") boolean onlyWithDates
+            String from,
+            Integer weeks,
+            String lifeAreaIds,
+            boolean onlyWithDates
     ) {
         User user = currentUser(username);
         ZoneId zone = ZoneId.of(user.getTimezone());
@@ -103,26 +100,28 @@ public class GanttService {
 
         List<ProjectRow> rows = buildProjectRows(filtered, weekColumns, planByKey, factByKey);
 
-        return ResponseEntity.ok(new GanttResponse(
+        return new GanttResponse(
                 user.getHourAccountingMode(),
                 user.getTimezone(),
                 first.weekStart(),
                 last.weekEndExclusive(),
                 weekColumns,
                 rows
-        ));
+        );
     }
-    public ResponseEntity<List<ForecastResponse>> getForecast(String username) {
-        return ResponseEntity.ok(ganttForecastService.forecast(currentUser(username)));
+    @Transactional(readOnly = true)
+    public List<ForecastResponse> getForecast(String username) {
+        return ganttForecastService.forecast(currentUser(username));
     }
 
     /**
      * Upsert План на неделю for project×ISO-week.
      * {@code planHours == null} or zero → delete plan cell (clear).
      */
-    public ResponseEntity<WeekPlanResponse> upsertWeekPlan(
+    @Transactional
+    public WeekPlanResponse upsertWeekPlan(
             String username,
-            @Valid @RequestBody UpsertWeekPlanRequest request
+            UpsertWeekPlanRequest request
     ) {
         User user = currentUser(username);
         validateIsoWeek(request.isoYear(), request.isoWeek());
@@ -137,12 +136,12 @@ public class GanttService {
             weekPlanRepository.findByUserAndProjectIdAndIsoYearAndIsoWeek(
                     user, project.getId(), request.isoYear(), request.isoWeek()
             ).ifPresent(weekPlanRepository::delete);
-            return ResponseEntity.ok(new WeekPlanResponse(
+            return new WeekPlanResponse(
                     project.getId(),
                     request.isoYear(),
                     request.isoWeek(),
                     null
-            ));
+            );
         }
 
         if (hours.compareTo(BigDecimal.ZERO) < 0) {
@@ -162,12 +161,12 @@ public class GanttService {
         plan.setPlanHours(hours.setScale(2, RoundingMode.HALF_UP));
         WeekPlan saved = weekPlanRepository.save(plan);
 
-        return ResponseEntity.ok(new WeekPlanResponse(
+        return new WeekPlanResponse(
                 project.getId(),
                 saved.getIsoYear(),
                 saved.getIsoWeek(),
                 saved.getPlanHours()
-        ));
+        );
     }
 
     // --- fact aggregation ---
