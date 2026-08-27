@@ -263,7 +263,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(detail).isNotNull();
         assertThat(detail.getRecurrenceSlots()).hasSize(2);
         assertThat(detail.getRecurrenceSlots())
-                .extracting(DeloController.RecurrenceSlotDto::getWeekday)
+                .extracting(ru.wolf.api.delo.DeloService.RecurrenceSlotDto::getWeekday)
                 .containsExactly(DayOfWeek.TUESDAY, DayOfWeek.SATURDAY);
         assertThat(detail.getRecurrenceSlots().get(0).getWindowStart()).isEqualTo(LocalTime.of(20, 0));
         assertThat(detail.getRecurrenceSlots().get(0).getWindowEnd()).isEqualTo(LocalTime.of(21, 30));
