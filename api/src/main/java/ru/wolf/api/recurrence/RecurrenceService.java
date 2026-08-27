@@ -48,7 +48,7 @@ public class RecurrenceService {
 
     static final int DEFAULT_HORIZON_WEEKS = 4;
     static final int MIN_HORIZON_WEEKS = 1;
-    static final int MAX_HORIZON_WEEKS = 12;
+    public static final int MAX_HORIZON_WEEKS = 12;
     static final LocalTime DEFAULT_WINDOW_START = LocalTime.of(9, 0);
     static final LocalTime DEFAULT_WINDOW_END = LocalTime.of(9, 15);
 
