@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.gantt;
+
+import ru.wolf.api.gantt.dto.*;
 import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -108,26 +110,26 @@ class GanttApiIT extends ApiIntegrationTest {
         Long areaId = createLifeArea(authed, "Работа");
         createProject(authed, areaId, null, "WOLF");
 
-        GanttController.GanttResponse body = getGantt(authed, null);
+        GanttResponse body = getGantt(authed, null);
 
         assertThat(body).isNotNull();
-        assertThat(body.getHourAccountingMode()).isEqualTo("PRIMARY_ONLY");
-        assertThat(body.getTimezone()).isEqualTo("Europe/Moscow");
-        assertThat(body.getWeeks()).isNotEmpty();
+        assertThat(body.hourAccountingMode()).isEqualTo("PRIMARY_ONLY");
+        assertThat(body.timezone()).isEqualTo("Europe/Moscow");
+        assertThat(body.weeks()).isNotEmpty();
 
         LocalDate today = LocalDate.now(MOSCOW);
         LocalDate thisMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate prevMonday = thisMonday.minusWeeks(1);
-        assertThat(body.getRangeStart()).isEqualTo(prevMonday.toString());
-        assertThat(body.getWeeks().get(0).getWeekStart()).isEqualTo(prevMonday.toString());
+        assertThat(body.rangeStart()).isEqualTo(prevMonday.toString());
+        assertThat(body.weeks().get(0).weekStart()).isEqualTo(prevMonday.toString());
 
         // Exactly one current week flagged
-        long currentCount = body.getWeeks().stream().filter(GanttController.WeekColumn::isCurrent).count();
+        long currentCount = body.weeks().stream().filter(WeekColumn::current).count();
         assertThat(currentCount).isEqualTo(1);
 
-        assertThat(body.getProjects()).hasSize(1);
-        assertThat(body.getProjects().get(0).getTitle()).isEqualTo("WOLF");
-        assertThat(body.getProjects().get(0).getCells()).hasSize(body.getWeeks().size());
+        assertThat(body.projects()).hasSize(1);
+        assertThat(body.projects().get(0).title()).isEqualTo("WOLF");
+        assertThat(body.projects().get(0).cells()).hasSize(body.weeks().size());
     }
 
     @Test
@@ -140,7 +142,7 @@ class GanttApiIT extends ApiIntegrationTest {
         int isoYear = monday.get(WeekFields.ISO.weekBasedYear());
         int isoWeek = monday.get(WeekFields.ISO.weekOfWeekBasedYear());
 
-        GanttController.WeekPlanResponse written = authed.put()
+        WeekPlanResponse written = authed.put()
                 .uri("/api/v1/gantt/week-plans")
                 .bodyValue(Map.of(
                         "projectId", projectId,
@@ -150,19 +152,19 @@ class GanttApiIT extends ApiIntegrationTest {
                 ))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(GanttController.WeekPlanResponse.class)
+                .expectBody(WeekPlanResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(written).isNotNull();
-        assertThat(written.getProjectId()).isEqualTo(projectId);
-        assertThat(written.getPlanHours()).isEqualByComparingTo("8.50");
+        assertThat(written.projectId()).isEqualTo(projectId);
+        assertThat(written.planHours()).isEqualByComparingTo("8.50");
 
-        GanttController.GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=4");
-        GanttController.ProjectRow row = findProject(gantt, projectId);
-        GanttController.CellHours cell = findCell(row, isoYear, isoWeek);
-        assertThat(cell.getPlanHours()).isEqualByComparingTo("8.50");
-        assertThat(cell.getFactHours()).isEqualByComparingTo("0.00");
+        GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=4");
+        ProjectRow row = findProject(gantt, projectId);
+        CellHours cell = findCell(row, isoYear, isoWeek);
+        assertThat(cell.planHours()).isEqualByComparingTo("8.50");
+        assertThat(cell.factHours()).isEqualByComparingTo("0.00");
 
         // Update
         authed.put()
@@ -178,10 +180,10 @@ class GanttApiIT extends ApiIntegrationTest {
 
         gantt = getGantt(authed, "from=" + monday + "&weeks=4");
         cell = findCell(findProject(gantt, projectId), isoYear, isoWeek);
-        assertThat(cell.getPlanHours()).isEqualByComparingTo("12.00");
+        assertThat(cell.planHours()).isEqualByComparingTo("12.00");
 
         // Clear with 0
-        GanttController.WeekPlanResponse cleared = authed.put()
+        WeekPlanResponse cleared = authed.put()
                 .uri("/api/v1/gantt/week-plans")
                 .bodyValue(Map.of(
                         "projectId", projectId,
@@ -191,14 +193,14 @@ class GanttApiIT extends ApiIntegrationTest {
                 ))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(GanttController.WeekPlanResponse.class)
+                .expectBody(WeekPlanResponse.class)
                 .returnResult()
                 .getResponseBody();
-        assertThat(cleared.getPlanHours()).isNull();
+        assertThat(cleared.planHours()).isNull();
 
         gantt = getGantt(authed, "from=" + monday + "&weeks=4");
         cell = findCell(findProject(gantt, projectId), isoYear, isoWeek);
-        assertThat(cell.getPlanHours()).isNull();
+        assertThat(cell.planHours()).isNull();
         assertThat(weekPlanRepository.count()).isZero();
     }
 
@@ -217,12 +219,12 @@ class GanttApiIT extends ApiIntegrationTest {
         int isoWeek = monday.get(WeekFields.ISO.weekOfWeekBasedYear());
         putEntry(authed, monday.atTime(10, 0), monday.atTime(12, 0), deloId, TimeEntry.Status.DONE);
 
-        GanttController.GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
+        GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
 
-        GanttController.CellHours c1 = findCell(findProject(gantt, p1), isoYear, isoWeek);
-        GanttController.CellHours c2 = findCell(findProject(gantt, p2), isoYear, isoWeek);
-        assertThat(c1.getFactHours()).isEqualByComparingTo("2.00");
-        assertThat(c2.getFactHours()).isEqualByComparingTo("0.00");
+        CellHours c1 = findCell(findProject(gantt, p1), isoYear, isoWeek);
+        CellHours c2 = findCell(findProject(gantt, p2), isoYear, isoWeek);
+        assertThat(c1.factHours()).isEqualByComparingTo("2.00");
+        assertThat(c2.factHours()).isEqualByComparingTo("0.00");
     }
 
     @Test
@@ -245,12 +247,12 @@ class GanttApiIT extends ApiIntegrationTest {
         // 1.5h
         putEntry(authed, monday.atTime(14, 0), monday.atTime(15, 30), deloId, TimeEntry.Status.DONE);
 
-        GanttController.GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
-        assertThat(gantt.getHourAccountingMode()).isEqualTo("ALL_PROJECTS");
+        GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
+        assertThat(gantt.hourAccountingMode()).isEqualTo("ALL_PROJECTS");
 
-        assertThat(findCell(findProject(gantt, p1), isoYear, isoWeek).getFactHours())
+        assertThat(findCell(findProject(gantt, p1), isoYear, isoWeek).factHours())
                 .isEqualByComparingTo("1.50");
-        assertThat(findCell(findProject(gantt, p2), isoYear, isoWeek).getFactHours())
+        assertThat(findCell(findProject(gantt, p2), isoYear, isoWeek).factHours())
                 .isEqualByComparingTo("1.50");
     }
 
@@ -269,9 +271,9 @@ class GanttApiIT extends ApiIntegrationTest {
         putAdHoc(authed, monday.atTime(9, 0), monday.atTime(11, 0), "Без дела", TimeEntry.Status.DONE);
         putEntry(authed, monday.atTime(11, 0), monday.atTime(12, 0), deloId, TimeEntry.Status.DONE);
 
-        GanttController.GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
-        GanttController.CellHours cell = findCell(findProject(gantt, p1), isoYear, isoWeek);
-        assertThat(cell.getFactHours()).isEqualByComparingTo("1.00");
+        GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
+        CellHours cell = findCell(findProject(gantt, p1), isoYear, isoWeek);
+        assertThat(cell.factHours()).isEqualByComparingTo("1.00");
     }
 
     @Test
@@ -287,8 +289,8 @@ class GanttApiIT extends ApiIntegrationTest {
 
         putEntry(authed, monday.atTime(10, 0), monday.atTime(12, 0), deloId, TimeEntry.Status.PLANNED);
 
-        GanttController.GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
-        assertThat(findCell(findProject(gantt, p1), isoYear, isoWeek).getFactHours())
+        GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
+        assertThat(findCell(findProject(gantt, p1), isoYear, isoWeek).factHours())
                 .isEqualByComparingTo("0.00");
     }
 
@@ -304,14 +306,14 @@ class GanttApiIT extends ApiIntegrationTest {
         createProject(authed, health, null, "Без сроков"); // undated health
 
         // Filter life area = health
-        GanttController.GanttResponse byArea = getGantt(authed, "lifeAreaIds=" + health + "&weeks=4");
-        assertThat(byArea.getProjects()).extracting(GanttController.ProjectRow::getId)
+        GanttResponse byArea = getGantt(authed, "lifeAreaIds=" + health + "&weeks=4");
+        assertThat(byArea.projects()).extracting(ProjectRow::id)
                 .contains(pHealthDated)
                 .doesNotContain(pWork);
 
         // onlyWithDates
-        GanttController.GanttResponse dated = getGantt(authed, "onlyWithDates=true&weeks=4");
-        assertThat(dated.getProjects()).extracting(GanttController.ProjectRow::getId)
+        GanttResponse dated = getGantt(authed, "onlyWithDates=true&weeks=4");
+        assertThat(dated.projects()).extracting(ProjectRow::id)
                 .containsExactly(pHealthDated);
     }
 
@@ -322,14 +324,14 @@ class GanttApiIT extends ApiIntegrationTest {
         Long root = createProject(authed, areaId, null, "Корень").id();
         Long child = createProject(authed, areaId, root, "Дочка").id();
 
-        GanttController.GanttResponse gantt = getGantt(authed, "weeks=4");
-        Map<Long, GanttController.ProjectRow> byId = new HashMap<>();
-        for (GanttController.ProjectRow r : gantt.getProjects()) {
-            byId.put(r.getId(), r);
+        GanttResponse gantt = getGantt(authed, "weeks=4");
+        Map<Long, ProjectRow> byId = new HashMap<>();
+        for (ProjectRow r : gantt.projects()) {
+            byId.put(r.id(), r);
         }
-        assertThat(byId.get(root).getDepth()).isEqualTo(0);
-        assertThat(byId.get(child).getDepth()).isEqualTo(1);
-        assertThat(byId.get(child).getParentId()).isEqualTo(root);
+        assertThat(byId.get(root).depth()).isEqualTo(0);
+        assertThat(byId.get(child).depth()).isEqualTo(1);
+        assertThat(byId.get(child).parentId()).isEqualTo(root);
     }
 
     @Test
@@ -387,8 +389,8 @@ class GanttApiIT extends ApiIntegrationTest {
         userRepository.save(user2);
 
         WebTestClient client2 = authedClient("user2", "admin");
-        GanttController.GanttResponse gantt = getGantt(client2, "weeks=4");
-        assertThat(gantt.getProjects()).isEmpty();
+        GanttResponse gantt = getGantt(client2, "weeks=4");
+        assertThat(gantt.projects()).isEmpty();
     }
 
     @Test
@@ -406,41 +408,41 @@ class GanttApiIT extends ApiIntegrationTest {
             putEntry(authed, day.atTime(10, 0), day.atTime(15, 0), deloId, TimeEntry.Status.DONE);
         }
 
-        List<GanttController.ForecastResponse> response = authed.get()
+        List<ForecastResponse> response = authed.get()
                 .uri("/api/v1/gantt/forecast")
                 .exchange().expectStatus().isOk()
-                .expectBodyList(GanttController.ForecastResponse.class)
+                .expectBodyList(ForecastResponse.class)
                 .returnResult().getResponseBody();
-        GanttController.ForecastResponse forecast = response.stream()
-                .filter(item -> item.getProjectId().equals(project.id())).findFirst().orElseThrow();
-        assertThat(forecast.getWeeklyAvg()).isEqualByComparingTo("5.00");
-        assertThat(forecast.getRemaining()).isEqualByComparingTo("40.00");
-        assertThat(forecast.getForecastEnd()).isEqualTo(currentMonday.plusWeeks(8));
+        ForecastResponse forecast = response.stream()
+                .filter(item -> item.projectId().equals(project.id())).findFirst().orElseThrow();
+        assertThat(forecast.weeklyAvg()).isEqualByComparingTo("5.00");
+        assertThat(forecast.remaining()).isEqualByComparingTo("40.00");
+        assertThat(forecast.forecastEnd()).isEqualTo(currentMonday.plusWeeks(8));
     }
 
     // --- helpers ---
 
-    private GanttController.GanttResponse getGantt(WebTestClient client, String query) {
+    private GanttResponse getGantt(WebTestClient client, String query) {
         String uri = query == null || query.isBlank() ? "/api/v1/gantt" : "/api/v1/gantt?" + query;
         return client.get()
                 .uri(uri)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(GanttController.GanttResponse.class)
+                .expectBody(GanttResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
 
-    private GanttController.ProjectRow findProject(GanttController.GanttResponse gantt, Long id) {
-        return gantt.getProjects().stream()
-                .filter(p -> p.getId().equals(id))
+    private ProjectRow findProject(GanttResponse gantt, Long id) {
+        return gantt.projects().stream()
+                .filter(p -> p.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("project " + id + " not in gantt"));
     }
 
-    private GanttController.CellHours findCell(GanttController.ProjectRow row, int year, int week) {
-        return row.getCells().stream()
-                .filter(c -> c.getIsoYear() == year && c.getIsoWeek() == week)
+    private CellHours findCell(ProjectRow row, int year, int week) {
+        return row.cells().stream()
+                .filter(c -> c.isoYear() == year && c.isoWeek() == week)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("cell " + year + "-W" + week + " missing"));
     }

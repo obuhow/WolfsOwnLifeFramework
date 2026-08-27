@@ -30,6 +30,7 @@ import ru.wolf.api.timeentry.DayBounds;
 import ru.wolf.api.timeentry.TimeEntry;
 import ru.wolf.api.timeentry.TimeEntryRepository;
 import ru.wolf.api.user.User;
+import ru.wolf.api.gantt.dto.ForecastResponse;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -60,7 +61,7 @@ public class GanttForecastService {
     private final ProjectDependencyRepository dependencyRepository;
 
     @Transactional(readOnly = true)
-    public List<GanttController.ForecastResponse> forecast(User user) {
+    public List<ForecastResponse> forecast(User user) {
         ZoneId zone = ZoneId.of(user.getTimezone());
         LocalTime dayEnd = user.getDayEnd() != null ? user.getDayEnd() : LocalTime.of(2, 0);
         LocalDate currentMonday = LocalDate.now(zone)
@@ -209,8 +210,8 @@ public class GanttForecastService {
             return new ForecastValue(projectId, planEnd, end, weeklyAvg, remaining);
         }
 
-        GanttController.ForecastResponse toResponse() {
-            return new GanttController.ForecastResponse(projectId, planEnd, forecastEnd, weeklyAvg, remaining);
+        ForecastResponse toResponse() {
+            return new ForecastResponse(projectId, planEnd, forecastEnd, weeklyAvg, remaining);
         }
     }
 }
