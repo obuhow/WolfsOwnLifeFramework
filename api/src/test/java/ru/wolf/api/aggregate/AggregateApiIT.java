@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.aggregate;
+import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -327,7 +328,7 @@ class AggregateApiIT extends ApiIntegrationTest {
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult();
     }
 
@@ -348,7 +349,7 @@ class AggregateApiIT extends ApiIntegrationTest {
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult();
     }
 }
