@@ -100,16 +100,15 @@
 
 - **08 (Competency & Life Structure: LifeArea, LifeSphere, Synergy) — resolved.** Три контроллера (`LifeArea`, `LifeSphere`, `Synergy`) переведены на thin MVCS; бизнес-логика (проверки дублей имён, reorder/sortOrder, archive-toggle, валидация «ровно один владелец синергии», изоляция по пользователю) перенесена в сервисы `LifeAreaService`/`LifeSphereService`/`SynergyService`; 11 DTO вынесены в `ru.wolf.api.lifearea.dto` и `ru.wolf.api.lifesphere.dto` как records (`from(...)` на самих record'ах). `clean compileJava compileTestJava` — BUILD SUCCESSFUL; structural scan: целевые контроллеры без поля `Repository`, сервисы без веб-аннотаций, все DTO — records. Соседние `*ApiIT`, ссылавшиеся на вложенные `LifeAreaController.*`, поправлены механически (FQN + `getX()`→`x()` + конструкторы records) без изменения поведения. Полные `*ApiIT` отложены до release-gate 0.9.
 
+- **09 (Notes & Assistant: Note, NotesAssistant, ProjectResume) — resolved.** `NoteController` → тонкий MVCS (бизнес-логика + `@Transactional` в новом `NoteService`, DTO — records в `ru.wolf.api.note.dto`). `note/assistant` формализован под конвенцию портов: интерфейс `NotesAssistant` → `AssistantPort`, адаптеры переименованы в `FakeNotesAssistantAdapter` (`@Profile("test")`) и `HttpNotesAssistantAdapter` (`@Profile("!test")`) — переключатель fake/http через Spring-profiles сохранён; `LlmDisabledException` вынесен в собственный класс пакета `note.assistant` (маппинг в `GlobalExceptionHandler` → 503 без изменения тела); `ProjectResumeController`/`NotesAssistantController` стали тонкими, делегируют в `NotesAssistantService`; `ResumeResponse` → record в `ru.wolf.api.note.assistant.dto`. `AgentJob` обновлён под переименованный порт. `clean compileJava compileTestJava` — BUILD SUCCESSFUL; structural scan: контроллеры без `Repository`, сервисы без веб-аннотаций, DTO — records. `NoteApiIT` прогнан изолированно против Testcontainers-postgres — 3/3 зелёный; добавлены DB-free unit-тесты (AssistantControllerUnitTest 3/3, GlobalExceptionHandlerTest 1/1) на затронутую логику. `LlmDisabledApiIT`/`NotesAssistantApiIT` не проходят из-за предсуществующего бага H2-драйвера против Testcontainers-postgres (падают на загрузке контекста) — вне скоупа тикета, перепроверяются единым release-gate. Полный кластерный IT gate отложен до завершения релиза.
+
 ## Текущее состояние дорожной карты
 
-**Текущий фронтир: тикет 06 — `Import/Export` (`Status: open`).**
+**Текущий фронтир: тикет 10 — `Agent Jobs` (`Status: open`).**
 
-Работа остановлена перед реализацией, потому что несколько попыток рефакторинга в общем
-checkout не дали проверенного результата: промежуточные версии сервисов/DTO содержали
-ошибки компиляции, а последующие IT-запуски (`TimeEntryApiIT`, `CalendarApiIT`,
-`RoutineApiIT`) зависали на Gradle-задаче `:test` и завершались по тайм-ауту/SIGTERM.
-Из-за конкурентной работы агентов в одном checkout также возникал риск смешать или
-закоммитить чужие изменения. Нерабочий WIP удалён, исходное состояние восстановлено.
+Реальное состояние (по `develop` на момент тикета 09): тикеты 01–09 слиты в `develop`;
+09 — последний выполненный. 10 — следующий к реализации. 11 (сквозной аудит) блокируется
+тикетами 02–10 и выполняется единым release-gate после 10.
 
 Последняя подтверждённая точка:
 
@@ -117,13 +116,16 @@ checkout не дали проверенного результата: проме
 - `02` — **resolved**: Identity & Access.
 - `03` — **resolved**: Planning & Priorities.
 - `04` — **resolved**: Time Grid.
-- `05–10` — **open**, ожидают завершения `04` по порядку карты.
+- `05` — **resolved**: Roadmap & Load.
+- `06` — **resolved**: Import/Export (порты).
+- `07` — **resolved**: Daily Rituals & Stats.
+- `08` — **resolved**: Competency & Life Structure.
+- `09` — **resolved**: Notes & Assistant (формализация порта).
+- `10` — **open**, следующий фронтир.
 - `11` — **open**, сквозной аудит; блокируется тикетами `02–10`.
 
-Коммиты `01–03` уже находятся в `develop`. Ветка
-`release-0.9/feature/04-time-grid` существует, но пока совпадает с `origin/develop`;
-коммита тикета `04` нет. Пользовательские незакоммиченные изменения в checkout
-сохранены и не входят в дорожную карту релиза.
+Коммиты 01–09 находятся в `develop` (ahead of `origin/develop`). Пользовательские
+незакоммиченные изменения в checkout сохранены в stash и не входят в дорожную карту релиза.
 
 ## Тикеты
 
@@ -133,10 +135,10 @@ checkout не дали проверенного результата: проме
 02. ✅ **resolved** — Identity & Access: Auth, User, Admin, Invite, Onboarding
 03. ✅ **resolved** — Planning & Priorities: Goal, Project, ProjectDependency, Backlog, WeekBacklog
 04. ✅ **resolved** — Time Grid: TimeEntry, Calendar, Routine
-05. 🔶 **open / текущий фронтир** — Roadmap & Load: Gantt, PlanningCapacity, LoadCurve
-06. ⏳ **open** — Import/Export (порты): DataSync, ImportXlsx, Delo, DeloImport
-07. ⏳ **open** — Daily Rituals & Stats: Checklist, ChecklistReport, Today*, Focus, FocusReview, MorningDigest, WaveStats
+05. ✅ **resolved** — Roadmap & Load: Gantt, PlanningCapacity, LoadCurve
+06. ✅ **resolved** — Import/Export (порты): DataSync, ImportXlsx, Delo, DeloImport
+07. ✅ **resolved** — Daily Rituals & Stats: Checklist, ChecklistReport, Today*, Focus, FocusReview, MorningDigest, WaveStats
 08. ✅ **resolved** — Competency & Life Structure: LifeArea, LifeSphere, Synergy
-09. ⏳ **open** — Notes & Assistant (формализация существующего порта): Note, NotesAssistant, ProjectResume
-10. ⏳ **open** — Agent Jobs: Agent, AgentRunLog
+09. ✅ **resolved** — Notes & Assistant (формализация существующего порта): Note, NotesAssistant, ProjectResume
+10. 🔶 **open / текущий фронтир** — Agent Jobs: Agent, AgentRunLog
 11. ⏳ **open** — Сквозной аудит и обновление CONTEXT.md/AGENTS.md — блокируется тикетами 02–10
