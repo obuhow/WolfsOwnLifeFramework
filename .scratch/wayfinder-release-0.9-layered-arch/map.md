@@ -94,6 +94,8 @@
 
 ## Decisions so far
 
+- **07 (Daily Rituals & Stats) — resolved.** Семь контроллеров (`Checklist`, `ChecklistReport`, `TodayBacklog`, `Focus`, `FocusReview`, `MorningDigest`, `WaveStats`) переведены на thin MVCS; бизнес-логика находится в сервисах, DTO вынесены в feature-specific `dto/` как records. Проверены `clean compileJava compileTestJava` (`BUILD SUCCESSFUL`) и structural scan (`PASS`, 7 controllers, 28 DTO records). Полные `*ApiIT` отложены до release-gate 0.9. Реализация: `72ac23a`, merge в `develop`: `589fc8b`.
+
 - **05 (Roadmap & Load: Gantt, PlanningCapacity, LoadCurve) — resolved.** Три контроллера мигрированы на thin MVCS; DTO вынесены в feature-specific `dto/` records; `GanttForecastService` оставлен отдельной зависимостью. `clean compileJava compileTestJava` и структурные проверки зелёные. Полный IT gate отложен до завершения релиза.
 
 ## Текущее состояние дорожной карты
