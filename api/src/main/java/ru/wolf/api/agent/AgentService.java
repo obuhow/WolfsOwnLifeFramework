@@ -18,22 +18,25 @@
 package ru.wolf.api.agent;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.stereotype.Service;
 import ru.wolf.api.agent.dto.AgentRunResponse;
+import ru.wolf.api.user.User;
+import ru.wolf.api.user.UserRepository;
 
-@RestController
-@RequestMapping("/api/v1/admin/agent")
+@Service
 @RequiredArgsConstructor
-public class AgentController {
+public class AgentService {
 
-    private final AgentService agentService;
+    private final AgentJob agentJob;
+    private final UserRepository userRepository;
 
-    @PostMapping("/run")
-    public ResponseEntity<AgentRunResponse> run(Authentication authentication) {
-        return ResponseEntity.ok(agentService.run(authentication.getName()));
+    public AgentRunResponse run(String username) {
+        User user = currentUser(username);
+        return AgentRunResponse.from(agentJob.runForUser(user));
+    }
+
+    private User currentUser(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
     }
 }

@@ -17,6 +17,7 @@
  */
 package ru.wolf.api.agent;
 
+import ru.wolf.api.agent.dto.AgentRunResponse;
 import ru.wolf.api.lifearea.dto.*;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -87,7 +88,7 @@ class AgentApiIT extends ApiIntegrationTest {
 
         client.post().uri("/api/v1/admin/agent/run")
                 .exchange().expectStatus().isOk()
-                .expectBody(AgentController.RunResponse.class)
+                .expectBody(AgentRunResponse.class)
                 .value(result -> {
                     assertThat(result.projectsProcessed()).isEqualTo(1);
                     assertThat(result.notesCreated()).isEqualTo(1);
@@ -95,7 +96,7 @@ class AgentApiIT extends ApiIntegrationTest {
 
         client.post().uri("/api/v1/admin/agent/run")
                 .exchange().expectStatus().isOk()
-                .expectBody(AgentController.RunResponse.class)
+                .expectBody(AgentRunResponse.class)
                 .value(result -> assertThat(result.notesCreated()).isZero());
 
         assertThat(noteRepository.findAll()).hasSize(1);

@@ -100,15 +100,17 @@
 
 - **08 (Competency & Life Structure: LifeArea, LifeSphere, Synergy) — resolved.** Три контроллера (`LifeArea`, `LifeSphere`, `Synergy`) переведены на thin MVCS; бизнес-логика (проверки дублей имён, reorder/sortOrder, archive-toggle, валидация «ровно один владелец синергии», изоляция по пользователю) перенесена в сервисы `LifeAreaService`/`LifeSphereService`/`SynergyService`; 11 DTO вынесены в `ru.wolf.api.lifearea.dto` и `ru.wolf.api.lifesphere.dto` как records (`from(...)` на самих record'ах). `clean compileJava compileTestJava` — BUILD SUCCESSFUL; structural scan: целевые контроллеры без поля `Repository`, сервисы без веб-аннотаций, все DTO — records. Соседние `*ApiIT`, ссылавшиеся на вложенные `LifeAreaController.*`, поправлены механически (FQN + `getX()`→`x()` + конструкторы records) без изменения поведения. Полные `*ApiIT` отложены до release-gate 0.9.
 
+- **10 (Agent Jobs: AgentController, AgentRunLog) — resolved.** `AgentController` очищен от `UserRepository` и бизнес-логики, делегирует orchestration в новый тонкий `AgentService` (резолв `User` по `authentication.getName()`, вызов `agentJob.runForUser(user)`, обёртка результата в DTO). `AgentRunLogService` **не поглощён** — оставлен отдельным сфокусированным сервисом-зависимостью (правило карты для существующих сервисов). Публичный `RunResponse` вынесен из контроллера в `ru.wolf/api/agent/dto/AgentRunResponse.java` как record с `from(AgentJob.AgentRunResult)`; `AgentApiIT` поправлен механически (FQN + record-accessor) без изменения поведения. `clean compileJava compileTestJava` — BUILD SUCCESSFUL (JDK 21, 36s, локально на хосте — docker-daemon был перегружен). Structural scan: `AgentController` без поля `Repository`, `AgentService` без веб-аннотаций/импортов/ResponseEntity, DTO — record; сквозной grep `private final .*Repository` по всем `*Controller.java` — **0 совпадений** (финальное состояние карты 0.9). Полный `AgentApiIT` отложен до release-gate 0.9.
+
 - **09 (Notes & Assistant: Note, NotesAssistant, ProjectResume) — resolved.** `NoteController` → тонкий MVCS (бизнес-логика + `@Transactional` в новом `NoteService`, DTO — records в `ru.wolf.api.note.dto`). `note/assistant` формализован под конвенцию портов: интерфейс `NotesAssistant` → `AssistantPort`, адаптеры переименованы в `FakeNotesAssistantAdapter` (`@Profile("test")`) и `HttpNotesAssistantAdapter` (`@Profile("!test")`) — переключатель fake/http через Spring-profiles сохранён; `LlmDisabledException` вынесен в собственный класс пакета `note.assistant` (маппинг в `GlobalExceptionHandler` → 503 без изменения тела); `ProjectResumeController`/`NotesAssistantController` стали тонкими, делегируют в `NotesAssistantService`; `ResumeResponse` → record в `ru.wolf.api.note.assistant.dto`. `AgentJob` обновлён под переименованный порт. `clean compileJava compileTestJava` — BUILD SUCCESSFUL; structural scan: контроллеры без `Repository`, сервисы без веб-аннотаций, DTO — records. `NoteApiIT` прогнан изолированно против Testcontainers-postgres — 3/3 зелёный; добавлены DB-free unit-тесты (AssistantControllerUnitTest 3/3, GlobalExceptionHandlerTest 1/1) на затронутую логику. `LlmDisabledApiIT`/`NotesAssistantApiIT` не проходят из-за предсуществующего бага H2-драйвера против Testcontainers-postgres (падают на загрузке контекста) — вне скоупа тикета, перепроверяются единым release-gate. Полный кластерный IT gate отложен до завершения релиза.
 
 ## Текущее состояние дорожной карты
 
-**Текущий фронтир: тикет 10 — `Agent Jobs` (`Status: open`).**
+**Текущий фронтир: тикет 11 — `Сквозной аудит` (`Status: open`).** Блокируется тикетами 02–10; все они **resolved**, поэтому 11 разблокирован и является последней точкой карты 0.9 перед release-gate.
 
-Реальное состояние (по `develop` на момент тикета 09): тикеты 01–09 слиты в `develop`;
-09 — последний выполненный. 10 — следующий к реализации. 11 (сквозной аудит) блокируется
-тикетами 02–10 и выполняется единым release-gate после 10.
+Реальное состояние (по `develop` на момент тикета 10): тикеты 01–10 слиты в `develop`;
+10 — последний выполненный фиче-кластер. 11 (сквозной аудит) выполняется единым release-gate
+после 10 и перед полным прогоном `*ApiIT`.
 
 Последняя подтверждённая точка:
 
@@ -121,8 +123,8 @@
 - `07` — **resolved**: Daily Rituals & Stats.
 - `08` — **resolved**: Competency & Life Structure.
 - `09` — **resolved**: Notes & Assistant (формализация порта).
-- `10` — **open**, следующий фронтир.
-- `11` — **open**, сквозной аудит; блокируется тикетами `02–10`.
+- `10` — **resolved**: Agent Jobs (AgentController → AgentService, RunResponse → record в agent/dto).
+- `11` — **open**, сквозной аудит; разблокирован (02–10 resolved), выполняется единым release-gate.
 
 Коммиты 01–09 находятся в `develop` (ahead of `origin/develop`). Пользовательские
 незакоммиченные изменения в checkout сохранены в stash и не входят в дорожную карту релиза.
