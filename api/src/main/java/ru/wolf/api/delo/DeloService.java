@@ -17,26 +17,25 @@
  */
 package ru.wolf.api.delo;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.aggregate.FactAggregate;
 import ru.wolf.api.aggregate.FactAggregateService;
+import ru.wolf.api.delo.dto.ApplyRecurrenceRequest;
+import ru.wolf.api.delo.dto.ApplyRecurrenceResponse;
+import ru.wolf.api.delo.dto.CreateDeloRequest;
+import ru.wolf.api.delo.dto.DeloDetailResponse;
+import ru.wolf.api.delo.dto.DeloResponse;
+import ru.wolf.api.delo.dto.ProjectLink;
+import ru.wolf.api.delo.dto.RecurrenceSlotDto;
+import ru.wolf.api.delo.dto.UpdateDeloRequest;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.recurrence.RecurrenceService;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
-import java.time.DayOfWeek;
-import java.time.Instant;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -68,21 +67,21 @@ public class DeloService {
         User user = currentUser(username);
         Delo delo = deloRepository.findByUserAndId(user, id)
                 .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
-        return toDetailResponse(delo);
+        return toDetailResponse(delo, factAggregateService, recurrenceService);
     }
 
     @Transactional
     public DeloResponse createDelo(String username, CreateDeloRequest request) {
         User user = currentUser(username);
-        List<Long> projectIds = normalizeIds(request.getProjectIds());
-        Long primaryProjectId = request.getPrimaryProjectId();
+        List<Long> projectIds = normalizeIds(request.projectIds());
+        Long primaryProjectId = request.primaryProjectId();
         validateLinks(user, projectIds, primaryProjectId);
 
         Delo delo = Delo.builder()
                 .user(user)
-                .title(request.getTitle().trim())
-                .description(normalizeDescription(request.getDescription()))
-                .executionMode(request.getExecutionMode() != null ? request.getExecutionMode() : Delo.ExecutionMode.SELF)
+                .title(request.title().trim())
+                .description(normalizeDescription(request.description()))
+                .executionMode(request.executionMode() != null ? request.executionMode() : Delo.ExecutionMode.SELF)
                 .build();
 
         Delo saved = deloRepository.save(delo);
@@ -97,13 +96,13 @@ public class DeloService {
         Delo delo = deloRepository.findByUserAndId(user, id)
                 .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
 
-        List<Long> projectIds = normalizeIds(request.getProjectIds());
-        Long primaryProjectId = request.getPrimaryProjectId();
+        List<Long> projectIds = normalizeIds(request.projectIds());
+        Long primaryProjectId = request.primaryProjectId();
         validateLinks(user, projectIds, primaryProjectId);
 
-        delo.setTitle(request.getTitle().trim());
-        delo.setDescription(normalizeDescription(request.getDescription()));
-        delo.setExecutionMode(request.getExecutionMode() != null ? request.getExecutionMode() : Delo.ExecutionMode.SELF);
+        delo.setTitle(request.title().trim());
+        delo.setDescription(normalizeDescription(request.description()));
+        delo.setExecutionMode(request.executionMode() != null ? request.executionMode() : Delo.ExecutionMode.SELF);
 
         applyProjectLinks(delo, projectIds, primaryProjectId);
         Delo saved = deloRepository.save(delo);
@@ -198,16 +197,16 @@ public class DeloService {
     @Transactional
     public ApplyRecurrenceResponse applyRecurrence(String username, Long id, ApplyRecurrenceRequest request) {
         User user = currentUser(username);
-        ApplyRecurrenceRequest body = request != null ? request : new ApplyRecurrenceRequest();
+        ApplyRecurrenceRequest body = request != null ? request : new ApplyRecurrenceRequest(null, null, null, null, null);
         RecurrenceService.ApplyResult result = recurrenceService.apply(
                 user,
                 id,
                 new RecurrenceService.ApplyCommand(
-                        body.getWeekdays(),
-                        body.getWindowStart(),
-                        body.getWindowEnd(),
-                        body.getHorizonWeeks(),
-                        toSlots(body.getSlots())
+                        body.weekdays(),
+                        body.windowStart(),
+                        body.windowEnd(),
+                        body.horizonWeeks(),
+                        toSlots(body.slots())
                 )
         );
         return new ApplyRecurrenceResponse(
@@ -323,10 +322,10 @@ public class DeloService {
         );
     }
 
-    private DeloDetailResponse toDetailResponse(Delo delo) {
+    static DeloDetailResponse toDetailResponse(Delo delo, FactAggregateService factAggregateService, RecurrenceService recurrenceService) {
         List<ProjectLink> projectLinks = delo.getDeloProjects().stream()
                 .map(l -> new ProjectLink(l.getProject().getId(), l.getProject().getTitle(), Boolean.TRUE.equals(l.getIsPrimary())))
-                .sorted((a, b) -> a.getTitle().compareToIgnoreCase(b.getTitle()))
+                .sorted((a, b) -> a.title().compareToIgnoreCase(b.title()))
                 .toList();
         FactAggregate aggregates = factAggregateService.forDelo(delo.getUser(), delo.getId());
         return new DeloDetailResponse(
@@ -350,120 +349,14 @@ public class DeloService {
             return List.of();
         }
         return dtos.stream()
-                .map(d -> new RecurrenceService.Slot(d.getWeekday(), d.getWindowStart(), d.getWindowEnd()))
+                .map(d -> new RecurrenceService.Slot(d.weekday(), d.windowStart(), d.windowEnd()))
                 .toList();
     }
 
-    private List<RecurrenceSlotDto> toSlotDtos(List<RecurrenceService.Slot> slots) {
+    private static List<RecurrenceSlotDto> toSlotDtos(List<RecurrenceService.Slot> slots) {
         return slots.stream()
                 .map(s -> new RecurrenceSlotDto(s.weekday(), s.windowStart(), s.windowEnd()))
                 .toList();
     }
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class DeloResponse {
-        private Long id;
-        private String title;
-        private String description;
-        private Delo.ExecutionMode executionMode;
-        private List<Long> projectIds;
-        private Long primaryProjectId;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class DeloDetailResponse {
-        private Long id;
-        private String title;
-        private String description;
-        private Delo.ExecutionMode executionMode;
-        private List<ProjectLink> projects;
-        private Instant createdAt;
-        private Instant updatedAt;
-        private FactAggregate aggregates;
-        private List<DayOfWeek> recurrenceWeekdays;
-        private LocalTime recurrenceWindowStart;
-        private LocalTime recurrenceWindowEnd;
-        private List<RecurrenceSlotDto> recurrenceSlots;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class RecurrenceSlotDto {
-        private DayOfWeek weekday;
-        private LocalTime windowStart;
-        private LocalTime windowEnd;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ApplyRecurrenceRequest {
-        private List<DayOfWeek> weekdays;
-        private LocalTime windowStart;
-        private LocalTime windowEnd;
-        private Integer horizonWeeks;
-        private List<RecurrenceSlotDto> slots;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ApplyRecurrenceResponse {
-        private int created;
-        private int skippedOccupied;
-        private int skippedPast;
-        private int horizonWeeks;
-        private String from;
-        private String toExclusive;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ProjectLink {
-        private Long id;
-        private String title;
-        private Boolean isPrimary;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class CreateDeloRequest {
-        @NotBlank
-        @Size(max = 200)
-        private String title;
-
-        @Size(max = 10000)
-        private String description;
-
-        private Delo.ExecutionMode executionMode;
-
-        private List<Long> projectIds;
-
-        private Long primaryProjectId;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UpdateDeloRequest {
-        @NotBlank
-        @Size(max = 200)
-        private String title;
-
-        @Size(max = 10000)
-        private String description;
-
-        private Delo.ExecutionMode executionMode;
-
-        private List<Long> projectIds;
-
-        private Long primaryProjectId;
-    }
 }

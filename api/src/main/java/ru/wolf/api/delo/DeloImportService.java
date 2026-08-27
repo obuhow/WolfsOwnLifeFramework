@@ -17,13 +17,12 @@
  */
 package ru.wolf.api.delo;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.backlog.BacklogItem;
 import ru.wolf.api.backlog.BacklogItemRepository;
+import ru.wolf.api.delo.dto.ImportResponse;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.lifearea.LifeArea;
@@ -411,10 +410,4 @@ public class DeloImportService {
             int lineNumber
     ) {}
 
-    @Data
-    @AllArgsConstructor
-    public static class ImportResponse {
-        private int imported;
-        private boolean addedToCurrentWeek;
-    }
 }

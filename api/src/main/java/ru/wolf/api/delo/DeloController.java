@@ -22,7 +22,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import ru.wolf.api.delo.DeloService.*;
+import ru.wolf.api.delo.dto.ApplyRecurrenceRequest;
+import ru.wolf.api.delo.dto.ApplyRecurrenceResponse;
+import ru.wolf.api.delo.dto.CreateDeloRequest;
+import ru.wolf.api.delo.dto.DeloDetailResponse;
+import ru.wolf.api.delo.dto.DeloResponse;
+import ru.wolf.api.delo.dto.UpdateDeloRequest;
 
 import java.util.List;
 
@@ -33,23 +38,23 @@ public class DeloController {
     private final DeloService service;
 
     @GetMapping
-    public ResponseEntity<List<DeloService.DeloResponse>> listDelos(Authentication authentication) {
+    public ResponseEntity<List<DeloResponse>> listDelos(Authentication authentication) {
         return ResponseEntity.ok(service.listDelos(authentication.getName()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<DeloService.DeloDetailResponse> getDelo(Authentication authentication, @PathVariable Long id) {
+    public ResponseEntity<DeloDetailResponse> getDelo(Authentication authentication, @PathVariable Long id) {
         return ResponseEntity.ok(service.getDelo(authentication.getName(), id));
     }
 
     @PostMapping
-    public ResponseEntity<DeloService.DeloResponse> createDelo(Authentication authentication,
+    public ResponseEntity<DeloResponse> createDelo(Authentication authentication,
                                                     @Valid @RequestBody CreateDeloRequest request) {
         return ResponseEntity.ok(service.createDelo(authentication.getName(), request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<DeloService.DeloResponse> updateDelo(Authentication authentication, @PathVariable Long id,
+    public ResponseEntity<DeloResponse> updateDelo(Authentication authentication, @PathVariable Long id,
                                                     @Valid @RequestBody UpdateDeloRequest request) {
         return ResponseEntity.ok(service.updateDelo(authentication.getName(), id, request));
     }
@@ -61,93 +66,27 @@ public class DeloController {
     }
 
     @PostMapping("/{deloId}/link/{projectId}")
-    public ResponseEntity<DeloService.DeloResponse> linkProject(Authentication authentication, @PathVariable Long deloId,
+    public ResponseEntity<DeloResponse> linkProject(Authentication authentication, @PathVariable Long deloId,
                                                      @PathVariable Long projectId) {
         return ResponseEntity.ok(service.linkProject(authentication.getName(), deloId, projectId));
     }
 
     @DeleteMapping("/{deloId}/link/{projectId}")
-    public ResponseEntity<DeloService.DeloResponse> unlinkProject(Authentication authentication, @PathVariable Long deloId,
+    public ResponseEntity<DeloResponse> unlinkProject(Authentication authentication, @PathVariable Long deloId,
                                                        @PathVariable Long projectId) {
         return ResponseEntity.ok(service.unlinkProject(authentication.getName(), deloId, projectId));
     }
 
     @PutMapping("/{deloId}/primary/{projectId}")
-    public ResponseEntity<DeloService.DeloResponse> setPrimaryProject(Authentication authentication, @PathVariable Long deloId,
+    public ResponseEntity<DeloResponse> setPrimaryProject(Authentication authentication, @PathVariable Long deloId,
                                                           @PathVariable Long projectId) {
         return ResponseEntity.ok(service.setPrimaryProject(authentication.getName(), deloId, projectId));
     }
 
     @PostMapping("/{id}/apply-recurrence")
-    public ResponseEntity<DeloService.ApplyRecurrenceResponse> applyRecurrence(Authentication authentication, @PathVariable Long id,
+    public ResponseEntity<ApplyRecurrenceResponse> applyRecurrence(Authentication authentication, @PathVariable Long id,
                                                                     @RequestBody(required = false) ApplyRecurrenceRequest request) {
         return ResponseEntity.ok(service.applyRecurrence(authentication.getName(), id, request));
-    }
-
-
-    /** Compatibility DTO names retained for existing API integration tests. */
-    @Deprecated
-    public static class DeloResponse extends DeloService.DeloResponse {
-        public DeloResponse() {
-            super();
-        }
-
-        public DeloResponse(Long id, String title, String description, Delo.ExecutionMode executionMode,
-                            List<Long> projectIds, Long primaryProjectId) {
-            super(id, title, description, executionMode, projectIds, primaryProjectId);
-        }
-    }
-
-    @Deprecated
-    public static class DeloDetailResponse extends DeloService.DeloDetailResponse {
-        public DeloDetailResponse() {
-            super();
-        }
-    }
-
-    @Deprecated
-    public static class CreateDeloRequest extends DeloService.CreateDeloRequest {
-        public CreateDeloRequest() {
-            super();
-        }
-
-        public CreateDeloRequest(String title, String description, Delo.ExecutionMode executionMode,
-                                 List<Long> projectIds, Long primaryProjectId) {
-            super();
-            setTitle(title);
-            setDescription(description);
-            setExecutionMode(executionMode);
-            setProjectIds(projectIds);
-            setPrimaryProjectId(primaryProjectId);
-        }
-    }
-
-    @Deprecated
-    public static class RecurrenceSlotDto extends DeloService.RecurrenceSlotDto {
-        public RecurrenceSlotDto() {
-            super();
-        }
-    }
-
-    @Deprecated
-    public static class ApplyRecurrenceResponse extends DeloService.ApplyRecurrenceResponse {
-        public ApplyRecurrenceResponse() {
-            super();
-        }
-    }
-
-    @Deprecated
-    public static class UpdateDeloRequest extends DeloService.UpdateDeloRequest {
-        public UpdateDeloRequest() {
-            super();
-        }
-    }
-
-    @Deprecated
-    public static class DeloImportResponse extends DeloImportService.ImportResponse {
-        public DeloImportResponse(int imported, boolean addedToCurrentWeek) {
-            super(imported, addedToCurrentWeek);
-        }
     }
 
 }

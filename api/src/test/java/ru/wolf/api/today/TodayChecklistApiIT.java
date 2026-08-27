@@ -17,6 +17,8 @@
  */
 package ru.wolf.api.today;
 
+import ru.wolf.api.delo.dto.*;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDate;
 import java.util.List;
@@ -45,9 +47,9 @@ class TodayChecklistApiIT extends ApiIntegrationTest {
     @Test
     void backlog_fact_is_scoped_to_current_iso_week() {
         WebTestClient client = authedAdminClient();
-        ru.wolf.api.delo.DeloController.DeloResponse delo = client.post().uri("/api/v1/delos").contentType(MediaType.APPLICATION_JSON).bodyValue(new ru.wolf.api.delo.DeloController.CreateDeloRequest("Today fact", null, ru.wolf.api.delo.Delo.ExecutionMode.SELF, List.of(), null)).exchange().expectStatus().isOk().expectBody(ru.wolf.api.delo.DeloController.DeloResponse.class).returnResult().getResponseBody();
-        client.post().uri("/api/v1/backlog").contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("deloId", delo.getId(), "scope", "WEEK", "period", "2026-W34", "plannedHours", 10)).exchange().expectStatus().isCreated();
-        client.put().uri("/api/v1/time-entries").contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("startAt", "2026-08-19T10:00:00", "endAt", "2026-08-19T14:00:00", "deloId", delo.getId(), "status", "DONE")).exchange().expectStatus().isOk();
+        DeloResponse delo = client.post().uri("/api/v1/delos").contentType(MediaType.APPLICATION_JSON).bodyValue(new CreateDeloRequest("Today fact", null, ru.wolf.api.delo.Delo.ExecutionMode.SELF, List.of(), null)).exchange().expectStatus().isOk().expectBody(DeloResponse.class).returnResult().getResponseBody();
+        client.post().uri("/api/v1/backlog").contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("deloId", delo.id(), "scope", "WEEK", "period", "2026-W34", "plannedHours", 10)).exchange().expectStatus().isCreated();
+        client.put().uri("/api/v1/time-entries").contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("startAt", "2026-08-19T10:00:00", "endAt", "2026-08-19T14:00:00", "deloId", delo.id(), "status", "DONE")).exchange().expectStatus().isOk();
         client.get().uri("/api/v1/today/backlog?date=2026-08-19").exchange().expectStatus().isOk().expectBody(ru.wolf.api.today.dto.BacklogResponse.class).value(body -> { assertThat(body.weekId()).isEqualTo("2026-W34"); assertThat(body.totalPlanned()).isEqualByComparingTo("10"); assertThat(body.totalFact()).isEqualByComparingTo("4"); assertThat(body.items()).singleElement().satisfies(i -> { assertThat(i.plannedHours()).isEqualByComparingTo("10"); assertThat(i.factHours()).isEqualByComparingTo("4"); }); });
         client.get().uri("/api/v1/today/backlog?date=2026-08-26").exchange().expectStatus().isOk().expectBody(ru.wolf.api.today.dto.BacklogResponse.class).value(body -> assertThat(body.items()).isEmpty());
     }
