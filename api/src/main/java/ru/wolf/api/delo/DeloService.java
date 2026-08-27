@@ -1,0 +1,362 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+package ru.wolf.api.delo;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.wolf.api.aggregate.FactAggregate;
+import ru.wolf.api.aggregate.FactAggregateService;
+import ru.wolf.api.delo.dto.ApplyRecurrenceRequest;
+import ru.wolf.api.delo.dto.ApplyRecurrenceResponse;
+import ru.wolf.api.delo.dto.CreateDeloRequest;
+import ru.wolf.api.delo.dto.DeloDetailResponse;
+import ru.wolf.api.delo.dto.DeloResponse;
+import ru.wolf.api.delo.dto.ProjectLink;
+import ru.wolf.api.delo.dto.RecurrenceSlotDto;
+import ru.wolf.api.delo.dto.UpdateDeloRequest;
+import ru.wolf.api.project.Project;
+import ru.wolf.api.project.ProjectRepository;
+import ru.wolf.api.recurrence.RecurrenceService;
+import ru.wolf.api.user.User;
+import ru.wolf.api.user.UserRepository;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class DeloService {
+
+    private final DeloRepository deloRepository;
+    private final DeloProjectRepository deloProjectRepository;
+    private final ProjectRepository projectRepository;
+    private final UserRepository userRepository;
+    private final FactAggregateService factAggregateService;
+    private final RecurrenceService recurrenceService;
+
+    @Transactional(readOnly = true)
+    public List<DeloResponse> listDelos(String username) {
+        User user = currentUser(username);
+        List<DeloResponse> response = deloRepository.findByUserOrderByTitleAsc(user).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public DeloDetailResponse getDelo(String username, Long id) {
+        User user = currentUser(username);
+        Delo delo = deloRepository.findByUserAndId(user, id)
+                .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
+        return toDetailResponse(delo, factAggregateService, recurrenceService);
+    }
+
+    @Transactional
+    public DeloResponse createDelo(String username, CreateDeloRequest request) {
+        User user = currentUser(username);
+        List<Long> projectIds = normalizeIds(request.projectIds());
+        Long primaryProjectId = request.primaryProjectId();
+        validateLinks(user, projectIds, primaryProjectId);
+
+        Delo delo = Delo.builder()
+                .user(user)
+                .title(request.title().trim())
+                .description(normalizeDescription(request.description()))
+                .executionMode(request.executionMode() != null ? request.executionMode() : Delo.ExecutionMode.SELF)
+                .build();
+
+        Delo saved = deloRepository.save(delo);
+        applyProjectLinks(saved, projectIds, primaryProjectId);
+        Delo reloaded = deloRepository.findByUserAndId(user, saved.getId()).orElse(saved);
+        return toResponse(reloaded);
+    }
+
+    @Transactional
+    public DeloResponse updateDelo(String username, Long id, UpdateDeloRequest request) {
+        User user = currentUser(username);
+        Delo delo = deloRepository.findByUserAndId(user, id)
+                .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
+
+        List<Long> projectIds = normalizeIds(request.projectIds());
+        Long primaryProjectId = request.primaryProjectId();
+        validateLinks(user, projectIds, primaryProjectId);
+
+        delo.setTitle(request.title().trim());
+        delo.setDescription(normalizeDescription(request.description()));
+        delo.setExecutionMode(request.executionMode() != null ? request.executionMode() : Delo.ExecutionMode.SELF);
+
+        applyProjectLinks(delo, projectIds, primaryProjectId);
+        Delo saved = deloRepository.save(delo);
+        Delo reloaded = deloRepository.findByUserAndId(user, saved.getId()).orElse(saved);
+        return toResponse(reloaded);
+    }
+
+    @Transactional
+    public void deleteDelo(String username, Long id) {
+        User user = currentUser(username);
+        Delo delo = deloRepository.findByUserAndId(user, id)
+                .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
+        deloRepository.delete(delo);
+    }
+
+    @Transactional
+    public DeloResponse linkProject(String username, Long deloId, Long projectId) {
+        User user = currentUser(username);
+        Delo delo = deloRepository.findByUserAndId(user, deloId)
+                .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
+        Project project = projectRepository.findByUserAndId(user, projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
+
+        boolean alreadyLinked = delo.getDeloProjects().stream()
+                .anyMatch(dp -> dp.getProject().getId().equals(projectId));
+        if (!alreadyLinked) {
+            boolean makePrimary = delo.getDeloProjects().isEmpty();
+            DeloProject link = DeloProject.builder()
+                    .id(new DeloProjectId(deloId, projectId))
+                    .delo(delo)
+                    .project(project)
+                    .isPrimary(makePrimary)
+                    .build();
+            delo.getDeloProjects().add(link);
+            deloRepository.save(delo);
+        }
+
+        Delo reloaded = deloRepository.findByUserAndId(user, deloId).orElseThrow();
+        return toResponse(reloaded);
+    }
+
+    @Transactional
+    public DeloResponse unlinkProject(String username, Long deloId, Long projectId) {
+        User user = currentUser(username);
+        Delo delo = deloRepository.findByUserAndId(user, deloId)
+                .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
+
+        // Ensure project exists for this user (isolation)
+        projectRepository.findByUserAndId(user, projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
+
+        boolean removed = delo.getDeloProjects().removeIf(dp -> dp.getProject().getId().equals(projectId));
+        if (!removed) {
+            throw new IllegalArgumentException("Связь Дело–Проект не найдена");
+        }
+
+        // If primary removed and links remain — promote first remaining
+        boolean hasPrimary = delo.getDeloProjects().stream().anyMatch(dp -> Boolean.TRUE.equals(dp.getIsPrimary()));
+        if (!hasPrimary && !delo.getDeloProjects().isEmpty()) {
+            delo.getDeloProjects().iterator().next().setIsPrimary(true);
+        }
+
+        deloRepository.save(delo);
+        Delo reloaded = deloRepository.findByUserAndId(user, deloId).orElseThrow();
+        return toResponse(reloaded);
+    }
+
+    @Transactional
+    public DeloResponse setPrimaryProject(String username, Long deloId, Long projectId) {
+        User user = currentUser(username);
+        Delo delo = deloRepository.findByUserAndId(user, deloId)
+                .orElseThrow(() -> new IllegalArgumentException("Дело не найдено"));
+        projectRepository.findByUserAndId(user, projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
+
+        DeloProject target = delo.getDeloProjects().stream()
+                .filter(dp -> dp.getProject().getId().equals(projectId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Связь Дело–Проект не найдена"));
+
+        for (DeloProject dp : delo.getDeloProjects()) {
+            dp.setIsPrimary(dp.getProject().getId().equals(projectId));
+        }
+        // silence unused
+        target.setIsPrimary(true);
+
+        deloRepository.save(delo);
+        Delo reloaded = deloRepository.findByUserAndId(user, deloId).orElseThrow();
+        return toResponse(reloaded);
+    }
+
+    @Transactional
+    public ApplyRecurrenceResponse applyRecurrence(String username, Long id, ApplyRecurrenceRequest request) {
+        User user = currentUser(username);
+        ApplyRecurrenceRequest body = request != null ? request : new ApplyRecurrenceRequest(null, null, null, null, null);
+        RecurrenceService.ApplyResult result = recurrenceService.apply(
+                user,
+                id,
+                new RecurrenceService.ApplyCommand(
+                        body.weekdays(),
+                        body.windowStart(),
+                        body.windowEnd(),
+                        body.horizonWeeks(),
+                        toSlots(body.slots())
+                )
+        );
+        return new ApplyRecurrenceResponse(
+                result.created(),
+                result.skippedOccupied(),
+                result.skippedPast(),
+                result.horizonWeeks(),
+                result.from().toString(),
+                result.toExclusive().toString()
+        );
+    }
+
+    private User currentUser(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+    }
+
+    private List<Long> normalizeIds(List<Long> ids) {
+        if (ids == null) {
+            return List.of();
+        }
+        // preserve order, drop nulls and duplicates
+        Set<Long> seen = new HashSet<>();
+        List<Long> out = new ArrayList<>();
+        for (Long id : ids) {
+            if (id != null && seen.add(id)) {
+                out.add(id);
+            }
+        }
+        return out;
+    }
+
+    private void validateLinks(User user, List<Long> projectIds, Long primaryProjectId) {
+        if (projectIds.isEmpty()) {
+            if (primaryProjectId != null) {
+                throw new IllegalArgumentException("Нельзя задать основной проект без привязанных проектов");
+            }
+            return;
+        }
+
+        List<Project> projects = projectRepository.findByUserAndIdIn(user, projectIds);
+        if (projects.size() != projectIds.size()) {
+            throw new IllegalArgumentException("Один или несколько проектов не найдены или недоступны");
+        }
+
+        if (primaryProjectId != null && !projectIds.contains(primaryProjectId)) {
+            throw new IllegalArgumentException("Основной проект должен быть среди привязанных");
+        }
+    }
+
+    private void applyProjectLinks(Delo delo, List<Long> projectIds, Long primaryProjectId) {
+        Set<Long> desired = new HashSet<>(projectIds);
+
+        // remove stale
+        delo.getDeloProjects().removeIf(dp -> !desired.contains(dp.getProject().getId()));
+
+        // add missing
+        Set<Long> existing = delo.getDeloProjects().stream()
+                .map(dp -> dp.getProject().getId())
+                .collect(Collectors.toSet());
+
+        for (Long pid : projectIds) {
+            if (!existing.contains(pid)) {
+                Project project = projectRepository.findByUserAndId(delo.getUser(), pid)
+                        .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
+                DeloProject link = DeloProject.builder()
+                        .id(new DeloProjectId(delo.getId(), pid))
+                        .delo(delo)
+                        .project(project)
+                        .isPrimary(false)
+                        .build();
+                delo.getDeloProjects().add(link);
+            }
+        }
+
+        // primary: explicit or first when linked
+        Long effectivePrimary = primaryProjectId;
+        if (effectivePrimary == null && !projectIds.isEmpty()) {
+            effectivePrimary = projectIds.get(0);
+        }
+        if (effectivePrimary != null) {
+            for (DeloProject dp : delo.getDeloProjects()) {
+                dp.setIsPrimary(dp.getProject().getId().equals(effectivePrimary));
+            }
+        }
+    }
+
+    private String normalizeDescription(String description) {
+        if (description == null) {
+            return null;
+        }
+        String trimmed = description.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private DeloResponse toResponse(Delo delo) {
+        List<Long> projectIds = delo.getDeloProjects().stream()
+                .map(l -> l.getProject().getId())
+                .sorted()
+                .toList();
+        Long primaryId = delo.getDeloProjects().stream()
+                .filter(l -> Boolean.TRUE.equals(l.getIsPrimary()))
+                .map(l -> l.getProject().getId())
+                .findFirst()
+                .orElse(null);
+        return new DeloResponse(
+                delo.getId(),
+                delo.getTitle(),
+                delo.getDescription(),
+                delo.getExecutionMode(),
+                projectIds,
+                primaryId
+        );
+    }
+
+    static DeloDetailResponse toDetailResponse(Delo delo, FactAggregateService factAggregateService, RecurrenceService recurrenceService) {
+        List<ProjectLink> projectLinks = delo.getDeloProjects().stream()
+                .map(l -> new ProjectLink(l.getProject().getId(), l.getProject().getTitle(), Boolean.TRUE.equals(l.getIsPrimary())))
+                .sorted((a, b) -> a.title().compareToIgnoreCase(b.title()))
+                .toList();
+        FactAggregate aggregates = factAggregateService.forDelo(delo.getUser(), delo.getId());
+        return new DeloDetailResponse(
+                delo.getId(),
+                delo.getTitle(),
+                delo.getDescription(),
+                delo.getExecutionMode(),
+                projectLinks,
+                delo.getCreatedAt(),
+                delo.getUpdatedAt(),
+                aggregates,
+                RecurrenceService.decodeWeekdays(delo.getRecurrenceWeekdays()),
+                delo.getRecurrenceWindowStart(),
+                delo.getRecurrenceWindowEnd(),
+                toSlotDtos(recurrenceService.slotsOf(delo))
+        );
+    }
+
+    private List<RecurrenceService.Slot> toSlots(List<RecurrenceSlotDto> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            return List.of();
+        }
+        return dtos.stream()
+                .map(d -> new RecurrenceService.Slot(d.weekday(), d.windowStart(), d.windowEnd()))
+                .toList();
+    }
+
+    private static List<RecurrenceSlotDto> toSlotDtos(List<RecurrenceService.Slot> slots) {
+        return slots.stream()
+                .map(s -> new RecurrenceSlotDto(s.weekday(), s.windowStart(), s.windowEnd()))
+                .toList();
+    }
+
+}

@@ -1,69 +1,123 @@
+<!--
+  WOLF — Wolf's Own Life Framework
+  Copyright (C) 2025 Pavel Obukhov
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Affero General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU Affero General Public License for more details.
+
+  You should have received a copy of the GNU Affero General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
 <script setup>
 import { onMounted, onBeforeUnmount, ref, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { apiBase } from './api'
+import { tourActive, startTour } from './onboardingTour'
+import OnboardingTour from './components/OnboardingTour.vue'
 
 const router = useRouter()
 const route = useRoute()
 const token = ref(localStorage.getItem('wolf_token') || '')
 const username = ref('')
 
-// --- Navigation model (approved Release 0.3 IA) ---------------------------
+// Версия сборки (релиз 0.6, тикет 08). `__APP_VERSION__` — compile-time
+// константа из web/vite.config.js, читающая web/package.json. Смена версии
+// в package.json отражается в шапке после пересборки, без правок App.vue.
+const appVersion = __APP_VERSION__
+
+// Онбординг-маршруты (релиз 0.6) — полноэкранные, без навигационной оболочки.
+const isOnboarding = computed(() => route.path.startsWith('/onboarding'))
+
+// --- Navigation model (Release 0.5 IA — see wolf-life-os skill reference
+// navigation-ia-05-supersession.md and .scratch/wayfinder-releases-05-07/issues/04) ---
+// `tour` — стабильный якорь для тура Знакомства (релиз 0.6, тикет 03). Тур
+// только читает эти атрибуты через `data-tour-target`; структуру NAV не меняет.
 const NAV = [
-  { kind: 'link', label: 'Сегодня', to: '/today' },
+  { kind: 'link', label: 'Утренний обход', to: '/morning', tour: 'morning' },
+  { kind: 'link', label: 'Ежедневник', to: '/calendar', tour: 'calendar' },
   {
-    kind: 'group', key: 'calendar', label: 'Календарь',
-    children: [
-      { label: 'Неделя', to: '/calendar' },
-      { label: 'Месяц', to: '/calendar/month' },
+    kind: 'group', key: 'delo-management', label: 'Управление делами', tour: 'delo-management',
+    subgroups: [
+      {
+        title: 'Планирование',
+        children: [
+          { label: 'Дорожная карта', to: '/roadmap' },
+          { label: 'План нагрузки', to: '/roadmap#load-plan' },
+          { label: 'Бэклог', to: '/backlog' },
+        ],
+      },
+      {
+        title: 'Сущности',
+        children: [
+          { label: 'Проекты', to: '/projects' },
+          { label: 'Рутины', to: '/routines' },
+          { label: 'Дела', to: '/delos' },
+          { label: 'Банк идей', to: '/ideas' },
+        ],
+      },
+      {
+        title: 'Аналитика',
+        children: [
+          { label: 'Статистика', to: '/stats' },
+          { label: 'Чек-лист', to: '/checklist' },
+        ],
+      },
     ],
   },
   {
-    kind: 'group', key: 'planning', label: 'Планирование',
-    children: [
-      { label: 'Диаграмма Ганта', to: '/planning' },
-      { label: 'Бэклог', to: '/planning/backlog' },
-    ],
-  },
-  {
-    kind: 'group', key: 'projects', label: 'Управление проектами',
+    kind: 'group', key: 'flow', label: 'Управление потоком', tour: 'flow',
     children: [
       { label: 'Области жизни', to: '/life-areas' },
-      { label: 'Проекты', to: '/projects' },
-      { label: 'Дела', to: '/delos' },
-      { label: 'Банк идей', to: '/ideas' },
+      { label: 'Цели', to: '/goals' },
+      { label: 'Диаграмма компетенций', to: '/competency' },
+      { label: 'Личная база знаний', to: '/knowledge' },
+    ],
+  },
+  { kind: 'link', label: 'Документация', to: '/docs', tour: 'docs' },
+  {
+    kind: 'group', key: 'settings', label: 'Настройки', tour: 'settings',
+    children: [
+      { label: 'Настройки', to: '/settings' },
       { label: 'Импорт XLSX', to: '/import/xlsx' },
       { label: 'Синхронизация данных', to: '/data-sync' },
     ],
   },
-  {
-    kind: 'group', key: 'flow', label: 'Управление потоком',
-    children: [
-      { label: 'Цели', to: '/goals' },
-      { label: 'Сферы жизни', to: '/spheres' },
-      { label: 'Синергия', to: '/synergy' },
-      { label: 'Утренний обход', to: '/morning' },
-      { label: 'Рутины', to: '/routines' },
-      { label: 'Заметки / LLM Wiki', to: '/notes' },
-      { label: 'Отчёт «Чек-лист»', to: '/reports/checklist' },
-      { label: 'Статистика', to: '/stats' },
-    ],
-  },
-  { kind: 'link', label: 'Настройки', to: '/settings' },
 ]
+
+// Flat list of every {label, to} pair, group children and subgroup children included.
+function flatChildren(item) {
+  if (item.kind === 'link') return []
+  if (item.children) return item.children
+  if (item.subgroups) return item.subgroups.flatMap((sg) => sg.children)
+  return []
+}
+
+// Anchor-aware match: '/roadmap#load-plan' is active whenever the path is /roadmap.
+function baseOf(to) {
+  const hashIdx = to.indexOf('#')
+  return hashIdx === -1 ? to : to.slice(0, hashIdx)
+}
 
 // Prefix map for active-state detection (detail routes highlight their parent link).
 function isChildActive(to) {
   const p = route.path
-  if (p === to) return true
+  const base = baseOf(to)
+  if (p === base) return true
   // Detail routes share the list prefix
   const prefixes = ['/projects', '/delos', '/goals', '/ideas']
-  if (prefixes.includes(to) && p.startsWith(to + '/')) return true
+  if (prefixes.includes(base) && p.startsWith(base + '/')) return true
   return false
 }
 
 function isGroupActive(group) {
-  return group.children.some((c) => isChildActive(c.to))
+  return flatChildren(group).some((c) => isChildActive(c.to))
 }
 
 function groupKeyForPath() {
@@ -212,13 +266,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div id="app-root">
-    <div v-if="token" class="app-shell">
+    <div v-if="token && !isOnboarding" class="app-shell">
       <header class="app-header">
         <div class="header-inner">
-          <router-link to="/today" class="brand" aria-label="WOLF — Главная">
+          <router-link to="/morning" class="brand" aria-label="WOLF — Главная">
             <div class="brand-container">
               <div class="brand-logo">WOLF</div>
               <div class="brand-tagline">Система управления потоком</div>
+              <div class="brand-version">v{{ appVersion }}</div>
             </div>
           </router-link>
 
@@ -229,6 +284,7 @@ onBeforeUnmount(() => {
                 v-if="item.kind === 'link'"
                 :to="item.to"
                 class="nav-link"
+                :data-tour-target="item.tour"
                 :class="{ active: isChildActive(item.to) }"
               >{{ item.label }}</router-link>
 
@@ -240,6 +296,7 @@ onBeforeUnmount(() => {
                 <button
                   type="button"
                   class="nav-link nav-group-trigger"
+                  :data-tour-target="item.tour"
                   :class="{ active: isGroupActive(item) }"
                   :aria-expanded="openGroup === item.key ? 'true' : 'false'"
                   :aria-controls="`grp-${item.key}`"
@@ -253,17 +310,34 @@ onBeforeUnmount(() => {
                   v-show="openGroup === item.key"
                   :id="`grp-${item.key}`"
                   class="nav-submenu"
+                  :class="{ 'nav-submenu-grouped': !!item.subgroups }"
                   role="menu"
                 >
-                  <router-link
-                    v-for="child in item.children"
-                    :key="child.to"
-                    :to="child.to"
-                    class="nav-submenu-link"
-                    :class="{ active: isChildActive(child.to) }"
-                    role="menuitem"
-                    @click="closeGroups"
-                  >{{ child.label }}</router-link>
+                  <template v-if="item.subgroups">
+                    <div v-for="subgroup in item.subgroups" :key="subgroup.title" class="nav-subgroup">
+                      <div class="nav-subgroup-title">{{ subgroup.title }}</div>
+                      <router-link
+                        v-for="child in subgroup.children"
+                        :key="child.to"
+                        :to="child.to"
+                        class="nav-submenu-link"
+                        :class="{ active: isChildActive(child.to) }"
+                        role="menuitem"
+                        @click="closeGroups"
+                      >{{ child.label }}</router-link>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <router-link
+                      v-for="child in item.children"
+                      :key="child.to"
+                      :to="child.to"
+                      class="nav-submenu-link"
+                      :class="{ active: isChildActive(child.to) }"
+                      role="menuitem"
+                      @click="closeGroups"
+                    >{{ child.label }}</router-link>
+                  </template>
                 </div>
               </div>
             </template>
@@ -272,12 +346,21 @@ onBeforeUnmount(() => {
           <div class="header-right">
             <div class="user-menu">
               <span class="user-name">{{ username }}</span>
+              <button
+                @click="() => { startTour(); router.push('/morning'); }"
+                class="btn btn-ghost tour-btn"
+                aria-label="Приветственный тур"
+                title="Пройти Знакомство заново"
+              >
+                Приветственный тур
+              </button>
               <button @click="logout" class="btn btn-ghost logout-btn" aria-label="Выйти" title="Выйти">Выйти</button>
             </div>
             <button
               ref="menuTriggerEl"
               type="button"
               class="menu-trigger"
+              data-tour-target="menu"
               aria-label="Меню"
               :aria-expanded="drawerOpen ? 'true' : 'false'"
               @click="openDrawer"
@@ -302,6 +385,7 @@ onBeforeUnmount(() => {
               <div class="brand-container-sm">
                 <div class="brand-logo-sm">WOLF</div>
                 <div class="brand-tagline-sm">Система управления потоком</div>
+                <div class="brand-version-sm">v{{ appVersion }}</div>
               </div>
               <button type="button" class="menu-trigger" aria-label="Закрыть меню" @click="closeDrawer">
                 <span aria-hidden="true">✕</span>
@@ -314,6 +398,7 @@ onBeforeUnmount(() => {
                   v-if="item.kind === 'link'"
                   :to="item.to"
                   class="drawer-link"
+                  :data-tour-target="item.tour"
                   :class="{ active: isChildActive(item.to) }"
                   @click="onDrawerNavigate"
                 >{{ item.label }}</router-link>
@@ -322,6 +407,7 @@ onBeforeUnmount(() => {
                   <button
                     type="button"
                     class="drawer-group-trigger"
+                    :data-tour-target="item.tour"
                     :class="{ active: isGroupActive(item) }"
                     :aria-expanded="expandedGroups[item.key] ? 'true' : 'false'"
                     @click="toggleDrawerGroup(item.key)"
@@ -330,14 +416,29 @@ onBeforeUnmount(() => {
                     <span class="caret" aria-hidden="true">{{ expandedGroups[item.key] ? '▾' : '▸' }}</span>
                   </button>
                   <div v-show="expandedGroups[item.key]" class="drawer-submenu">
-                    <router-link
-                      v-for="child in item.children"
-                      :key="child.to"
-                      :to="child.to"
-                      class="drawer-submenu-link"
-                      :class="{ active: isChildActive(child.to) }"
-                      @click="onDrawerNavigate"
-                    >{{ child.label }}</router-link>
+                    <template v-if="item.subgroups">
+                      <div v-for="subgroup in item.subgroups" :key="subgroup.title" class="drawer-subgroup">
+                        <div class="drawer-subgroup-title">{{ subgroup.title }}</div>
+                        <router-link
+                          v-for="child in subgroup.children"
+                          :key="child.to"
+                          :to="child.to"
+                          class="drawer-submenu-link"
+                          :class="{ active: isChildActive(child.to) }"
+                          @click="onDrawerNavigate"
+                        >{{ child.label }}</router-link>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <router-link
+                        v-for="child in item.children"
+                        :key="child.to"
+                        :to="child.to"
+                        class="drawer-submenu-link"
+                        :class="{ active: isChildActive(child.to) }"
+                        @click="onDrawerNavigate"
+                      >{{ child.label }}</router-link>
+                    </template>
                   </div>
                 </div>
               </template>
@@ -345,6 +446,14 @@ onBeforeUnmount(() => {
 
             <div class="drawer-foot">
               <span class="user-name">{{ username }}</span>
+              <button
+                @click="() => { startTour(); router.push('/morning'); closeDrawer(); }"
+                class="btn btn-ghost tour-btn"
+                aria-label="Приветственный тур"
+                title="Пройти Знакомство заново"
+              >
+                Приветственный тур
+              </button>
               <button type="button" class="btn btn-ghost" @click="logout">Выйти</button>
             </div>
           </nav>
@@ -354,6 +463,10 @@ onBeforeUnmount(() => {
       <main class="app-main" role="main">
         <router-view />
       </main>
+
+      <!-- Тур Знакомства (релиз 0.6, тикет 03) — поверх реальной оболочки,
+           потому что подсвечивает настоящие пункты NAV, а не их копии. -->
+      <OnboardingTour v-if="tourActive" />
     </div>
 
     <div v-else class="app-shell">

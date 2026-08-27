@@ -1,4 +1,24 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.loadcurve;
+
+import ru.wolf.api.loadcurve.dto.*;
+import ru.wolf.api.planning.dto.CapacityResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
@@ -36,8 +56,8 @@ class LoadCurveApiIT extends ApiIntegrationTest {
         client.put().uri("/api/v1/projects/{id}/load-curve", project.getId()).contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("weekStart", "2026-08-17", "hours", 16)).exchange().expectStatus().isOk();
         client.put().uri("/api/v1/projects/{id}/load-curve", project.getId()).contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("weekStart", "2026-08-24", "hours", 8)).exchange().expectStatus().isOk();
         client.put().uri("/api/v1/projects/{id}/load-curve", project.getId()).contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("weekStart", "2026-08-17", "hours", 12)).exchange().expectStatus().isOk();
-        client.get().uri("/api/v1/projects/{id}/load-curve", project.getId()).exchange().expectStatus().isOk().expectBodyList(LoadCurveController.Response.class).value(items -> { assertThat(items).hasSize(2); assertThat(items.get(0).hours()).isEqualByComparingTo("12.00"); });
-        client.get().uri("/api/v1/planning/capacity?from=2026-08-17&to=2026-08-30").exchange().expectStatus().isOk().expectBodyList(ru.wolf.api.planning.PlanningCapacityController.CapacityResponse.class).value(items -> assertThat(items).anySatisfy(item -> { if (item.getWeekId().equals("2026-W34")) assertThat(item.getPlannedHours()).isGreaterThanOrEqualTo(BigDecimal.ZERO); }));
+        client.get().uri("/api/v1/projects/{id}/load-curve", project.getId()).exchange().expectStatus().isOk().expectBodyList(LoadCurveResponse.class).value(items -> { assertThat(items).hasSize(2); assertThat(items.get(0).hours()).isEqualByComparingTo("12.00"); });
+        client.get().uri("/api/v1/planning/capacity?from=2026-08-17&to=2026-08-30").exchange().expectStatus().isOk().expectBodyList(CapacityResponse.class).value(items -> assertThat(items).anySatisfy(item -> { if (item.weekId().equals("2026-W34")) assertThat(item.plannedHours()).isGreaterThanOrEqualTo(BigDecimal.ZERO); }));
     }
 
     @Test
@@ -46,7 +66,7 @@ class LoadCurveApiIT extends ApiIntegrationTest {
         Routine routine = routines.save(Routine.builder().user(user).title("Спорт").weeklyHours(new BigDecimal("12")).build());
         WebTestClient client = authedAdminClient();
         client.put().uri("/api/v1/routines/{id}/load-curve", routine.getId()).contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("weekStart", "2026-08-17", "hours", 6)).exchange().expectStatus().isOk();
-        client.get().uri("/api/v1/routines/{id}/load-curve", routine.getId()).exchange().expectStatus().isOk().expectBodyList(LoadCurveController.Response.class).hasSize(1);
+        client.get().uri("/api/v1/routines/{id}/load-curve", routine.getId()).exchange().expectStatus().isOk().expectBodyList(LoadCurveResponse.class).hasSize(1);
         client.put().uri("/api/v1/routines/{id}/load-curve", routine.getId()).contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of("weekStart", "2026-08-24", "hours", -1)).exchange().expectStatus().isBadRequest();
     }
 }

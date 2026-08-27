@@ -1,4 +1,24 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.recurrence;
+
+import ru.wolf.api.delo.dto.*;
+import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -7,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.Delo;
-import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaRepository;
@@ -88,7 +107,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
 
         LocalDateTime rangeFrom = today.atStartOfDay();
         LocalDateTime rangeTo = horizonEnd.atStartOfDay();
-        List<TimeEntryController.TimeEntryResponse> inHorizon = listRange(authed, rangeFrom, rangeTo).stream()
+        List<TimeEntryResponse> inHorizon = listRange(authed, rangeFrom, rangeTo).stream()
                 .filter(e -> deloId.equals(e.getDeloId()))
                 .toList();
 
@@ -103,7 +122,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
                 .toList();
         assertThat(createdDays).containsExactlyElementsOf(expectedDays);
 
-        List<TimeEntryController.TimeEntryResponse> beyond = listRange(
+        List<TimeEntryResponse> beyond = listRange(
                 authed,
                 horizonEnd.atStartOfDay(),
                 horizonEnd.plusWeeks(2).atStartOfDay()
@@ -119,7 +138,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         LocalDate lastWednesday = LocalDate.now(MOSCOW).with(java.time.temporal.TemporalAdjusters.previous(DayOfWeek.WEDNESDAY));
         LocalDateTime doneStart = lastWednesday.atTime(9, 0);
         LocalDateTime doneEnd = lastWednesday.atTime(10, 0);
-        TimeEntryController.TimeEntryResponse historical = putEntry(authed, Map.of(
+        TimeEntryResponse historical = putEntry(authed, Map.of(
                 "startAt", doneStart.toString(),
                 "endAt", doneEnd.toString(),
                 "deloId", deloId,
@@ -130,7 +149,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
 
         LocalDate nextWednesday = LocalDate.now(MOSCOW).with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.WEDNESDAY));
         LocalDateTime futureDoneStart = nextWednesday.atTime(9, 0);
-        TimeEntryController.TimeEntryResponse futureDone = putEntry(authed, Map.of(
+        TimeEntryResponse futureDone = putEntry(authed, Map.of(
                 "startAt", futureDoneStart.toString(),
                 "endAt", nextWednesday.atTime(10, 0).toString(),
                 "deloId", deloId,
@@ -150,8 +169,8 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         int expectedCreated = (int) expectedFuture.stream().filter(d -> !d.equals(nextWednesday)).count();
         assertThat(applied.created()).isEqualTo(expectedCreated);
 
-        TimeEntryController.TimeEntryResponse stillDone = listRange(authed, doneStart, doneEnd.plusMinutes(1)).stream()
-                .filter(e -> historicalId.equals(e.getId()))
+        TimeEntryResponse stillDone = listRange(authed, doneStart, doneEnd.plusMinutes(1)).stream()
+                .filter(e -> historicalId.equals(e.id()))
                 .findFirst()
                 .orElseThrow();
         assertThat(stillDone.getStatus()).isEqualTo(TimeEntry.Status.DONE);
@@ -159,8 +178,8 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(normalize(stillDone.getEndAt())).isEqualTo(normalize(doneEnd.toString()));
         assertThat(stillDone.getDeloId()).isEqualTo(deloId);
 
-        TimeEntryController.TimeEntryResponse futureStillDone = listRange(authed, futureDoneStart, futureDoneStart.plusHours(1)).stream()
-                .filter(e -> futureDone.getId().equals(e.getId()))
+        TimeEntryResponse futureStillDone = listRange(authed, futureDoneStart, futureDoneStart.plusHours(1)).stream()
+                .filter(e -> futureDone.getId().equals(e.id()))
                 .findFirst()
                 .orElseThrow();
         assertThat(futureStillDone.getStatus()).isEqualTo(TimeEntry.Status.DONE);
@@ -179,18 +198,18 @@ class RecurrenceApiIT extends ApiIntegrationTest {
                 "horizonWeeks", 2
         ));
 
-        DeloController.DeloDetailResponse detail = authed.get()
+        DeloDetailResponse detail = authed.get()
                 .uri("/api/v1/delos/{id}", deloId)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloController.DeloDetailResponse.class)
+                .expectBody(DeloDetailResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(detail).isNotNull();
-        assertThat(detail.getRecurrenceWeekdays()).containsExactly(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
-        assertThat(detail.getRecurrenceWindowStart()).isEqualTo(LocalTime.of(18, 0));
-        assertThat(detail.getRecurrenceWindowEnd()).isEqualTo(LocalTime.of(19, 0));
+        assertThat(detail.recurrenceWeekdays()).containsExactly(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
+        assertThat(detail.recurrenceWindowStart()).isEqualTo(LocalTime.of(18, 0));
+        assertThat(detail.recurrenceWindowEnd()).isEqualTo(LocalTime.of(19, 0));
     }
 
     @Test
@@ -214,15 +233,15 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(saturdays).isNotEmpty();
         assertThat(applied.created()).isEqualTo(tuesdays.size() + saturdays.size());
 
-        List<TimeEntryController.TimeEntryResponse> inHorizon = listRange(authed, today.atStartOfDay(), horizonEnd.atStartOfDay())
+        List<TimeEntryResponse> inHorizon = listRange(authed, today.atStartOfDay(), horizonEnd.atStartOfDay())
                 .stream()
                 .filter(e -> deloId.equals(e.getDeloId()))
                 .toList();
 
-        List<TimeEntryController.TimeEntryResponse> tueEntries = inHorizon.stream()
+        List<TimeEntryResponse> tueEntries = inHorizon.stream()
                 .filter(e -> LocalDateTime.parse(normalize(e.getStartAt())).getDayOfWeek() == DayOfWeek.TUESDAY)
                 .toList();
-        List<TimeEntryController.TimeEntryResponse> satEntries = inHorizon.stream()
+        List<TimeEntryResponse> satEntries = inHorizon.stream()
                 .filter(e -> LocalDateTime.parse(normalize(e.getStartAt())).getDayOfWeek() == DayOfWeek.SATURDAY)
                 .toList();
 
@@ -235,22 +254,22 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(satEntries).allMatch(e -> normalize(e.getStartAt()).endsWith("T10:00:00"));
         assertThat(satEntries).allMatch(e -> normalize(e.getEndAt()).endsWith("T11:00:00"));
 
-        DeloController.DeloDetailResponse detail = authed.get()
+        DeloDetailResponse detail = authed.get()
                 .uri("/api/v1/delos/{id}", deloId)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloController.DeloDetailResponse.class)
+                .expectBody(DeloDetailResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(detail).isNotNull();
-        assertThat(detail.getRecurrenceSlots()).hasSize(2);
-        assertThat(detail.getRecurrenceSlots())
-                .extracting(DeloController.RecurrenceSlotDto::getWeekday)
+        assertThat(detail.recurrenceSlots()).hasSize(2);
+        assertThat(detail.recurrenceSlots())
+                .extracting(ru.wolf.api.delo.dto.RecurrenceSlotDto::weekday)
                 .containsExactly(DayOfWeek.TUESDAY, DayOfWeek.SATURDAY);
-        assertThat(detail.getRecurrenceSlots().get(0).getWindowStart()).isEqualTo(LocalTime.of(20, 0));
-        assertThat(detail.getRecurrenceSlots().get(0).getWindowEnd()).isEqualTo(LocalTime.of(21, 30));
-        assertThat(detail.getRecurrenceSlots().get(1).getWindowStart()).isEqualTo(LocalTime.of(10, 0));
-        assertThat(detail.getRecurrenceSlots().get(1).getWindowEnd()).isEqualTo(LocalTime.of(11, 0));
+        assertThat(detail.recurrenceSlots().get(0).windowStart()).isEqualTo(LocalTime.of(20, 0));
+        assertThat(detail.recurrenceSlots().get(0).windowEnd()).isEqualTo(LocalTime.of(21, 30));
+        assertThat(detail.recurrenceSlots().get(1).windowStart()).isEqualTo(LocalTime.of(10, 0));
+        assertThat(detail.recurrenceSlots().get(1).windowEnd()).isEqualTo(LocalTime.of(11, 0));
     }
 
     @Test
@@ -263,24 +282,24 @@ class RecurrenceApiIT extends ApiIntegrationTest {
     }
 
     private ApplyResult applyRecurrence(WebTestClient client, Long deloId, Map<String, ?> request) {
-        DeloController.ApplyRecurrenceResponse applied = client.post()
+        ApplyRecurrenceResponse applied = client.post()
                 .uri("/api/v1/delos/{id}/apply-recurrence", deloId)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloController.ApplyRecurrenceResponse.class)
+                .expectBody(ApplyRecurrenceResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(applied).isNotNull();
-        return new ApplyResult(applied.getCreated());
+        return new ApplyResult(applied.created());
     }
 
-    private List<TimeEntryController.TimeEntryResponse> listRange(
+    private List<TimeEntryResponse> listRange(
             WebTestClient client,
             LocalDateTime from,
             LocalDateTime to
     ) {
-        List<TimeEntryController.TimeEntryResponse> all = new ArrayList<>();
+        List<TimeEntryResponse> all = new ArrayList<>();
         LocalDateTime cursor = from;
         while (cursor.isBefore(to)) {
             LocalDateTime next = cursor.plusDays(7);
@@ -289,7 +308,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
             }
             LocalDateTime chunkFrom = cursor;
             LocalDateTime chunkTo = next;
-            List<TimeEntryController.TimeEntryResponse> chunk = client.get()
+            List<TimeEntryResponse> chunk = client.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/v1/time-entries")
                             .queryParam("from", chunkFrom.toString())
@@ -297,7 +316,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
                             .build())
                     .exchange()
                     .expectStatus().isOk()
-                    .expectBodyList(TimeEntryController.TimeEntryResponse.class)
+                    .expectBodyList(TimeEntryResponse.class)
                     .returnResult()
                     .getResponseBody();
             if (chunk != null) {
@@ -308,30 +327,28 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         return all;
     }
 
-    private TimeEntryController.TimeEntryResponse putEntry(WebTestClient client, Map<String, Object> body) {
+    private TimeEntryResponse putEntry(WebTestClient client, Map<String, Object> body) {
         return client.put()
                 .uri("/api/v1/time-entries")
                 .bodyValue(body)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(TimeEntryController.TimeEntryResponse.class)
+                .expectBody(TimeEntryResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
 
     private Long createDelo(WebTestClient client, String title) {
-        var req = new DeloController.CreateDeloRequest();
-        req.setTitle(title);
-        req.setExecutionMode(Delo.ExecutionMode.SELF);
-        DeloController.DeloResponse created = client.post()
+        var req = new CreateDeloRequest(title, null, Delo.ExecutionMode.SELF, null, null);
+        DeloResponse created = client.post()
                 .uri("/api/v1/delos")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloController.DeloResponse.class)
+                .expectBody(DeloResponse.class)
                 .returnResult()
                 .getResponseBody();
-        return created.getId();
+        return created.id();
     }
 
     private static List<LocalDate> expectedFutureDays(

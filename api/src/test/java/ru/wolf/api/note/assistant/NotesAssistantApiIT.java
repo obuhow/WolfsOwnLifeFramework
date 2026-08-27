@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.note.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,12 +36,14 @@ import org.springframework.util.MultiValueMap;
 import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.note.Note;
-import ru.wolf.api.note.NoteController;
 import ru.wolf.api.note.NoteRepository;
-import ru.wolf.api.project.ProjectController;
+import ru.wolf.api.note.dto.NoteRequest;
+import ru.wolf.api.note.dto.NoteResponse;
+import ru.wolf.api.note.assistant.dto.ResumeResponse;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 
@@ -33,7 +52,7 @@ import ru.wolf.api.support.ApiIntegrationTest;
 class NotesAssistantApiIT extends ApiIntegrationTest {
 
     @Autowired
-    private FakeNotesAssistant fakeNotesAssistant;
+    private FakeNotesAssistantAdapter fakeNotesAssistant;
 
     @Autowired
     private NoteRepository noteRepository;
@@ -63,7 +82,7 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
     @Test
     void uploading_audio_creates_note_with_fake_transcription_and_attachment() {
         WebTestClient client = authedAdminClient();
-        Long projectId = createProject(client, "WOLF").getId();
+        Long projectId = createProject(client, "WOLF").id();
 
         MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
         parts.add("file", new NamedByteArrayResource("voice memo".getBytes(StandardCharsets.UTF_8), "memo.webm"));
@@ -75,19 +94,19 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
                 .bodyValue(parts)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(NoteController.NoteResponse.class)
+                .expectBody(NoteResponse.class)
                 .value(note -> {
-                    assertThat(note.getBody()).isEqualTo("Тестовая транскрипция");
-                    assertThat(note.getProjectId()).isEqualTo(projectId);
-                    assertThat(note.getAudioRef()).isNotBlank();
-                    assertThat(note.getTags()).containsExactly("voice");
+                    assertThat(note.body()).isEqualTo("Тестовая транскрипция");
+                    assertThat(note.projectId()).isEqualTo(projectId);
+                    assertThat(note.audioRef()).isNotBlank();
+                    assertThat(note.tags()).containsExactly("voice");
                 });
     }
 
     @Test
     void resume_summarizes_latest_project_notes_through_fake() {
         WebTestClient client = authedAdminClient();
-        Long projectId = createProject(client, "WOLF").getId();
+        Long projectId = createProject(client, "WOLF").id();
         createNote(client, projectId, "Решили оставить JWT фильтр");
         createNote(client, projectId, "Остановился на проверке Spring Security");
         createNote(client, projectId, "Следом нужно добавить интеграционный тест");
@@ -96,7 +115,7 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
         client.get().uri(uri -> uri.path("/api/v1/projects/{id}/resume").queryParam("limit", 10).build(projectId))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectResumeController.ResumeResponse.class)
+                .expectBody(ResumeResponse.class)
                 .value(resume -> {
                     assertThat(resume.projectId()).isEqualTo(projectId);
                     assertThat(resume.noteIds()).hasSize(3);
@@ -105,26 +124,20 @@ class NotesAssistantApiIT extends ApiIntegrationTest {
     }
 
 
-    private ProjectController.ProjectResponse createProject(WebTestClient client, String title) {
-        var areaRequest = new LifeAreaController.CreateLifeAreaRequest();
-        areaRequest.setName("Работа");
-        areaRequest.setColor("#3d5a4a");
+    private ProjectResponse createProject(WebTestClient client, String title) {
+        var areaRequest = new CreateLifeAreaRequest("Работа", "#3d5a4a");
         Long areaId = client.post().uri("/api/v1/life-areas").bodyValue(areaRequest).exchange()
-                .expectStatus().isOk().expectBody(LifeAreaController.LifeAreaResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectStatus().isOk().expectBody(LifeAreaResponse.class)
+                .returnResult().getResponseBody().id();
 
-        var projectRequest = new ProjectController.CreateProjectRequest();
-        projectRequest.setLifeAreaId(areaId);
-        projectRequest.setTitle(title);
+        var projectRequest = new CreateProjectRequest(areaId, title);
         return client.post().uri("/api/v1/projects").bodyValue(projectRequest).exchange()
-                .expectStatus().isOk().expectBody(ProjectController.ProjectResponse.class)
+                .expectStatus().isOk().expectBody(ProjectResponse.class)
                 .returnResult().getResponseBody();
     }
 
     private void createNote(WebTestClient client, Long projectId, String body) {
-        var request = new NoteController.NoteRequest();
-        request.setProjectId(projectId);
-        request.setBody(body);
+        var request = new NoteRequest(projectId, null, null, body, null);
         client.post().uri("/api/v1/notes").bodyValue(request).exchange()
                 .expectStatus().isOk();
     }

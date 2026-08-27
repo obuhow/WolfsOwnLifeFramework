@@ -5,11 +5,24 @@ plugins {
 }
 
 group = 'ru.wolf'
-version = '0.1.0-SNAPSHOT'
+version = '0.6.0'
+
+// SPDX-License-Identifier: AGPL-3.0-only (см. LICENSE в корне репозитория)
 
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// Repo-root assets/ is the single source of truth for demo profile JSON
+// (ticket 01, release 0.6). Expose it on the runtime classpath so
+// assets/profiles/<slug>.json resolves as classpath resource profiles/<slug>.json.
+sourceSets {
+    main {
+        resources {
+            srcDir "${rootDir}/../assets"
+        }
     }
 }
 
@@ -47,6 +60,7 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testCompileOnly 'org.projectlombok:lombok:1.18.36'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.36'
+    testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {

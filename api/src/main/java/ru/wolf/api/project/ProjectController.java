@@ -1,75 +1,52 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.project;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-import ru.wolf.api.aggregate.FactAggregate;
-import ru.wolf.api.aggregate.FactAggregateService;
-import ru.wolf.api.delo.DeloProjectRepository;
-import ru.wolf.api.lifearea.LifeArea;
-import ru.wolf.api.lifearea.LifeAreaRepository;
-import ru.wolf.api.user.User;
-import ru.wolf.api.user.UserRepository;
+import ru.wolf.api.project.dto.*;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/projects")
 @RequiredArgsConstructor
 public class ProjectController {
 
-    private final ProjectRepository projectRepository;
-    private final LifeAreaRepository lifeAreaRepository;
-    private final UserRepository userRepository;
-    private final DeloProjectRepository deloProjectRepository;
-    private final FactAggregateService factAggregateService;
-    private final ResourceCascadeService resourceCascadeService;
-    private final PlanDistributionService planDistributionService;
+    private final ProjectService projectService;
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(
             Authentication authentication,
             @RequestParam(required = false) Long lifeAreaId
     ) {
-        User user = currentUser(authentication);
-
-        List<Project> projects = lifeAreaId == null
-                ? projectRepository.findByUserOrderByTitleAsc(user)
-                : projectRepository.findByUserAndLifeAreaIdOrderByTitleAsc(user, lifeAreaId);
-
-        List<ProjectResponse> response = projects.stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(projectService.listProjects(authentication.getName(), lifeAreaId));
     }
 
     @GetMapping("/{id}")
-    @Transactional(readOnly = true)
     public ResponseEntity<ProjectDetailResponse> getProject(
             Authentication authentication,
             @PathVariable Long id
     ) {
-        User user = currentUser(authentication);
-        Project project = projectRepository.findByUserAndId(user, id)
-                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
-        return ResponseEntity.ok(toDetailResponse(project));
+        return ResponseEntity.ok(projectService.getProject(authentication.getName(), id));
     }
 
     @PostMapping
@@ -77,30 +54,7 @@ public class ProjectController {
             Authentication authentication,
             @Valid @RequestBody CreateProjectRequest request
     ) {
-        User user = currentUser(authentication);
-        validateDates(request.getStartDate(), request.getEndDate());
-
-        LifeArea lifeArea = lifeAreaRepository.findByUserAndId(user, request.getLifeAreaId())
-                .orElseThrow(() -> new IllegalArgumentException("Область жизни не найдена"));
-
-        Project parent = resolveParent(user, request.getParentId(), lifeArea);
-
-        Project project = Project.builder()
-                .user(user)
-                .lifeArea(lifeArea)
-                .parent(parent)
-                .title(request.getTitle().trim())
-                .status(request.getStatus() == null ? Project.Status.IN_PROGRESS : request.getStatus())
-                .description(normalizeDescription(request.getDescription()))
-                .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
-                .totalPlanHours(request.getTotalPlanHours())
-                .planDistribution(request.getPlanDistribution() == null ? Project.PlanDistribution.NONE : request.getPlanDistribution())
-                .planFrozenAt(LocalDate.now().with(TemporalAdjusters.firstDayOfMonth()))
-                .build();
-
-        Project saved = projectRepository.save(project);
-        return ResponseEntity.ok(toResponse(saved));
+        return ResponseEntity.ok(projectService.createProject(authentication.getName(), request));
     }
 
     @PutMapping("/{id}")
@@ -109,44 +63,7 @@ public class ProjectController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateProjectRequest request
     ) {
-        User user = currentUser(authentication);
-        Project project = projectRepository.findByUserAndId(user, id)
-                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
-
-        validateDates(request.getStartDate(), request.getEndDate());
-
-        LifeArea lifeArea = lifeAreaRepository.findByUserAndId(user, request.getLifeAreaId())
-                .orElseThrow(() -> new IllegalArgumentException("Область жизни не найдена"));
-
-        Project parent = resolveParent(user, request.getParentId(), lifeArea);
-        if (parent != null && parent.getId().equals(project.getId())) {
-            throw new IllegalArgumentException("Проект не может быть родителем самому себе");
-        }
-        if (parent != null && wouldCreateCycle(user, project.getId(), parent.getId())) {
-            throw new IllegalArgumentException("Нельзя сделать потомка родителем — образуется цикл");
-        }
-
-        // Moving a subtree to another life area: keep subtree consistent
-        if (!project.getLifeArea().getId().equals(lifeArea.getId())) {
-            reassignLifeAreaRecursive(user, project, lifeArea);
-        }
-
-        project.setLifeArea(lifeArea);
-        project.setParent(parent);
-        project.setTitle(request.getTitle().trim());
-        if (request.getStatus() != null) {
-            project.setStatus(request.getStatus());
-        }
-        project.setDescription(normalizeDescription(request.getDescription()));
-        project.setStartDate(request.getStartDate());
-        project.setEndDate(request.getEndDate());
-        project.setTotalPlanHours(request.getTotalPlanHours());
-        if (request.getPlanDistribution() != null) {
-            project.setPlanDistribution(request.getPlanDistribution());
-        }
-
-        Project saved = projectRepository.save(project);
-        return ResponseEntity.ok(toResponse(saved));
+        return ResponseEntity.ok(projectService.updateProject(authentication.getName(), id, request));
     }
 
     @DeleteMapping("/{id}")
@@ -154,285 +71,24 @@ public class ProjectController {
             Authentication authentication,
             @PathVariable Long id
     ) {
-        User user = currentUser(authentication);
-        Project project = projectRepository.findByUserAndId(user, id)
-                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
-        // Self-ref FK: delete children first (DB ON DELETE CASCADE alone is not enough under JPA).
-        List<Project> all = projectRepository.findByUserOrderByTitleAsc(user);
-        List<Project> subtree = new ArrayList<>();
-        collectSubtree(all, project.getId(), subtree);
-        // deepest first
-        for (int i = subtree.size() - 1; i >= 0; i--) {
-            projectRepository.delete(subtree.get(i));
-        }
+        projectService.deleteProject(authentication.getName(), id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/plan-shift-preview")
-    @Transactional(readOnly = true)
     public ResponseEntity<ResourceCascadeService.Preview> planShiftPreview(
             Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody PlanShiftPreviewRequest request
     ) {
-        return ResponseEntity.ok(resourceCascadeService.preview(currentUser(authentication), id, request.getNewEnd()));
+        return ResponseEntity.ok(projectService.planShiftPreview(authentication.getName(), id, request));
     }
 
     @PostMapping("/{id}/plan-distribution")
-    @Transactional
     public ResponseEntity<PlanDistributionService.DistributionResult> applyPlanDistribution(
             Authentication authentication,
             @PathVariable Long id,
             @RequestBody PlanDistributionRequest request) {
-        User user = currentUser(authentication);
-        Project project = projectRepository.findByUserAndId(user, id)
-                .orElseThrow(() -> new IllegalArgumentException("Проект не найден"));
-        Project.PlanDistribution mode;
-        try {
-            mode = Project.PlanDistribution.valueOf(request.getMode().toUpperCase());
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("Неизвестный режим распределения: " + request.getMode());
-        }
-        project.setPlanDistribution(mode);
-        projectRepository.save(project);
-        return ResponseEntity.ok(planDistributionService.apply(user, project, mode));
-    }
-
-    private User currentUser(Authentication authentication) {
-        return userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new IllegalStateException("User not found"));
-    }
-
-    private Project resolveParent(User user, Long parentId, LifeArea lifeArea) {
-        if (parentId == null) {
-            return null;
-        }
-        Project parent = projectRepository.findByUserAndId(user, parentId)
-                .orElseThrow(() -> new IllegalArgumentException("Родительский проект не найден"));
-        if (!parent.getLifeArea().getId().equals(lifeArea.getId())) {
-            throw new IllegalArgumentException("Родительский проект должен быть в той же области жизни");
-        }
-        return parent;
-    }
-
-    private boolean wouldCreateCycle(User user, Long projectId, Long newParentId) {
-        Set<Long> visited = new HashSet<>();
-        Long cursor = newParentId;
-        while (cursor != null) {
-            if (cursor.equals(projectId)) {
-                return true;
-            }
-            if (!visited.add(cursor)) {
-                return true;
-            }
-            Project current = projectRepository.findByUserAndId(user, cursor).orElse(null);
-            if (current == null || current.getParent() == null) {
-                return false;
-            }
-            cursor = current.getParent().getId();
-        }
-        return false;
-    }
-
-    private void reassignLifeAreaRecursive(User user, Project root, LifeArea lifeArea) {
-        List<Project> all = projectRepository.findByUserOrderByTitleAsc(user);
-        List<Project> subtree = new ArrayList<>();
-        collectSubtree(all, root.getId(), subtree);
-        for (Project child : subtree) {
-            if (!child.getId().equals(root.getId())) {
-                child.setLifeArea(lifeArea);
-            }
-        }
-        if (!subtree.isEmpty()) {
-            projectRepository.saveAll(subtree);
-        }
-    }
-
-    private void collectSubtree(List<Project> all, Long rootId, List<Project> acc) {
-        for (Project p : all) {
-            if (p.getId().equals(rootId)) {
-                acc.add(p);
-            }
-        }
-        for (Project p : all) {
-            if (p.getParent() != null && p.getParent().getId().equals(rootId)) {
-                collectSubtree(all, p.getId(), acc);
-            }
-        }
-    }
-
-    private void validateDates(LocalDate start, LocalDate end) {
-        if (start != null && end != null && end.isBefore(start)) {
-            throw new IllegalArgumentException("Дата окончания не может быть раньше даты начала");
-        }
-    }
-
-    private String normalizeDescription(String description) {
-        if (description == null) {
-            return null;
-        }
-        String trimmed = description.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private ProjectResponse toResponse(Project project) {
-        return new ProjectResponse(
-                project.getId(),
-                project.getLifeArea().getId(),
-                project.getParent() != null ? project.getParent().getId() : null,
-                project.getTitle(),
-                project.getStatus(),
-                project.getDescription(),
-                project.getStartDate(),
-                project.getEndDate(),
-                project.getTotalPlanHours(),
-                project.getPlanDistribution()
-        );
-    }
-
-    private ProjectDetailResponse toDetailResponse(Project project) {
-        var links = deloProjectRepository.findByProjectId(project.getId());
-        List<DeloLink> deloLinks = links.stream()
-                .map(l -> new DeloLink(
-                        l.getDelo().getId(),
-                        l.getDelo().getTitle(),
-                        Boolean.TRUE.equals(l.getIsPrimary())
-                ))
-                .toList();
-        FactAggregate aggregates = factAggregateService.forProject(project.getUser(), project.getId());
-        return new ProjectDetailResponse(
-                project.getId(),
-                project.getLifeArea().getId(),
-                project.getLifeArea().getName(),
-                project.getParent() != null ? project.getParent().getId() : null,
-                project.getParent() != null ? project.getParent().getTitle() : null,
-                project.getTitle(),
-                project.getStatus(),
-                project.getDescription(),
-                project.getStartDate(),
-                project.getEndDate(),
-                project.getTotalPlanHours(),
-                project.getPlanDistribution(),
-                deloLinks,
-                aggregates
-        );
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ProjectResponse {
-        private Long id;
-        private Long lifeAreaId;
-        private Long parentId;
-        private String title;
-        private Project.Status status;
-        private String description;
-        private LocalDate startDate;
-        private LocalDate endDate;
-        private BigDecimal totalPlanHours;
-        private Project.PlanDistribution planDistribution;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ProjectDetailResponse {
-        private Long id;
-        private Long lifeAreaId;
-        private String lifeAreaName;
-        private Long parentId;
-        private String parentTitle;
-        private String title;
-        private Project.Status status;
-        private String description;
-        private LocalDate startDate;
-        private LocalDate endDate;
-        private BigDecimal totalPlanHours;
-        private Project.PlanDistribution planDistribution;
-        private List<DeloLink> delos;
-        private FactAggregate aggregates;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class DeloLink {
-        private Long id;
-        private String title;
-        private Boolean isPrimary;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class CreateProjectRequest {
-        @NotNull
-        private Long lifeAreaId;
-
-        private Long parentId;
-
-        @NotBlank
-        @Size(max = 200)
-        private String title;
-
-        private Project.Status status;
-
-        @Size(max = 10000)
-        private String description;
-
-        private LocalDate startDate;
-        private LocalDate endDate;
-
-        @DecimalMin(value = "0.0", inclusive = true)
-        private BigDecimal totalPlanHours;
-        private Project.PlanDistribution planDistribution;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UpdateProjectRequest {
-        @NotNull
-        private Long lifeAreaId;
-
-        private Long parentId;
-
-        @NotBlank
-        @Size(max = 200)
-        private String title;
-
-        private Project.Status status;
-
-        @Size(max = 10000)
-        private String description;
-
-        private LocalDate startDate;
-        private LocalDate endDate;
-
-        @DecimalMin(value = "0.0", inclusive = true)
-        private BigDecimal totalPlanHours;
-        private Project.PlanDistribution planDistribution;
-
-        public UpdateProjectRequest(Long lifeAreaId, Long parentId, String title, Project.Status status,
-                                    String description, LocalDate startDate, LocalDate endDate,
-                                    BigDecimal totalPlanHours) {
-            this(lifeAreaId, parentId, title, status, description, startDate, endDate, totalPlanHours, null);
-        }
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class PlanShiftPreviewRequest {
-        @NotNull
-        private LocalDate newEnd;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class PlanDistributionRequest {
-        private String mode;
+        return ResponseEntity.ok(projectService.applyPlanDistribution(authentication.getName(), id, request));
     }
 }

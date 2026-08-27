@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.lifearea;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,8 +33,15 @@ public interface LifeAreaRepository extends JpaRepository<LifeArea, Long> {
 
     Optional<LifeArea> findByUserAndId(User user, Long id);
 
+    Optional<LifeArea> findFirstByUserOrderBySortOrderAsc(User user);
+
+    /** Get-or-create по имени при повторной загрузке демо-профиля (релиз 0.6, тикет 05). */
+    Optional<LifeArea> findByUserAndNameIgnoreCase(User user, String name);
+
     @Query("SELECT COALESCE(MAX(la.sortOrder), -1) FROM LifeArea la WHERE la.user = :user")
     int findMaxSortOrderByUser(@Param("user") User user);
 
     boolean existsByUserAndName(User user, String name);
+
+    void deleteAllByUser(User user);
 }

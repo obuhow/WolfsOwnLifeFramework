@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.lifesphere;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -12,6 +29,7 @@ import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.user.User;
+import ru.wolf.api.lifesphere.dto.*;
 import ru.wolf.api.user.UserRepository;
 
 import java.time.LocalDate;
@@ -105,36 +123,30 @@ class SynergyApiIT extends ApiIntegrationTest {
     void create_synergy_with_project_and_sphere_persists() {
         WebTestClient authed = authedAdminClient();
 
-        var request = new SynergyController.CreateSynergyRequest();
-        request.setSphereId(sphereHealth.getId());
-        request.setProjectId(projectTest.getId());
-        request.setImpact(Synergy.Impact.POSITIVE); // +1
+        var request = new CreateSynergyRequest(sphereHealth.getId(), projectTest.getId(), null, null, Synergy.Impact.POSITIVE);
 
-        SynergyController.SynergyResponse created = authed.post()
+        SynergyResponse created = authed.post()
                 .uri("/api/v1/synergies")
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(SynergyController.SynergyResponse.class)
+                .expectBody(SynergyResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(created).isNotNull();
-        assertThat(created.getId()).isNotNull();
-        assertThat(created.getProjectId()).isEqualTo(projectTest.getId());
-        assertThat(created.getSphereId()).isEqualTo(sphereHealth.getId());
-        assertThat(created.getSphereName()).isEqualTo("Здоровье");
-        assertThat(created.getImpact()).isEqualTo(Synergy.Impact.POSITIVE);
+        assertThat(created.id()).isNotNull();
+        assertThat(created.projectId()).isEqualTo(projectTest.getId());
+        assertThat(created.sphereId()).isEqualTo(sphereHealth.getId());
+        assertThat(created.sphereId()).isEqualTo("Здоровье");
+        assertThat(created.impact()).isEqualTo(Synergy.Impact.POSITIVE);
     }
 
     @Test
     void duplicate_project_sphere_synergy_returns_409() {
         WebTestClient authed = authedAdminClient();
 
-        var request = new SynergyController.CreateSynergyRequest();
-        request.setSphereId(sphereHealth.getId());
-        request.setProjectId(projectTest.getId());
-        request.setImpact(Synergy.Impact.POSITIVE);
+        var request = new CreateSynergyRequest(sphereHealth.getId(), projectTest.getId(), null, null, Synergy.Impact.POSITIVE);
 
         authed.post().uri("/api/v1/synergies").bodyValue(request).exchange().expectStatus().isOk();
 
@@ -147,90 +159,76 @@ class SynergyApiIT extends ApiIntegrationTest {
         WebTestClient authed = authedAdminClient();
 
         // Create synergy with health (+) and money (-)
-        var req1 = new SynergyController.CreateSynergyRequest();
-        req1.setSphereId(sphereHealth.getId());
-        req1.setProjectId(projectTest.getId());
-        req1.setImpact(Synergy.Impact.POSITIVE);
-
-        var req2 = new SynergyController.CreateSynergyRequest();
-        req2.setSphereId(sphereMoney.getId());
-        req2.setProjectId(projectTest.getId());
-        req2.setImpact(Synergy.Impact.NEGATIVE);
+        var req1 = new CreateSynergyRequest(sphereHealth.getId(), projectTest.getId(), null, null, Synergy.Impact.POSITIVE);
+        var req2 = new CreateSynergyRequest(sphereMoney.getId(), projectTest.getId(), null, null, Synergy.Impact.NEGATIVE);
 
         authed.post().uri("/api/v1/synergies").bodyValue(req1).exchange().expectStatus().isOk();
         authed.post().uri("/api/v1/synergies").bodyValue(req2).exchange().expectStatus().isOk();
 
-        List<SynergyController.SynergyResponse> synergies = authed.get()
+        List<SynergyResponse> synergies = authed.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/v1/synergies").queryParam("projectId", projectTest.getId()).build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(SynergyController.SynergyResponse.class)
+                .expectBodyList(SynergyResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(synergies).hasSize(2);
-        assertThat(synergies).anyMatch(s -> s.getSphereId().equals(sphereHealth.getId()) && s.getImpact() == Synergy.Impact.POSITIVE);
-        assertThat(synergies).anyMatch(s -> s.getSphereId().equals(sphereMoney.getId()) && s.getImpact() == Synergy.Impact.NEGATIVE);
+        assertThat(synergies).anyMatch(s -> s.sphereId().equals(sphereHealth.getId()) && s.impact() == Synergy.Impact.POSITIVE);
+        assertThat(synergies).anyMatch(s -> s.sphereId().equals(sphereMoney.getId()) && s.impact() == Synergy.Impact.NEGATIVE);
     }
 
     @Test
     void update_synergy_impact() {
         WebTestClient authed = authedAdminClient();
 
-        var request = new SynergyController.CreateSynergyRequest();
-        request.setSphereId(sphereHealth.getId());
-        request.setProjectId(projectTest.getId());
-        request.setImpact(Synergy.Impact.POSITIVE);
+        var request = new CreateSynergyRequest(sphereHealth.getId(), projectTest.getId(), null, null, Synergy.Impact.POSITIVE);
 
-        SynergyController.SynergyResponse created = authed.post()
+        SynergyResponse created = authed.post()
                 .uri("/api/v1/synergies")
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(SynergyController.SynergyResponse.class)
+                .expectBody(SynergyResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        var updateReq = new SynergyController.UpdateSynergyRequest();
-        updateReq.setImpact(Synergy.Impact.NEUTRAL);
+        var updateReq = new UpdateSynergyRequest(Synergy.Impact.NEUTRAL);
 
-        SynergyController.SynergyResponse updated = authed.put()
-                .uri("/api/v1/synergies/{id}", created.getId())
+        SynergyResponse updated = authed.put()
+                .uri("/api/v1/synergies/{id}", created.id())
                 .bodyValue(updateReq)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(SynergyController.SynergyResponse.class)
+                .expectBody(SynergyResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(updated.getImpact()).isEqualTo(Synergy.Impact.NEUTRAL);
+        assertThat(updated.impact()).isEqualTo(Synergy.Impact.NEUTRAL);
     }
 
     @Test
     void delete_synergy() {
         WebTestClient authed = authedAdminClient();
 
-        var request = new SynergyController.CreateSynergyRequest();
-        request.setSphereId(sphereHealth.getId());
-        request.setProjectId(projectTest.getId());
-        request.setImpact(Synergy.Impact.POSITIVE);
+        var request = new CreateSynergyRequest(sphereHealth.getId(), projectTest.getId(), null, null, Synergy.Impact.POSITIVE);
 
-        SynergyController.SynergyResponse created = authed.post()
+        SynergyResponse created = authed.post()
                 .uri("/api/v1/synergies")
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(SynergyController.SynergyResponse.class)
+                .expectBody(SynergyResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        authed.delete().uri("/api/v1/synergies/{id}", created.getId()).exchange().expectStatus().isNoContent();
+        authed.delete().uri("/api/v1/synergies/{id}", created.id()).exchange().expectStatus().isNoContent();
 
-        List<SynergyController.SynergyResponse> list = authed.get()
+        List<SynergyResponse> list = authed.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/v1/synergies").queryParam("projectId", projectTest.getId()).build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(SynergyController.SynergyResponse.class)
+                .expectBodyList(SynergyResponse.class)
                 .returnResult()
                 .getResponseBody();
 

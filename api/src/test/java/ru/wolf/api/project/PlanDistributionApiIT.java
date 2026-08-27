@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,6 +32,7 @@ import ru.wolf.api.gantt.WeekPlan;
 import ru.wolf.api.gantt.WeekPlanRepository;
 import ru.wolf.api.lifearea.LifeArea;
 import ru.wolf.api.lifearea.LifeAreaRepository;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
@@ -45,10 +63,10 @@ class PlanDistributionApiIT extends ApiIntegrationTest {
         WebTestClient client = authedAdminClient();
         Map body = Map.of("lifeAreaId", area.getId(), "title", "Проект", "startDate", "2026-03-02",
                 "endDate", "2026-03-27", "totalPlanHours", 40);
-        ProjectController.ProjectResponse project = client.post().uri("/api/v1/projects").bodyValue(body)
-                .exchange().expectStatus().isOk().expectBody(ProjectController.ProjectResponse.class).returnResult().getResponseBody();
+        ProjectResponse project = client.post().uri("/api/v1/projects").bodyValue(body)
+                .exchange().expectStatus().isOk().expectBody(ProjectResponse.class).returnResult().getResponseBody();
 
-        Map result = client.post().uri("/api/v1/projects/{id}/plan-distribution", project.getId())
+        Map result = client.post().uri("/api/v1/projects/{id}/plan-distribution", project.id())
                 .bodyValue(Map.of("mode", "even_weekdays")).exchange().expectStatus().isOk()
                 .expectBody(Map.class).returnResult().getResponseBody();
         List<Map> weeks = (List<Map>) result.get("weeks");

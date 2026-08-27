@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.agent;
 
 import org.springframework.scheduling.annotation.Scheduled;
@@ -6,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.note.Note;
 import ru.wolf.api.note.NoteRepository;
-import ru.wolf.api.note.assistant.NotesAssistant;
+import ru.wolf.api.note.assistant.AssistantPort;
 import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.timeentry.TimeEntryRepository;
@@ -32,7 +49,7 @@ public class AgentJob {
     private final DeloProjectRepository deloProjectRepository;
     private final NoteRepository noteRepository;
     private final UserRepository userRepository;
-    private final NotesAssistant notesAssistant;
+    private final AssistantPort notesAssistant;
 
     public AgentJob(
             AgentRunLogService runLogService,
@@ -41,7 +58,7 @@ public class AgentJob {
             DeloProjectRepository deloProjectRepository,
             NoteRepository noteRepository,
             UserRepository userRepository,
-            NotesAssistant notesAssistant
+            AssistantPort notesAssistant
     ) {
         this.runLogService = runLogService;
         this.projectRepository = projectRepository;
@@ -61,7 +78,7 @@ public class AgentJob {
         int projects = 0;
         int notes = 0;
         int logs = 0;
-        for (User user : userRepository.findAll()) {
+        for (User user : userRepository.findByAccountTypeAndStatus("REGULAR", "ACTIVE")) {
             AgentRunResult result = runForUserInTransaction(user);
             projects += result.projectsProcessed();
             notes += result.notesCreated();

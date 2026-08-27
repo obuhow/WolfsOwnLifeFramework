@@ -1,5 +1,22 @@
+<!--
+  WOLF — Wolf's Own Life Framework
+  Copyright (C) 2025 Pavel Obukhov
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Affero General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU Affero General Public License for more details.
+
+  You should have received a copy of the GNU Affero General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { apiBase } from '../api'
 
 const file = ref(null)
@@ -9,12 +26,43 @@ const loading = ref(false)
 const error = ref('')
 const deleteMissing = ref(false)
 const scopes = ref([])
+const manifest = ref(null)
+const now = ref(Date.now())
+
+// Тикающие часы: preview протухает по expiresAt, кнопка Apply должна
+// погаснуть сама, без перезагрузки страницы (чек-лист 0.21-06).
+let clockId = null
+onMounted(() => { clockId = setInterval(() => { now.value = Date.now() }, 1000) })
+onBeforeUnmount(() => { if (clockId) clearInterval(clockId) })
 
 const token = () => localStorage.getItem('wolf_token')
 const headers = () => ({ Authorization: `Bearer ${token()}` })
-const canApply = computed(() => preview.value?.applyAllowed === true && !loading.value)
+
+const expired = computed(() => {
+  const exp = preview.value?.expiresAt
+  if (!exp) return false
+  return new Date(exp).getTime() <= now.value
+})
+const canApply = computed(() => preview.value?.applyAllowed === true && !expired.value && !loading.value)
 
 function selectFile(event) { file.value = event.target.files?.[0] || null; preview.value = null; result.value = null; error.value = '' }
+
+// created/updated/deleted приходят как Map<String,Integer>; без форматирования
+// интерполяция Vue дала бы [object Object].
+function fmtCounts(map) {
+  if (!map) return '—'
+  const parts = Object.entries(map).filter(([, n]) => n > 0).map(([k, n]) => `${k}: ${n}`)
+  return parts.length ? parts.join(', ') : '—'
+}
+
+async function loadManifest() {
+  try {
+    const response = await fetch(`${apiBase()}/data-sync/manifest?version=0.21`, { headers: headers() })
+    if (!response.ok) return
+    manifest.value = await response.json()
+  } catch { /* manifest справочный, его отсутствие не ломает импорт */ }
+}
+onMounted(loadManifest)
 
 async function downloadExport() {
   loading.value = true; error.value = ''
@@ -69,10 +117,17 @@ async function applyPreview() {
         <button class="btn" :disabled="!file || loading" @click="makePreview">Показать preview</button>
       </div>
       <p class="hint">Канонический формат: manifest + 17 листов, externalId для связей. Загрузка не изменяет данные автоматически.</p>
+      <p v-if="manifest" class="hint" data-testid="sync-manifest">
+        Контракт: {{ manifest.format }} версия {{ manifest.version }} · листов: {{ manifest.sheets?.length ?? 0 }}
+      </p>
 
       <div v-if="preview" class="preview" aria-live="polite">
         <h2>Preview #{{ preview.id }} — {{ preview.status }}</h2>
         <p>Checksum: <code>{{ preview.checksum }}</code></p>
+        <p v-if="preview.expiresAt" class="hint" data-testid="sync-expiry">
+          <template v-if="expired">Preview устарел — загрузите файл заново, применение недоступно.</template>
+          <template v-else>Действителен до {{ new Date(preview.expiresAt).toLocaleString('ru-RU') }}.</template>
+        </p>
         <div class="summary-grid">
           <div v-for="(count, sheet) in preview.counts" :key="sheet"><strong>{{ sheet }}</strong><span>{{ count }} строк</span></div>
         </div>
@@ -99,7 +154,9 @@ async function applyPreview() {
         <button class="btn btn-primary" :disabled="!canApply" @click="applyPreview">Применить preview атомарно</button>
       </div>
 
-      <div v-if="result" class="alert alert-success" data-testid="sync-result">Применено: {{ result.status }}; создано: {{ result.created }}; обновлено: {{ result.updated }}</div>
+      <div v-if="result" class="alert alert-success" data-testid="sync-result">
+        Применено: {{ result.status }}; создано: {{ fmtCounts(result.created) }}; обновлено: {{ fmtCounts(result.updated) }}; удалено: {{ fmtCounts(result.deleted) }}
+      </div>
       <div v-if="error" class="alert alert-error" data-testid="sync-error">{{ error }}</div>
     </section>
   </div>

@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.auth;
 
 import io.jsonwebtoken.*;
@@ -41,18 +58,27 @@ public class JwtUtil {
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", extractUserIdFromUserDetails(userDetails));
-        return createToken(claims, userDetails.getUsername());
+        return createToken(claims, userDetails.getUsername(), expirationMs);
     }
 
-    public String generateToken(String username, Long userId) {
+    public String generateToken(String username, Long userId, String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
-        return createToken(claims, username);
+        claims.put("role", role);
+        return createToken(claims, username, expirationMs);
     }
 
-    private String createToken(Map<String, Object> claims, String subject) {
+    /** For ephemeral demo accounts: token lifetime equals the account's remaining lifetime. */
+    public String generateToken(String username, Long userId, String role, long ttlMs) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("role", role);
+        return createToken(claims, username, ttlMs);
+    }
+
+    private String createToken(Map<String, Object> claims, String subject, long ttlMs) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
+        Date expiry = new Date(now.getTime() + ttlMs);
         return Jwts.builder()
                 .claims(claims)
                 .subject(subject)
@@ -68,6 +94,10 @@ public class JwtUtil {
 
     public Long extractUserId(String token) {
         return extractClaim(token, claims -> claims.get("userId", Long.class));
+    }
+
+    public String extractRole(String token) {
+        return extractClaim(token, claims -> claims.get("role", String.class));
     }
 
     public Date extractExpiration(String token) {

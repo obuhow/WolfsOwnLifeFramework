@@ -19,8 +19,8 @@ services:
   api:
     image: wolf-api:latest
     build:
-      context: ./api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api/Dockerfile
       network: host
     container_name: wolf-api
     environment:

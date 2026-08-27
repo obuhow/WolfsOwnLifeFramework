@@ -27,9 +27,14 @@ wolf:
   llm:
     enabled: ${WOLF_LLM_ENABLED:false}
     url: ${WOLF_LLM_URL:https://api.x.ai/v1}
-    api-key: ${WOLF_LLM_API_KEY:}
+    api-key: ${WOLF...EY:}
     model: ${WOLF_LLM_MODEL:grok-3-mini}
     audio-directory: ${WOLF_AUDIO_DIRECTORY:${user.home}/.wolf/audio}
+  demo:
+    rate-per-ip-per-hour: 3
+    max-live-accounts: 200
+    ttl-hours: 24
+    gc-enabled: false
 
 server:
   port: ${SERVER_PORT:8082}

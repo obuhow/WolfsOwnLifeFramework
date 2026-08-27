@@ -1,6 +1,24 @@
+<!--
+  WOLF — Wolf's Own Life Framework
+  Copyright (C) 2025 Pavel Obukhov
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Affero General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU Affero General Public License for more details.
+
+  You should have received a copy of the GNU Affero General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
 <script setup>
 import { ref, onMounted } from 'vue'
 import { apiBase } from '../api'
+import ProfileChoiceList from './ProfileChoiceList.vue'
 
 const settings = ref({
   timezone: 'Europe/Moscow',
@@ -16,6 +34,7 @@ const settings = ref({
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
+const isAdmin = ref(false)
 
 const timezones = [
   'Europe/Moscow',
@@ -106,7 +125,80 @@ async function saveSettings() {
   }
 }
 
+/**
+ * Повторная загрузка демо-профиля (релиз 0.6, тикет 05).
+ *
+ * Раскрывается по кнопке — тот же список карточек, что и на `/onboarding/profile`,
+ * через общий `ProfileChoiceList.vue`. Выбор идёт на POST /onboarding/reload-profile,
+ * который сначала полностью очищает данные профиля, затем наполняет заново. Мастер
+ * первого входа при этом не запускается: пользователь уже прошёл Знакомство.
+ */
+const profilePickerOpen = ref(false)
+const reloadingSlug = ref('')
+const reloadError = ref('')
+const reloadSuccess = ref('')
+
+function toggleProfilePicker() {
+  profilePickerOpen.value = !profilePickerOpen.value
+  reloadError.value = ''
+  reloadSuccess.value = ''
+}
+
+async function reloadProfile(slug) {
+  if (reloadingSlug.value) return
+  reloadError.value = ''
+  reloadSuccess.value = ''
+  reloadingSlug.value = slug
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) {
+      window.location.hash = '#/login'
+      return
+    }
+
+    const res = await fetch(`${apiBase()}/onboarding/reload-profile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ slug })
+    })
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+
+    const data = await res.json()
+    reloadSuccess.value = `Профиль «${data.displayName}» загружен`
+    profilePickerOpen.value = false
+    // Норма пришла из профиля — подтягиваем её в форму, чтобы поле не врало.
+    await loadSettings()
+  } catch (e) {
+    reloadError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    reloadingSlug.value = ''
+  }
+}
+
+async function loadRole() {
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) return
+    const res = await fetch(`${apiBase()}/auth/me`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    isAdmin.value = data.role === 'ADMIN'
+  } catch {
+    // ignore network blips — menu item just stays hidden
+  }
+}
+
 onMounted(loadSettings)
+onMounted(loadRole)
 </script>
 
 <template>
@@ -236,6 +328,46 @@ onMounted(loadSettings)
         <div v-if="success" class="alert alert-success">{{ success }}</div>
       </div>
     </section>
+
+    <section class="card">
+      <fieldset class="settings-fieldset">
+        <legend>Демо-профиль</legend>
+        <p class="hint">
+          Загрузка другого профиля сначала удаляет всё, что создал текущий, — Проекты, Дела,
+          Записи времени, Цели, Идеи и Заметки, включая добавленные вручную. Области жизни и
+          9 Сфер остаются. Это замена профиля, а не слияние.
+        </p>
+
+        <button
+          type="button"
+          class="btn btn-ghost"
+          data-demo-profile-toggle
+          :disabled="!!reloadingSlug"
+          @click="toggleProfilePicker"
+        >
+          {{ profilePickerOpen ? 'Скрыть выбор' : 'Загрузить другой профиль' }}
+        </button>
+
+        <ProfileChoiceList
+          v-if="profilePickerOpen"
+          class="profile-picker"
+          :busy-slug="reloadingSlug"
+          busy-label="Очищаю и загружаю…"
+          @select="reloadProfile"
+        />
+
+        <div v-if="reloadError" class="alert alert-error">{{ reloadError }}</div>
+        <div v-if="reloadSuccess" class="alert alert-success">{{ reloadSuccess }}</div>
+      </fieldset>
+    </section>
+
+    <section v-if="isAdmin" class="card admin-section">
+      <fieldset class="settings-fieldset">
+        <legend>Администрирование</legend>
+        <p class="hint">Выпуск и отзыв пригласительных кодов — доступно только администратору.</p>
+        <router-link to="/admin/invites" class="btn btn-ghost">Пользователи / Инвайт-коды</router-link>
+      </fieldset>
+    </section>
   </div>
 </template>
 
@@ -253,6 +385,10 @@ onMounted(loadSettings)
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
+}
+
+.profile-picker {
+  margin-top: 1rem;
 }
 
 @media (max-width: 560px) {

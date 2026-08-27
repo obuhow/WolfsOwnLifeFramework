@@ -1,9 +1,9 @@
-# WOLF - Wolf's One Life Framework
+# WOLF - Wolf's Own Life Framework
 
 Самостоятельная оцифровка своей жизни <br>
 для предпринимателей, фрилансеров, художников и разработчиков
 
-> **Статус:** `v0.1 / alpha` · **развёртывание:** self-hosted / Docker · **лицензия:** open source for personal use (AGPL-3.0)
+> **Статус:** `v0.5 / alpha` · **развёртывание:** self-hosted / Docker · **лицензия:** AGPL-3.0
 
 ### Архитектурные принципы
 

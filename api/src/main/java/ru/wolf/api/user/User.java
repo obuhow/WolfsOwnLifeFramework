@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.user;
 
 import jakarta.persistence.*;
@@ -68,6 +85,35 @@ public class User implements UserDetails {
     @Column(name = "updated_at", nullable = false)
     private java.time.Instant updatedAt;
 
+    /** USER | ADMIN */
+    @Builder.Default
+    @Column(nullable = false, length = 20)
+    private String role = "USER";
+
+    /** ACTIVE | BLOCKED */
+    @Builder.Default
+    @Column(nullable = false, length = 20)
+    private String status = "ACTIVE";
+
+    /** REGULAR | DEMO */
+    @Builder.Default
+    @Column(name = "account_type", nullable = false, length = 20)
+    private String accountType = "REGULAR";
+
+    @Column(length = 255)
+    private String email;
+
+    /** Only set for DEMO accounts; null means the account never expires. */
+    @Column(name = "expires_at")
+    private java.time.Instant expiresAt;
+
+    /** Set once the first-run wizard is completed or skipped. */
+    @Column(name = "onboarding_completed_at")
+    private java.time.Instant onboardingCompletedAt;
+
+    @Column(name = "last_login_at")
+    private java.time.Instant lastLoginAt;
+
     @PrePersist
     void onCreate() {
         this.createdAt = java.time.Instant.now();
@@ -81,7 +127,7 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
     @Override
@@ -96,7 +142,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return true;
+        return expiresAt == null || expiresAt.isAfter(java.time.Instant.now());
     }
 
     @Override
@@ -111,6 +157,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return "ACTIVE".equals(status);
     }
 }

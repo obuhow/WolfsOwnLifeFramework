@@ -1,3 +1,20 @@
+<!--
+  WOLF — Wolf's Own Life Framework
+  Copyright (C) 2025 Pavel Obukhov
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Affero General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU Affero General Public License for more details.
+
+  You should have received a copy of the GNU Affero General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import GanttView from './GanttView.vue'
@@ -52,11 +69,11 @@ onMounted(loadCapacity)
   <div class="planning-page">
     <GanttView />
 
-    <section class="planning-capacity">
+    <section id="load-plan" class="planning-capacity">
       <div class="section-heading">
         <div>
           <span class="eyebrow">Нагрузка</span>
-          <h2>Суммарная плановая нагрузка</h2>
+          <h2>План нагрузки</h2>
         </div>
       </div>
       <p v-if="capacityError" class="banner error">{{ capacityError }}</p>
@@ -79,7 +96,7 @@ onMounted(loadCapacity)
       </div>
 
       <div v-if="curve.length" class="curve-list">
-        <h3>Кривые нагрузки</h3>
+        <h3>План нагрузки</h3>
         <div v-for="item in curve" :key="item.id" class="curve-row">
           <strong>{{ item.title }}</strong>
           <span class="cap-num">{{ item.weekStart }}</span>

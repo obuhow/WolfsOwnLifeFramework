@@ -1,26 +1,48 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.morning;
+
+import ru.wolf.api.delo.dto.*;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.backlog.BacklogItemRepository;
-import ru.wolf.api.goal.GoalController;
+import ru.wolf.api.goal.dto.BudgetRequest;
+import ru.wolf.api.goal.dto.CreateGoalRequest;
+import ru.wolf.api.goal.dto.GoalResponse;
 import ru.wolf.api.goal.GoalProjectRepository;
 import ru.wolf.api.goal.GoalRepository;
 import ru.wolf.api.goal.GoalWeekBudgetRepository;
 import ru.wolf.api.idea.Idea;
-import ru.wolf.api.idea.IdeaController;
+import ru.wolf.api.idea.dto.CreateIdeaRequest;
 import ru.wolf.api.idea.IdeaRepository;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
 import ru.wolf.api.note.Note;
-import ru.wolf.api.note.NoteController;
 import ru.wolf.api.note.NoteRepository;
-import ru.wolf.api.project.ProjectController;
+import ru.wolf.api.note.dto.NoteRequest;
+import ru.wolf.api.project.dto.CreateProjectRequest;
+import ru.wolf.api.project.dto.ProjectResponse;
+import ru.wolf.api.project.dto.UpdateProjectRequest;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.timeentry.TimeEntryRepository;
@@ -70,11 +92,11 @@ class MorningDigestApiIT extends ApiIntegrationTest {
         WebTestClient client = authedAdminClient();
         String week = currentIsoWeek();
         Long areaId = createLifeArea(client, "Работа");
-        ProjectController.ProjectResponse project = createProject(client, areaId, "Утренний проект");
+        ProjectResponse project = createProject(client, areaId, "Утренний проект");
 
         List<Long> deloIds = new ArrayList<>();
         for (int i = 1; i <= 3; i++) {
-            deloIds.add(createDelo(client, "Дело " + i, List.of(project.getId())));
+            deloIds.add(createDelo(client, "Дело " + i, List.of(project.id())));
         }
         for (Long deloId : deloIds) {
             client.post().uri(uri -> uri.path("/api/v1/backlog/week/{year}/{week}/delos/{deloId}")
@@ -82,10 +104,8 @@ class MorningDigestApiIT extends ApiIntegrationTest {
                     .exchange().expectStatus().isOk();
         }
         for (int i = 1; i <= 5; i++) {
-            NoteController.NoteRequest request = new NoteController.NoteRequest();
-            request.setProjectId(project.getId());
-            request.setAuthor(i == 5 ? Note.Author.AGENT : Note.Author.USER);
-            request.setBody("Заметка " + i);
+            NoteRequest request = new NoteRequest(project.id(), null,
+                    i == 5 ? Note.Author.AGENT : Note.Author.USER, "Заметка " + i, null);
             client.post().uri("/api/v1/notes").bodyValue(request)
                     .exchange().expectStatus().isOk();
         }
@@ -95,11 +115,11 @@ class MorningDigestApiIT extends ApiIntegrationTest {
         createIdea(client, "Личное", Idea.Category.PERSONAL);
         createIdea(client, "Криповое", Idea.Category.CREEPY);
 
-        GoalController.GoalResponse goal = createGoal(client, "Главная цель");
-        client.post().uri("/api/v1/goals/{id}/budget", goal.getId())
-                .bodyValue(new GoalController.BudgetRequest(week, new BigDecimal("8")))
+        GoalResponse goal = createGoal(client, "Главная цель");
+        client.post().uri("/api/v1/goals/{id}/budget", goal.id())
+                .bodyValue(new BudgetRequest(week, new BigDecimal("8")))
                 .exchange().expectStatus().isOk();
-        client.post().uri("/api/v1/goals/{id}/projects/{projectId}", goal.getId(), project.getId())
+        client.post().uri("/api/v1/goals/{id}/projects/{projectId}", goal.id(), project.id())
                 .exchange().expectStatus().isNoContent();
         client.put().uri("/api/v1/time-entries")
                 .bodyValue(Map.of(
@@ -109,26 +129,26 @@ class MorningDigestApiIT extends ApiIntegrationTest {
                         "status", "DONE"))
                 .exchange().expectStatus().isOk();
 
-        MorningDigestController.MorningDigestResponse response = client.get()
+        ru.wolf.api.morning.dto.MorningDigestResponse response = client.get()
                 .uri("/api/v1/morning-digest")
                 .exchange().expectStatus().isOk()
-                .expectBody(MorningDigestController.MorningDigestResponse.class)
+                .expectBody(ru.wolf.api.morning.dto.MorningDigestResponse.class)
                 .returnResult().getResponseBody();
 
         assertThat(response).isNotNull();
-        assertThat(response.getWeekId()).isEqualTo(week);
-        assertThat(response.getProjects()).hasSize(1);
-        assertThat(response.getProjects().get(0).getLastNotes()).hasSize(5);
-        assertThat(response.getProjects().get(0).getTopDelos()).hasSize(3);
-        assertThat(response.getProjects().get(0).getLastNotes())
-                .extracting(MorningDigestController.NoteDigest::getBody)
+        assertThat(response.weekId()).isEqualTo(week);
+        assertThat(response.projects()).hasSize(1);
+        assertThat(response.projects().get(0).lastNotes()).hasSize(5);
+        assertThat(response.projects().get(0).topDelos()).hasSize(3);
+        assertThat(response.projects().get(0).lastNotes())
+                .extracting(ru.wolf.api.morning.dto.NoteDigest::body)
                 .containsExactly("Заметка 5", "Заметка 4", "Заметка 3", "Заметка 2", "Заметка 1");
-        assertThat(response.getIdeas()).hasSize(3);
-        assertThat(response.getIdeas()).extracting(MorningDigestController.IdeaDigest::getCategory)
+        assertThat(response.ideas()).hasSize(3);
+        assertThat(response.ideas()).extracting(ru.wolf.api.morning.dto.IdeaDigest::category)
                 .doesNotHaveDuplicates();
-        assertThat(response.getGoalsFact()).singleElement()
-                .extracting(MorningDigestController.GoalFactDigest::getBudgetHours,
-                        MorningDigestController.GoalFactDigest::getFactHours)
+        assertThat(response.goalsFact()).singleElement()
+                .extracting(ru.wolf.api.morning.dto.GoalFactDigest::budgetHours,
+                        ru.wolf.api.morning.dto.GoalFactDigest::factHours)
                 .containsExactly(new BigDecimal("8.00"), new BigDecimal("2.00"));
     }
 
@@ -136,68 +156,63 @@ class MorningDigestApiIT extends ApiIntegrationTest {
     void digest_returns_only_active_projects_and_bank_ideas() {
         WebTestClient client = authedAdminClient();
         Long areaId = createLifeArea(client, "Работа");
-        ProjectController.ProjectResponse archived = createProject(client, areaId, "Архивный");
-        client.put().uri("/api/v1/projects/{id}", archived.getId())
-                .bodyValue(new ProjectController.UpdateProjectRequest(
+        ProjectResponse archived = createProject(client, areaId, "Архивный");
+        client.put().uri("/api/v1/projects/{id}", archived.id())
+                .bodyValue(new UpdateProjectRequest(
                         areaId, null, "Архивный", ru.wolf.api.project.Project.Status.ARCHIVED,
                         "", null, null, null))
                 .exchange().expectStatus().isOk();
         createIdea(client, "В банке", Idea.Category.PERSONAL);
-        IdeaController.CreateIdeaRequest inWork = new IdeaController.CreateIdeaRequest(
+        CreateIdeaRequest inWork = new CreateIdeaRequest(
                 "В работе", null, Idea.Category.BUSINESS, Idea.Status.IN_WORK);
         client.post().uri("/api/v1/ideas").bodyValue(inWork).exchange().expectStatus().isOk();
 
-        MorningDigestController.MorningDigestResponse response = client.get()
+        ru.wolf.api.morning.dto.MorningDigestResponse response = client.get()
                 .uri("/api/v1/morning-digest")
                 .exchange().expectStatus().isOk()
-                .expectBody(MorningDigestController.MorningDigestResponse.class)
+                .expectBody(ru.wolf.api.morning.dto.MorningDigestResponse.class)
                 .returnResult().getResponseBody();
 
-        assertThat(response.getProjects()).isEmpty();
-        assertThat(response.getIdeas()).extracting(MorningDigestController.IdeaDigest::getTitle)
+        assertThat(response.projects()).isEmpty();
+        assertThat(response.ideas()).extracting(ru.wolf.api.morning.dto.IdeaDigest::title)
                 .containsExactly("В банке");
     }
 
     private Long createLifeArea(WebTestClient client, String name) {
         return client.post().uri("/api/v1/life-areas")
-                .bodyValue(new LifeAreaController.CreateLifeAreaRequest(name, "#123456"))
+                .bodyValue(new CreateLifeAreaRequest(name, "#123456"))
                 .exchange().expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectBody(LifeAreaResponse.class)
+                .returnResult().getResponseBody().id();
     }
 
-    private ProjectController.ProjectResponse createProject(WebTestClient client, Long areaId, String title) {
-        ProjectController.CreateProjectRequest request = new ProjectController.CreateProjectRequest();
-        request.setLifeAreaId(areaId);
-        request.setTitle(title);
+    private ProjectResponse createProject(WebTestClient client, Long areaId, String title) {
+        CreateProjectRequest request = new CreateProjectRequest(areaId, title);
         return client.post().uri("/api/v1/projects").bodyValue(request)
                 .exchange().expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult().getResponseBody();
     }
 
     private Long createDelo(WebTestClient client, String title, List<Long> projectIds) {
-        DeloController.CreateDeloRequest request = new DeloController.CreateDeloRequest();
-        request.setTitle(title);
-        request.setProjectIds(projectIds);
-        request.setPrimaryProjectId(projectIds.get(0));
+        CreateDeloRequest request = new CreateDeloRequest(title, null, null, projectIds, projectIds.get(0));
         return client.post().uri("/api/v1/delos").bodyValue(request)
                 .exchange().expectStatus().isOk()
-                .expectBody(DeloController.DeloResponse.class)
-                .returnResult().getResponseBody().getId();
+                .expectBody(DeloResponse.class)
+                .returnResult().getResponseBody().id();
     }
 
     private void createIdea(WebTestClient client, String title, Idea.Category category) {
         client.post().uri("/api/v1/ideas")
-                .bodyValue(new IdeaController.CreateIdeaRequest(title, null, category, Idea.Status.BANK))
+                .bodyValue(new CreateIdeaRequest(title, null, category, Idea.Status.BANK))
                 .exchange().expectStatus().isOk();
     }
 
-    private GoalController.GoalResponse createGoal(WebTestClient client, String title) {
+    private GoalResponse createGoal(WebTestClient client, String title) {
         return client.post().uri("/api/v1/goals")
-                .bodyValue(new GoalController.CreateGoalRequest(title, null, 1))
+                .bodyValue(new CreateGoalRequest(title, null, 1))
                 .exchange().expectStatus().isOk()
-                .expectBody(GoalController.GoalResponse.class)
+                .expectBody(GoalResponse.class)
                 .returnResult().getResponseBody();
     }
 

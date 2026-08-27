@@ -1,0 +1,58 @@
+{
+  "slug": "wise-freelancer",
+  "displayName": "Мудрый фрилансер",
+  "weeklyHoursNorm": 30,
+  "timezone": "Europe/Moscow",
+  "areas": [
+    { "name": "Коммерческие проекты", "sphere": "Карьера" },
+    { "name": "Свой продукт", "sphere": "Навык QA Java" },
+    { "name": "Здоровье и отдых", "sphere": "Здоровье" },
+    { "name": "Обучение", "sphere": "Навык музыканта" }
+  ],
+  "projects": [
+    { "name": "Проект Альфа (клиент)", "area": "Коммерческие проекты", "plannedHours": 120, "startOffsetDays": -45, "dueOffsetDays": 30, "status": "IN_PROGRESS" },
+    { "name": "Проект Бета (клиент)", "area": "Коммерческие проекты", "plannedHours": 80, "startOffsetDays": -20, "dueOffsetDays": 60, "status": "IN_PROGRESS" },
+    { "name": "Свой SaaS (pet-проект)", "area": "Свой продукт", "plannedHours": 200, "startOffsetDays": -60, "dueOffsetDays": 180, "status": "IN_PROGRESS" },
+    { "name": "Инфраструктура и CI/CD", "area": "Свой продукт", "plannedHours": 40, "startOffsetDays": -30, "dueOffsetDays": 45, "status": "IN_PROGRESS" },
+    { "name": "Занятия спортом", "area": "Здоровье и отдых", "plannedHours": 50, "startOffsetDays": -10, "dueOffsetDays": 90, "status": "IN_PROGRESS" },
+    { "name": "Курс по архитектуре", "area": "Обучение", "plannedHours": 60, "startOffsetDays": -15, "dueOffsetDays": 120, "status": "PLANNED" }
+  ],
+  "goals": [
+    { "name": "Выйти на стабильный доход от своего продукта", "weeklyBudgetHours": 10, "metric": "MRR в $ (от пет-проектов)" },
+    { "name": "Снизить стресс от дедлайнов клиентов", "weeklyBudgetHours": 5, "metric": "количество переносов дедлайнов в месяц" },
+    { "name": "Поддерживать форму: 3 тренировки в неделю", "weeklyBudgetHours": 4, "metric": "недель с 3+ тренировками" }
+  ],
+  "delosSample": {
+    "done": ["Сдал этап Альфа клиенту", "Написал тесты для модуля оплаты", "Занятие в зале (нога+пресс)", "Клиент Х передвинул дедлайн — заложил буфер"],
+    "planned": ["Ревью PR Бета", "Настроить продовый деплой", "Занятие в зале (верх)", "Подготовить слайды для демо SaaS"],
+    "backlog": ["Рефакторинг легаси модуля Альфа", "Сравнить хостинги для продакшена", "Купить кроссовки для бега", "Прочитать книгу про DDD"]
+  },
+  "routines": [
+    { "name": "Утренняя разминка", "rrule": "FREQ=WEEKLY;BYDAY=MO,WE,FR", "durationMinutes": 30 },
+    { "name": "Работа над SaaS", "rrule": "FREQ=WEEKLY;BYDAY=TU,TH", "durationMinutes": 120 },
+    { "name": "Обучение архитектуре", "rrule": "FREQ=WEEKLY;BYDAY=SA", "durationMinutes": 90 }
+  ],
+  "timeEntriesHistoryDays": 30,
+  "ideas": [
+    "Добавить вебхуки в SaaS для интеграций",
+    "Сделать публичный API для клиентов",
+    "Запустить блог про инди-разработку",
+    "Автоматизировать онбординг новых клиентов",
+    "Миграция на Java 21 LTS",
+    "Интеграция с Telegram-ботом для уведомлений",
+    "Создать шаблон проектов для быстрого старта",
+    "Настроить мониторинг SLA"
+  ],
+  "notes": [
+    { "title": "Клиент Х снова передвинул дедлайн", "body": "В следующий раз заложу буфер +2 дня в оценку. Не жалоба — рабочий вывод, который меняет план.", "fromAgent": false },
+    { "title": "Идея от агента: кэширование ответов API", "body": "Рассмотреть кэширование ответа API для ускорения отдачи списка проектов.", "fromAgent": true },
+    { "title": "Вывод после спринта", "body": "Связей между коммерцией и развитием стало больше — осознанно распределяю время.", "fromAgent": false }
+  ],
+  "synergy": [
+    { "project": "Проект Альфа (клиент)", "area": "Коммерческие проекты", "weight": "high" },
+    { "project": "Свой SaaS (pet-проект)", "area": "Свой продукт", "weight": "high" },
+    { "project": "Занятия спортом", "area": "Здоровье и отдых", "weight": "medium" },
+    { "project": "Курс по архитектуре", "area": "Обучение", "weight": "medium" },
+    { "project": "Инфраструктура и CI/CD", "area": "Свой продукт", "weight": "high" }
+  ]
+}

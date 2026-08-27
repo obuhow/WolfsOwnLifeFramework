@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.lifesphere;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,6 +28,7 @@ import ru.wolf.api.project.Project;
 import ru.wolf.api.project.ProjectRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.user.User;
+import ru.wolf.api.lifesphere.dto.*;
 import ru.wolf.api.user.UserRepository;
 
 import java.util.List;
@@ -79,7 +97,7 @@ class LifeSphereApiIT extends ApiIntegrationTest {
                 .uri("/api/v1/life-spheres")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(LifeSphereController.LifeSphereResponse.class)
+                .expectBodyList(LifeSphereResponse.class)
                 .hasSize(9); // 9 seeded spheres
     }
 
@@ -87,99 +105,88 @@ class LifeSphereApiIT extends ApiIntegrationTest {
     void seeded_spheres_have_correct_names_and_order() {
         WebTestClient authed = authedAdminClient();
 
-        List<LifeSphereController.LifeSphereResponse> all = authed.get()
+        List<LifeSphereResponse> all = authed.get()
                 .uri("/api/v1/life-spheres")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(LifeSphereController.LifeSphereResponse.class)
+                .expectBodyList(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(all).hasSize(9);
-        assertThat(all.get(0).getName()).isEqualTo("Здоровье");
-        assertThat(all.get(0).getSortOrder()).isEqualTo(0);
-        assertThat(all.get(0).getColor()).isEqualTo("#EF4444");
-        assertThat(all.get(1).getName()).isEqualTo("Навык QA Java");
-        assertThat(all.get(1).getSortOrder()).isEqualTo(1);
-        assertThat(all.get(2).getName()).isEqualTo("Навык музыканта");
-        assertThat(all.get(3).getName()).isEqualTo("Общение на расстоянии");
-        assertThat(all.get(4).getName()).isEqualTo("Мотивация к делам");
-        assertThat(all.get(5).getName()).isEqualTo("Ресурсы/деньги");
-        assertThat(all.get(6).getName()).isEqualTo("Ресурсы/время");
-        assertThat(all.get(7).getName()).isEqualTo("Открытие новых ходов");
-        assertThat(all.get(8).getName()).isEqualTo("Независимость");
+        assertThat(all.get(0).name()).isEqualTo("Здоровье");
+        assertThat(all.get(0).sortOrder()).isEqualTo(0);
+        assertThat(all.get(0).color()).isEqualTo("#EF4444");
+        assertThat(all.get(1).name()).isEqualTo("Навык QA Java");
+        assertThat(all.get(1).sortOrder()).isEqualTo(1);
+        assertThat(all.get(2).name()).isEqualTo("Навык музыканта");
+        assertThat(all.get(3).name()).isEqualTo("Общение на расстоянии");
+        assertThat(all.get(4).name()).isEqualTo("Мотивация к делам");
+        assertThat(all.get(5).name()).isEqualTo("Ресурсы/деньги");
+        assertThat(all.get(6).name()).isEqualTo("Ресурсы/время");
+        assertThat(all.get(7).name()).isEqualTo("Открытие новых ходов");
+        assertThat(all.get(8).name()).isEqualTo("Независимость");
     }
 
     @Test
     void create_life_sphere_persists_and_returns() {
         WebTestClient authed = authedAdminClient();
 
-        var request = new LifeSphereController.CreateLifeSphereRequest();
-        request.setName("Тестовая сфера");
-        request.setColor("#123456");
+        var request = new CreateLifeSphereRequest("Тестовая сфера", "#123456");
 
-        LifeSphereController.LifeSphereResponse created = authed.post()
+        LifeSphereResponse created = authed.post()
                 .uri("/api/v1/life-spheres")
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeSphereController.LifeSphereResponse.class)
+                .expectBody(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(created).isNotNull();
-        assertThat(created.getId()).isNotNull();
-        assertThat(created.getName()).isEqualTo("Тестовая сфера");
-        assertThat(created.getColor()).isEqualTo("#123456");
-        assertThat(created.getSortOrder()).isEqualTo(9); // after seeded 9
-        assertThat(created.isArchived()).isFalse();
+        assertThat(created.id()).isNotNull();
+        assertThat(created.name()).isEqualTo("Тестовая сфера");
+        assertThat(created.color()).isEqualTo("#123456");
+        assertThat(created.sortOrder()).isEqualTo(9); // after seeded 9
+        assertThat(created.archived()).isFalse();
     }
 
     @Test
     void create_multiple_life_spheres_gets_sequential_sort_order() {
         WebTestClient authed = authedAdminClient();
 
-        var req1 = new LifeSphereController.CreateLifeSphereRequest();
-        req1.setName("Сфера 1");
-        req1.setColor("#111111");
-
-        var req2 = new LifeSphereController.CreateLifeSphereRequest();
-        req2.setName("Сфера 2");
-        req2.setColor("#222222");
-
-        var req3 = new LifeSphereController.CreateLifeSphereRequest();
-        req3.setName("Сфера 3");
-        req3.setColor("#333333");
+        var req1 = new CreateLifeSphereRequest("Сфера 1", "#111111");
+        var req2 = new CreateLifeSphereRequest("Сфера 2", "#222222");
+        var req3 = new CreateLifeSphereRequest("Сфера 3", "#333333");
 
         authed.post().uri("/api/v1/life-spheres").bodyValue(req1).exchange().expectStatus().isOk();
         authed.post().uri("/api/v1/life-spheres").bodyValue(req2).exchange().expectStatus().isOk();
         authed.post().uri("/api/v1/life-spheres").bodyValue(req3).exchange().expectStatus().isOk();
 
-        List<LifeSphereController.LifeSphereResponse> all = authed.get()
+        List<LifeSphereResponse> all = authed.get()
                 .uri("/api/v1/life-spheres")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(LifeSphereController.LifeSphereResponse.class)
+                .expectBodyList(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         // 9 seeded + 3 created = 12 total
         assertThat(all).hasSize(12);
         // Last 3 should have sort orders 9, 10, 11
-        assertThat(all.get(9).getName()).isEqualTo("Сфера 1");
-        assertThat(all.get(9).getSortOrder()).isEqualTo(9);
-        assertThat(all.get(10).getName()).isEqualTo("Сфера 2");
-        assertThat(all.get(10).getSortOrder()).isEqualTo(10);
-        assertThat(all.get(11).getName()).isEqualTo("Сфера 3");
-        assertThat(all.get(11).getSortOrder()).isEqualTo(11);
+        assertThat(all.get(9).name()).isEqualTo("Сфера 1");
+        assertThat(all.get(9).sortOrder()).isEqualTo(9);
+        assertThat(all.get(10).name()).isEqualTo("Сфера 2");
+        assertThat(all.get(10).sortOrder()).isEqualTo(10);
+        assertThat(all.get(11).name()).isEqualTo("Сфера 3");
+        assertThat(all.get(11).sortOrder()).isEqualTo(11);
     }
 
     @Test
     void duplicate_name_rejected() {
         WebTestClient authed = authedAdminClient();
 
-        var request = new LifeSphereController.CreateLifeSphereRequest();
-        request.setName("Здоровье"); // seeded name
+        var request = new CreateLifeSphereRequest("Здоровье", null); // seeded name
 
         authed.post().uri("/api/v1/life-spheres").bodyValue(request).exchange().expectStatus().isBadRequest();
     }
@@ -188,83 +195,75 @@ class LifeSphereApiIT extends ApiIntegrationTest {
     void update_life_sphere_changes_name_and_color() {
         WebTestClient authed = authedAdminClient();
 
-        var createReq = new LifeSphereController.CreateLifeSphereRequest();
-        createReq.setName("Тест");
-        createReq.setColor("#111111");
+        var createReq = new CreateLifeSphereRequest("Тест", "#111111");
 
-        LifeSphereController.LifeSphereResponse created = authed.post()
+        LifeSphereResponse created = authed.post()
                 .uri("/api/v1/life-spheres")
                 .bodyValue(createReq)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeSphereController.LifeSphereResponse.class)
+                .expectBody(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        var updateReq = new LifeSphereController.UpdateLifeSphereRequest();
-        updateReq.setName("Обновлённая");
-        updateReq.setColor("#222222");
+        var updateReq = new UpdateLifeSphereRequest("Обновлённая", "#222222");
 
-        LifeSphereController.LifeSphereResponse updated = authed.put()
-                .uri("/api/v1/life-spheres/{id}", created.getId())
+        LifeSphereResponse updated = authed.put()
+                .uri("/api/v1/life-spheres/{id}", created.id())
                 .bodyValue(updateReq)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeSphereController.LifeSphereResponse.class)
+                .expectBody(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(updated.getName()).isEqualTo("Обновлённая");
-        assertThat(updated.getColor()).isEqualTo("#222222");
-        assertThat(updated.getId()).isEqualTo(created.getId());
+        assertThat(updated.name()).isEqualTo("Обновлённая");
+        assertThat(updated.color()).isEqualTo("#222222");
+        assertThat(updated.id()).isEqualTo(created.id());
     }
 
     @Test
     void update_duplicate_name_rejected() {
         WebTestClient authed = authedAdminClient();
 
-        var req1 = new LifeSphereController.CreateLifeSphereRequest();
-        req1.setName("Сфера А");
+        var req1 = new CreateLifeSphereRequest("Сфера А", null);
         authed.post().uri("/api/v1/life-spheres").bodyValue(req1).exchange().expectStatus().isOk();
 
-        var req2 = new LifeSphereController.CreateLifeSphereRequest();
-        req2.setName("Сфера Б");
-        LifeSphereController.LifeSphereResponse area2 = authed.post()
+        var req2 = new CreateLifeSphereRequest("Сфера Б", null);
+        LifeSphereResponse area2 = authed.post()
                 .uri("/api/v1/life-spheres")
                 .bodyValue(req2)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeSphereController.LifeSphereResponse.class)
+                .expectBody(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        var updateReq = new LifeSphereController.UpdateLifeSphereRequest();
-        updateReq.setName("Сфера А"); // duplicate
-        authed.put().uri("/api/v1/life-spheres/{id}", area2.getId()).bodyValue(updateReq).exchange().expectStatus().isBadRequest();
+        var updateReq = new UpdateLifeSphereRequest("Сфера А", null); // duplicate
+        authed.put().uri("/api/v1/life-spheres/{id}", area2.id()).bodyValue(updateReq).exchange().expectStatus().isBadRequest();
     }
 
     @Test
     void delete_life_sphere_removes_it() {
         WebTestClient authed = authedAdminClient();
 
-        var createReq = new LifeSphereController.CreateLifeSphereRequest();
-        createReq.setName("Для удаления");
+        var createReq = new CreateLifeSphereRequest("Для удаления", null);
 
-        LifeSphereController.LifeSphereResponse created = authed.post()
+        LifeSphereResponse created = authed.post()
                 .uri("/api/v1/life-spheres")
                 .bodyValue(createReq)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeSphereController.LifeSphereResponse.class)
+                .expectBody(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        authed.delete().uri("/api/v1/life-spheres/{id}", created.getId()).exchange().expectStatus().isNoContent();
+        authed.delete().uri("/api/v1/life-spheres/{id}", created.id()).exchange().expectStatus().isNoContent();
 
         authed.get().uri("/api/v1/life-spheres")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(LifeSphereController.LifeSphereResponse.class)
+                .expectBodyList(LifeSphereResponse.class)
                 .hasSize(9); // back to seeded only
     }
 
@@ -272,76 +271,71 @@ class LifeSphereApiIT extends ApiIntegrationTest {
     void archive_life_sphere_toggles_archived() {
         WebTestClient authed = authedAdminClient();
 
-        var createReq = new LifeSphereController.CreateLifeSphereRequest();
-        createReq.setName("Архивируемая");
+        var createReq = new CreateLifeSphereRequest("Архивируемая", null);
 
-        LifeSphereController.LifeSphereResponse created = authed.post()
+        LifeSphereResponse created = authed.post()
                 .uri("/api/v1/life-spheres")
                 .bodyValue(createReq)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeSphereController.LifeSphereResponse.class)
+                .expectBody(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(created.isArchived()).isFalse();
+        assertThat(created.archived()).isFalse();
 
         // Archive
-        LifeSphereController.LifeSphereResponse archived = authed.put()
-                .uri("/api/v1/life-spheres/{id}/archive", created.getId())
+        LifeSphereResponse archived = authed.put()
+                .uri("/api/v1/life-spheres/{id}/archive", created.id())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeSphereController.LifeSphereResponse.class)
+                .expectBody(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(archived.isArchived()).isTrue();
+        assertThat(archived.archived()).isTrue();
 
         // Unarchive
-        LifeSphereController.LifeSphereResponse unarchived = authed.put()
-                .uri("/api/v1/life-spheres/{id}/archive", created.getId())
+        LifeSphereResponse unarchived = authed.put()
+                .uri("/api/v1/life-spheres/{id}/archive", created.id())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeSphereController.LifeSphereResponse.class)
+                .expectBody(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(unarchived.isArchived()).isFalse();
+        assertThat(unarchived.archived()).isFalse();
     }
 
     @Test
     void move_life_sphere_reorders() {
         WebTestClient authed = authedAdminClient();
 
-        var req1 = new LifeSphereController.CreateLifeSphereRequest();
-        req1.setName("Сфера А");
-        LifeSphereController.LifeSphereResponse a1 = authed.post().uri("/api/v1/life-spheres").bodyValue(req1).exchange().expectStatus().isOk().expectBody(LifeSphereController.LifeSphereResponse.class).returnResult().getResponseBody();
+        var req1 = new CreateLifeSphereRequest("Сфера А", null);
+        LifeSphereResponse a1 = authed.post().uri("/api/v1/life-spheres").bodyValue(req1).exchange().expectStatus().isOk().expectBody(LifeSphereResponse.class).returnResult().getResponseBody();
 
-        var req2 = new LifeSphereController.CreateLifeSphereRequest();
-        req2.setName("Сфера Б");
-        LifeSphereController.LifeSphereResponse a2 = authed.post().uri("/api/v1/life-spheres").bodyValue(req2).exchange().expectStatus().isOk().expectBody(LifeSphereController.LifeSphereResponse.class).returnResult().getResponseBody();
+        var req2 = new CreateLifeSphereRequest("Сфера Б", null);
+        LifeSphereResponse a2 = authed.post().uri("/api/v1/life-spheres").bodyValue(req2).exchange().expectStatus().isOk().expectBody(LifeSphereResponse.class).returnResult().getResponseBody();
 
-        var req3 = new LifeSphereController.CreateLifeSphereRequest();
-        req3.setName("Сфера В");
-        LifeSphereController.LifeSphereResponse a3 = authed.post().uri("/api/v1/life-spheres").bodyValue(req3).exchange().expectStatus().isOk().expectBody(LifeSphereController.LifeSphereResponse.class).returnResult().getResponseBody();
+        var req3 = new CreateLifeSphereRequest("Сфера В", null);
+        LifeSphereResponse a3 = authed.post().uri("/api/v1/life-spheres").bodyValue(req3).exchange().expectStatus().isOk().expectBody(LifeSphereResponse.class).returnResult().getResponseBody();
 
         // Move "Сфера В" (index 11) to index 0 (before seeded)
-        var moveReq = new LifeSphereController.MoveLifeSphereRequest();
-        moveReq.setNewIndex(0);
-        authed.put().uri("/api/v1/life-spheres/{id}/move", a3.getId()).bodyValue(moveReq).exchange().expectStatus().isOk();
+        var moveReq = new MoveLifeSphereRequest(0);
+        authed.put().uri("/api/v1/life-spheres/{id}/move", a3.id()).bodyValue(moveReq).exchange().expectStatus().isOk();
 
-        List<LifeSphereController.LifeSphereResponse> all = authed.get()
+        List<LifeSphereResponse> all = authed.get()
                 .uri("/api/v1/life-spheres")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(LifeSphereController.LifeSphereResponse.class)
+                .expectBodyList(LifeSphereResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(all.get(0).getName()).isEqualTo("Сфера В");
-        assertThat(all.get(0).getSortOrder()).isEqualTo(0);
-        assertThat(all.get(1).getName()).isEqualTo("Здоровье"); // shifted
-        assertThat(all.get(1).getSortOrder()).isEqualTo(1);
+        assertThat(all.get(0).name()).isEqualTo("Сфера В");
+        assertThat(all.get(0).sortOrder()).isEqualTo(0);
+        assertThat(all.get(1).name()).isEqualTo("Здоровье"); // shifted
+        assertThat(all.get(1).sortOrder()).isEqualTo(1);
     }
 
     @Test
@@ -365,26 +359,25 @@ class LifeSphereApiIT extends ApiIntegrationTest {
                 .build();
 
         // user2 should see seeded spheres (9)
-        user2Client.get().uri("/api/v1/life-spheres").exchange().expectStatus().isOk().expectBodyList(LifeSphereController.LifeSphereResponse.class).hasSize(9);
+        user2Client.get().uri("/api/v1/life-spheres").exchange().expectStatus().isOk().expectBodyList(LifeSphereResponse.class).hasSize(9);
 
         // user2 creates an area
-        var req = new LifeSphereController.CreateLifeSphereRequest();
-        req.setName("Работа user2");
+        var req = new CreateLifeSphereRequest("Работа user2", null);
         user2Client.post().uri("/api/v1/life-spheres").bodyValue(req).exchange().expectStatus().isOk();
 
         // user2 sees 10 spheres (9 seeded + 1 own)
-        user2Client.get().uri("/api/v1/life-spheres").exchange().expectStatus().isOk().expectBodyList(LifeSphereController.LifeSphereResponse.class).hasSize(10);
+        user2Client.get().uri("/api/v1/life-spheres").exchange().expectStatus().isOk().expectBodyList(LifeSphereResponse.class).hasSize(10);
 
         // admin should see only their own seeded 9
         WebTestClient adminClient = authedAdminClient();
-        adminClient.get().uri("/api/v1/life-spheres").exchange().expectStatus().isOk().expectBodyList(LifeSphereController.LifeSphereResponse.class).hasSize(9);
+        adminClient.get().uri("/api/v1/life-spheres").exchange().expectStatus().isOk().expectBodyList(LifeSphereResponse.class).hasSize(9);
     }
 
     @Test
     void unauthenticated_access_rejected() {
         webTestClient.get().uri("/api/v1/life-spheres").exchange().expectStatus().isForbidden();
-        webTestClient.post().uri("/api/v1/life-spheres").bodyValue(new LifeSphereController.CreateLifeSphereRequest()).exchange().expectStatus().isForbidden();
-        webTestClient.put().uri("/api/v1/life-spheres/1").bodyValue(new LifeSphereController.UpdateLifeSphereRequest()).exchange().expectStatus().isForbidden();
+        webTestClient.post().uri("/api/v1/life-spheres").bodyValue(new CreateLifeSphereRequest(null, null)).exchange().expectStatus().isForbidden();
+        webTestClient.put().uri("/api/v1/life-spheres/1").bodyValue(new UpdateLifeSphereRequest(null, null)).exchange().expectStatus().isForbidden();
         webTestClient.delete().uri("/api/v1/life-spheres/1").exchange().expectStatus().isForbidden();
     }
 }

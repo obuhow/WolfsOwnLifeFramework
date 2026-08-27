@@ -1,3 +1,20 @@
+/*
+ * WOLF — Wolf's Own Life Framework
+ * Copyright (C) 2025 Pavel Obukhov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package ru.wolf.api.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -9,8 +26,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
-import ru.wolf.api.lifearea.LifeAreaController;
+import ru.wolf.api.lifearea.dto.*;
 import ru.wolf.api.lifearea.LifeAreaRepository;
+import ru.wolf.api.project.dto.*;
 import ru.wolf.api.support.ApiIntegrationTest;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
@@ -63,7 +81,7 @@ class ProjectApiIT extends ApiIntegrationTest {
                 .uri("/api/v1/projects")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(ProjectController.ProjectResponse.class)
+                .expectBodyList(ProjectResponse.class)
                 .hasSize(0);
     }
 
@@ -72,32 +90,27 @@ class ProjectApiIT extends ApiIntegrationTest {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
 
-        var req = new ProjectController.CreateProjectRequest();
-        req.setLifeAreaId(areaId);
-        req.setTitle("WOLF 0.1");
-        req.setDescription("Календарная ОС");
-        req.setStartDate(LocalDate.of(2026, 8, 1));
-        req.setEndDate(LocalDate.of(2026, 9, 30));
-        req.setTotalPlanHours(new BigDecimal("40.00"));
+        var req = new CreateProjectRequest(areaId, null, "WOLF 0.1", null, "Календарная ОС",
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30), new BigDecimal("40.00"), null);
 
-        ProjectController.ProjectResponse created = authed.post()
+        ProjectResponse created = authed.post()
                 .uri("/api/v1/projects")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(created).isNotNull();
-        assertThat(created.getId()).isNotNull();
-        assertThat(created.getLifeAreaId()).isEqualTo(areaId);
-        assertThat(created.getParentId()).isNull();
-        assertThat(created.getTitle()).isEqualTo("WOLF 0.1");
-        assertThat(created.getDescription()).isEqualTo("Календарная ОС");
-        assertThat(created.getStartDate()).isEqualTo(LocalDate.of(2026, 8, 1));
-        assertThat(created.getEndDate()).isEqualTo(LocalDate.of(2026, 9, 30));
-        assertThat(created.getTotalPlanHours()).isEqualByComparingTo("40.00");
+        assertThat(created.id()).isNotNull();
+        assertThat(created.lifeAreaId()).isEqualTo(areaId);
+        assertThat(created.parentId()).isNull();
+        assertThat(created.title()).isEqualTo("WOLF 0.1");
+        assertThat(created.description()).isEqualTo("Календарная ОС");
+        assertThat(created.startDate()).isEqualTo(LocalDate.of(2026, 8, 1));
+        assertThat(created.endDate()).isEqualTo(LocalDate.of(2026, 9, 30));
+        assertThat(created.totalPlanHours()).isEqualByComparingTo("40.00");
     }
 
     @Test
@@ -105,17 +118,17 @@ class ProjectApiIT extends ApiIntegrationTest {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
 
-        ProjectController.ProjectResponse root = createProject(authed, areaId, null, "Корень");
-        ProjectController.ProjectResponse child = createProject(authed, areaId, root.getId(), "Подпроект");
+        ProjectResponse root = createProject(authed, areaId, null, "Корень");
+        ProjectResponse child = createProject(authed, areaId, root.id(), "Подпроект");
 
-        assertThat(child.getParentId()).isEqualTo(root.getId());
-        assertThat(child.getLifeAreaId()).isEqualTo(areaId);
+        assertThat(child.parentId()).isEqualTo(root.id());
+        assertThat(child.lifeAreaId()).isEqualTo(areaId);
 
-        List<ProjectController.ProjectResponse> all = authed.get()
+        List<ProjectResponse> all = authed.get()
                 .uri("/api/v1/projects")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(ProjectController.ProjectResponse.class)
+                .expectBodyList(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -131,69 +144,63 @@ class ProjectApiIT extends ApiIntegrationTest {
         createProject(authed, workId, null, "API");
         createProject(authed, healthId, null, "Бег");
 
-        List<ProjectController.ProjectResponse> workProjects = authed.get()
+        List<ProjectResponse> workProjects = authed.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/v1/projects").queryParam("lifeAreaId", workId).build())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(ProjectController.ProjectResponse.class)
+                .expectBodyList(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(workProjects).hasSize(1);
-        assertThat(workProjects.get(0).getTitle()).isEqualTo("API");
+        assertThat(workProjects.get(0).title()).isEqualTo("API");
     }
 
     @Test
     void get_project_detail_has_placeholders() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse created = createProject(authed, areaId, null, "WOLF");
+        ProjectResponse created = createProject(authed, areaId, null, "WOLF");
 
-        ProjectController.ProjectDetailResponse detail = authed.get()
-                .uri("/api/v1/projects/{id}", created.getId())
+        ProjectDetailResponse detail = authed.get()
+                .uri("/api/v1/projects/{id}", created.id())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectDetailResponse.class)
+                .expectBody(ProjectDetailResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(detail).isNotNull();
-        assertThat(detail.getTitle()).isEqualTo("WOLF");
-        assertThat(detail.getLifeAreaName()).isEqualTo("Работа");
-        assertThat(detail.getDelos()).isEmpty();
-        assertThat(detail.getAggregates()).isNotNull();
-        assertThat(detail.getAggregates().getTotalFactHours()).isEqualByComparingTo("0.00");
-        assertThat(detail.getAggregates().getByDay()).isEmpty();
+        assertThat(detail.title()).isEqualTo("WOLF");
+        assertThat(detail.lifeAreaName()).isEqualTo("Работа");
+        assertThat(detail.delos()).isEmpty();
+        assertThat(detail.aggregates()).isNotNull();
+        assertThat(detail.aggregates().getTotalFactHours()).isEqualByComparingTo("0.00");
+        assertThat(detail.aggregates().getByDay()).isEmpty();
     }
 
     @Test
     void update_project_fields_and_parent() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse root = createProject(authed, areaId, null, "Корень");
-        ProjectController.ProjectResponse child = createProject(authed, areaId, null, "Лист");
+        ProjectResponse root = createProject(authed, areaId, null, "Корень");
+        ProjectResponse child = createProject(authed, areaId, null, "Лист");
 
-        var update = new ProjectController.UpdateProjectRequest();
-        update.setLifeAreaId(areaId);
-        update.setParentId(root.getId());
-        update.setTitle("Лист v2");
-        update.setDescription("Описание");
-        update.setStartDate(LocalDate.of(2026, 1, 1));
-        update.setEndDate(LocalDate.of(2026, 6, 1));
-        update.setTotalPlanHours(new BigDecimal("12.5"));
+        var update = new UpdateProjectRequest(areaId, root.id(), "Лист v2", null, "Описание",
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 1), new BigDecimal("12.5"), null);
 
-        ProjectController.ProjectResponse updated = authed.put()
-                .uri("/api/v1/projects/{id}", child.getId())
+        ProjectResponse updated = authed.put()
+                .uri("/api/v1/projects/{id}", child.id())
                 .bodyValue(update)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(updated.getTitle()).isEqualTo("Лист v2");
-        assertThat(updated.getParentId()).isEqualTo(root.getId());
-        assertThat(updated.getTotalPlanHours()).isEqualByComparingTo("12.5");
+        assertThat(updated.title()).isEqualTo("Лист v2");
+        assertThat(updated.parentId()).isEqualTo(root.id());
+        assertThat(updated.totalPlanHours()).isEqualByComparingTo("12.5");
     }
 
     @Test
@@ -201,12 +208,9 @@ class ProjectApiIT extends ApiIntegrationTest {
         WebTestClient authed = authedAdminClient();
         Long workId = createLifeArea(authed, "Работа");
         Long healthId = createLifeArea(authed, "Здоровье");
-        ProjectController.ProjectResponse workRoot = createProject(authed, workId, null, "API");
+        ProjectResponse workRoot = createProject(authed, workId, null, "API");
 
-        var req = new ProjectController.CreateProjectRequest();
-        req.setLifeAreaId(healthId);
-        req.setParentId(workRoot.getId());
-        req.setTitle("Неверно");
+        var req = new CreateProjectRequest(healthId, workRoot.id(), "Неверно", null, null, null, null, null, null);
 
         authed.post()
                 .uri("/api/v1/projects")
@@ -219,18 +223,15 @@ class ProjectApiIT extends ApiIntegrationTest {
     void reject_cycle_when_setting_parent() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse a = createProject(authed, areaId, null, "A");
-        ProjectController.ProjectResponse b = createProject(authed, areaId, a.getId(), "B");
-        ProjectController.ProjectResponse c = createProject(authed, areaId, b.getId(), "C");
+        ProjectResponse a = createProject(authed, areaId, null, "A");
+        ProjectResponse b = createProject(authed, areaId, a.id(), "B");
+        ProjectResponse c = createProject(authed, areaId, b.id(), "C");
 
         // try make A child of C → cycle
-        var update = new ProjectController.UpdateProjectRequest();
-        update.setLifeAreaId(areaId);
-        update.setParentId(c.getId());
-        update.setTitle("A");
+        var update = new UpdateProjectRequest(areaId, c.id(), "A", null, null, null, null, null, null);
 
         authed.put()
-                .uri("/api/v1/projects/{id}", a.getId())
+                .uri("/api/v1/projects/{id}", a.id())
                 .bodyValue(update)
                 .exchange()
                 .expectStatus().isBadRequest();
@@ -240,70 +241,70 @@ class ProjectApiIT extends ApiIntegrationTest {
     void project_dependencies_list_add_and_delete() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse blocker = createProject(authed, areaId, null, "Блокер");
-        ProjectController.ProjectResponse blocked = createProject(authed, areaId, null, "Зависимый");
+        ProjectResponse blocker = createProject(authed, areaId, null, "Блокер");
+        ProjectResponse blocked = createProject(authed, areaId, null, "Зависимый");
 
-        ProjectDependencyController.DependenciesResponse response = authed.post()
-                .uri("/api/v1/projects/{id}/dependencies", blocked.getId())
-                .bodyValue(new ProjectDependencyController.AddDependencyRequest(blocker.getId()))
+        DependenciesResponse response = authed.post()
+                .uri("/api/v1/projects/{id}/dependencies", blocked.id())
+                .bodyValue(new AddDependencyRequest(blocker.id()))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectDependencyController.DependenciesResponse.class)
+                .expectBody(DependenciesResponse.class)
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(response.blockedBy()).extracting(ProjectDependencyController.ProjectSummary::title)
+        assertThat(response.blockedBy()).extracting(ProjectSummary::title)
                 .containsExactly("Блокер");
         assertThat(response.blocks()).isEmpty();
 
         authed.get()
-                .uri("/api/v1/projects/{id}/dependencies", blocker.getId())
+                .uri("/api/v1/projects/{id}/dependencies", blocker.id())
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectDependencyController.DependenciesResponse.class)
+                .expectBody(DependenciesResponse.class)
                 .value(body -> assertThat(body.blocks())
-                        .extracting(ProjectDependencyController.ProjectSummary::title)
+                        .extracting(ProjectSummary::title)
                         .containsExactly("Зависимый"));
 
         authed.delete()
-                .uri("/api/v1/projects/{id}/dependencies/{blockerId}", blocked.getId(), blocker.getId())
+                .uri("/api/v1/projects/{id}/dependencies/{blockerId}", blocked.id(), blocker.id())
                 .exchange()
                 .expectStatus().isNoContent();
 
-        addDependency(authed, blocked.getId(), blocker.getId());
+        addDependency(authed, blocked.id(), blocker.id());
     }
 
     @Test
     void delete_dependency_allows_chain_rewire() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse a = createProject(authed, areaId, null, "A");
-        ProjectController.ProjectResponse b = createProject(authed, areaId, null, "B");
-        ProjectController.ProjectResponse c = createProject(authed, areaId, null, "C");
+        ProjectResponse a = createProject(authed, areaId, null, "A");
+        ProjectResponse b = createProject(authed, areaId, null, "B");
+        ProjectResponse c = createProject(authed, areaId, null, "C");
 
-        addDependency(authed, b.getId(), a.getId());
-        addDependency(authed, c.getId(), b.getId());
+        addDependency(authed, b.id(), a.id());
+        addDependency(authed, c.id(), b.id());
 
         authed.delete()
-                .uri("/api/v1/projects/{id}/dependencies/{blockerId}", c.getId(), b.getId())
+                .uri("/api/v1/projects/{id}/dependencies/{blockerId}", c.id(), b.id())
                 .exchange()
                 .expectStatus().isNoContent();
 
-        addDependency(authed, c.getId(), a.getId());
+        addDependency(authed, c.id(), a.id());
     }
 
     @Test
     void reject_direct_dependency_cycle_with_path() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse a = createProject(authed, areaId, null, "A");
-        ProjectController.ProjectResponse b = createProject(authed, areaId, null, "B");
+        ProjectResponse a = createProject(authed, areaId, null, "A");
+        ProjectResponse b = createProject(authed, areaId, null, "B");
 
-        addDependency(authed, b.getId(), a.getId());
+        addDependency(authed, b.id(), a.id());
 
         String message = authed.post()
-                .uri("/api/v1/projects/{id}/dependencies", a.getId())
-                .bodyValue(new ProjectDependencyController.AddDependencyRequest(b.getId()))
+                .uri("/api/v1/projects/{id}/dependencies", a.id())
+                .bodyValue(new AddDependencyRequest(b.id()))
                 .exchange()
                 .expectStatus().isEqualTo(409)
                 .expectBody(Map.class)
@@ -319,16 +320,16 @@ class ProjectApiIT extends ApiIntegrationTest {
     void reject_dependency_cycle_with_path() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse a = createProject(authed, areaId, null, "A");
-        ProjectController.ProjectResponse b = createProject(authed, areaId, null, "B");
-        ProjectController.ProjectResponse c = createProject(authed, areaId, null, "C");
+        ProjectResponse a = createProject(authed, areaId, null, "A");
+        ProjectResponse b = createProject(authed, areaId, null, "B");
+        ProjectResponse c = createProject(authed, areaId, null, "C");
 
-        addDependency(authed, b.getId(), a.getId());
-        addDependency(authed, c.getId(), b.getId());
+        addDependency(authed, b.id(), a.id());
+        addDependency(authed, c.id(), b.id());
 
         String message = authed.post()
-                .uri("/api/v1/projects/{id}/dependencies", a.getId())
-                .bodyValue(new ProjectDependencyController.AddDependencyRequest(c.getId()))
+                .uri("/api/v1/projects/{id}/dependencies", a.id())
+                .bodyValue(new AddDependencyRequest(c.id()))
                 .exchange()
                 .expectStatus().isEqualTo(409)
                 .expectBody(Map.class)
@@ -345,11 +346,8 @@ class ProjectApiIT extends ApiIntegrationTest {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
 
-        var req = new ProjectController.CreateProjectRequest();
-        req.setLifeAreaId(areaId);
-        req.setTitle("Плохие даты");
-        req.setStartDate(LocalDate.of(2026, 6, 1));
-        req.setEndDate(LocalDate.of(2026, 1, 1));
+        var req = new CreateProjectRequest(areaId, null, "Плохие даты", null, null,
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 1, 1), null, null);
 
         authed.post()
                 .uri("/api/v1/projects")
@@ -362,9 +360,7 @@ class ProjectApiIT extends ApiIntegrationTest {
     void reject_unknown_life_area() {
         WebTestClient authed = authedAdminClient();
 
-        var req = new ProjectController.CreateProjectRequest();
-        req.setLifeAreaId(99999L);
-        req.setTitle("Сирота");
+        var req = new CreateProjectRequest(99999L, null, "Сирота", null, null, null, null, null, null);
 
         authed.post()
                 .uri("/api/v1/projects")
@@ -377,11 +373,11 @@ class ProjectApiIT extends ApiIntegrationTest {
     void delete_project_cascades_children() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
-        ProjectController.ProjectResponse root = createProject(authed, areaId, null, "Корень");
-        createProject(authed, areaId, root.getId(), "Дитя");
+        ProjectResponse root = createProject(authed, areaId, null, "Корень");
+        createProject(authed, areaId, root.id(), "Дитя");
 
         authed.delete()
-                .uri("/api/v1/projects/{id}", root.getId())
+                .uri("/api/v1/projects/{id}", root.id())
                 .exchange()
                 .expectStatus().isNoContent();
 
@@ -389,7 +385,7 @@ class ProjectApiIT extends ApiIntegrationTest {
                 .uri("/api/v1/projects")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(ProjectController.ProjectResponse.class)
+                .expectBodyList(ProjectResponse.class)
                 .hasSize(0);
     }
 
@@ -414,21 +410,21 @@ class ProjectApiIT extends ApiIntegrationTest {
                 .build();
 
         Long area2 = createLifeArea(client2, "Работа user2");
-        ProjectController.ProjectResponse p2 = createProject(client2, area2, null, "Проект user2");
+        ProjectResponse p2 = createProject(client2, area2, null, "Проект user2");
 
         client2.get()
                 .uri("/api/v1/projects")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(ProjectController.ProjectResponse.class)
+                .expectBodyList(ProjectResponse.class)
                 .hasSize(1);
 
         admin.get()
                 .uri("/api/v1/projects")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(ProjectController.ProjectResponse.class)
-                .value(list -> assertThat(list).extracting(ProjectController.ProjectResponse::getTitle)
+                .expectBodyList(ProjectResponse.class)
+                .value(list -> assertThat(list).extracting(ProjectResponse::title)
                         .containsExactly("Секрет admin"));
 
         // user2 cannot read admin's project by id
@@ -436,11 +432,11 @@ class ProjectApiIT extends ApiIntegrationTest {
                 .uri("/api/v1/projects")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBodyList(ProjectController.ProjectResponse.class)
+                .expectBodyList(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody()
                 .get(0)
-                .getId();
+                .id();
 
         client2.get()
                 .uri("/api/v1/projects/{id}", adminProjectId)
@@ -462,53 +458,48 @@ class ProjectApiIT extends ApiIntegrationTest {
                 .expectStatus().isBadRequest();
 
         // sanity: own project still there
-        assertThat(p2.getTitle()).isEqualTo("Проект user2");
+        assertThat(p2.title()).isEqualTo("Проект user2");
     }
 
     @Test
     void unauthenticated_access_rejected() {
         webTestClient.get().uri("/api/v1/projects").exchange().expectStatus().isForbidden();
         webTestClient.post().uri("/api/v1/projects")
-                .bodyValue(new ProjectController.CreateProjectRequest())
+                .bodyValue(new CreateProjectRequest(null, null, null, null, null, null, null, null, null))
                 .exchange().expectStatus().isForbidden();
         webTestClient.get().uri("/api/v1/projects/1").exchange().expectStatus().isForbidden();
         webTestClient.put().uri("/api/v1/projects/1")
-                .bodyValue(new ProjectController.UpdateProjectRequest())
+                .bodyValue(new UpdateProjectRequest(null, null, null, null, null, null, null, null, null))
                 .exchange().expectStatus().isForbidden();
         webTestClient.delete().uri("/api/v1/projects/1").exchange().expectStatus().isForbidden();
     }
 
     private Long createLifeArea(WebTestClient client, String name) {
-        var req = new LifeAreaController.CreateLifeAreaRequest();
-        req.setName(name);
-        req.setColor("#3d5a4a");
-        LifeAreaController.LifeAreaResponse created = client.post()
+        var req = new CreateLifeAreaRequest(name, "#3d5a4a");
+        LifeAreaResponse areaResp = client.post()
                 .uri("/api/v1/life-areas")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(LifeAreaController.LifeAreaResponse.class)
+                .expectBody(LifeAreaResponse.class)
                 .returnResult()
                 .getResponseBody();
-        return created.getId();
+        return areaResp.id();
     }
 
-    private ProjectController.ProjectResponse createProject(
+    private ProjectResponse createProject(
             WebTestClient client,
             Long lifeAreaId,
             Long parentId,
             String title
     ) {
-        var req = new ProjectController.CreateProjectRequest();
-        req.setLifeAreaId(lifeAreaId);
-        req.setParentId(parentId);
-        req.setTitle(title);
+        var req = new CreateProjectRequest(lifeAreaId, parentId, title, null, null, null, null, null, null);
         return client.post()
                 .uri("/api/v1/projects")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ProjectController.ProjectResponse.class)
+                .expectBody(ProjectResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
@@ -516,7 +507,7 @@ class ProjectApiIT extends ApiIntegrationTest {
     private void addDependency(WebTestClient client, Long blockedId, Long blockerId) {
         client.post()
                 .uri("/api/v1/projects/{id}/dependencies", blockedId)
-                .bodyValue(new ProjectDependencyController.AddDependencyRequest(blockerId))
+                .bodyValue(new AddDependencyRequest(blockerId))
                 .exchange()
                 .expectStatus().isOk();
     }

@@ -1,0 +1,21 @@
+# Root build context is used by the `api` compose service so that repo-root
+# assets/ (single source of truth for demo profile JSON, ticket 01) is visible
+# to the Gradle build. Keep the context small: exclude everything the API build
+# does not need.
+.git
+.github
+.hermes
+.scratch
+.worktrees
+ref
+scripts
+testing
+docs
+docs-site
+web
+node_modules
+**/node_modules
+**/build
+**/.gradle
+*.csv
+.~lock.*

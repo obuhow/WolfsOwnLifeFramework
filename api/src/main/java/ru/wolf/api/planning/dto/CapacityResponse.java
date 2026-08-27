@@ -1,0 +1,1 @@
+package ru.wolf.api.planning.dto; import java.math.BigDecimal; public record CapacityResponse(String weekId,BigDecimal plannedHours,BigDecimal routineHours,BigDecimal availableHours,BigDecimal delta) {}

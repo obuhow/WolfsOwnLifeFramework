@@ -120,6 +120,16 @@ textarea:focus-visible,
   letter-spacing: 0.5px;
 }
 
+/* Версия сборки (релиз 0.6, тикет 08) — тихий контракт 0.3:
+   приглушённый цвет тэглайна, мелкий кегль, без бейджа и фона. */
+.brand-version {
+  color: var(--wolf-muted);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
 .brand-container-sm {
   display: flex;
   flex-direction: row;
@@ -141,6 +151,14 @@ textarea:focus-visible,
   font-size: 10px;
   line-height: 1;
   letter-spacing: 0.4px;
+}
+
+.brand-version-sm {
+  color: var(--wolf-muted);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.4px;
+  font-variant-numeric: tabular-nums;
 }
 
 .nav {
@@ -213,6 +231,17 @@ textarea:focus-visible,
 .nav-submenu-link:hover { color: var(--wolf-ink); }
 .nav-submenu-link.active { color: var(--wolf-ink); font-weight: 600; }
 
+.nav-submenu-grouped { min-width: 230px; }
+.nav-subgroup { padding: 6px 0; }
+.nav-subgroup + .nav-subgroup { border-top: 1px solid var(--wolf-subrule); }
+.nav-subgroup-title {
+  padding: 6px 0 2px;
+  color: var(--wolf-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .header-right {
   display: inline-flex;
   align-items: center;
@@ -229,6 +258,7 @@ textarea:focus-visible,
 
 .user-name { color: var(--wolf-muted); font-size: 12px; }
 .logout-btn { min-height: auto; }
+.tour-btn { min-height: auto; }
 
 /* Mobile menu trigger — hidden on desktop */
 .menu-trigger {
@@ -309,6 +339,15 @@ textarea:focus-visible,
 }
 .drawer-submenu-link:last-child { border-bottom: 0; }
 .drawer-submenu-link.active { color: var(--wolf-ink); font-weight: 600; }
+
+.drawer-subgroup + .drawer-subgroup { margin-top: 6px; }
+.drawer-subgroup-title {
+  padding: 8px 0 2px;
+  color: var(--wolf-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 
 .drawer-foot {
   display: flex;
