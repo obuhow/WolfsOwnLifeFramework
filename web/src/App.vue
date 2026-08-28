@@ -21,6 +21,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { apiBase } from './api'
 import { tourActive, startTour } from './onboardingTour'
 import OnboardingTour from './components/OnboardingTour.vue'
+import ImportChatPanel from './components/ImportChatPanel.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -150,6 +151,11 @@ const drawerOpen = ref(false)
 const expandedGroups = ref({})
 const drawerEl = ref(null)
 const menuTriggerEl = ref(null)
+
+// --- Chat-panel import (release 0.7, ticket 02) ----------------------------
+const importOpen = ref(false)
+function toggleImport() { importOpen.value = !importOpen.value }
+function closeImport() { importOpen.value = false }
 
 function openDrawer() {
   drawerOpen.value = true
@@ -464,6 +470,32 @@ onBeforeUnmount(() => {
         <router-view />
       </main>
 
+      <!-- Чат-панель импорта записей (релиз 0.7, тикет 02): плавающая кнопка
+           открывает карточку предпросмотра поверх основного контента. -->
+      <button
+        v-if="token && !isOnboarding"
+        type="button"
+        class="import-fab"
+        :class="{ active: importOpen }"
+        :aria-expanded="importOpen ? 'true' : 'false'"
+        aria-label="Импорт записей"
+        title="Импорт записей"
+        @click="toggleImport"
+      >
+        <span aria-hidden="true">＋</span>
+      </button>
+
+      <transition name="import-slide">
+        <aside
+          v-if="token && !isOnboarding && importOpen"
+          class="import-dock"
+          aria-label="Карточка импорта записей"
+        >
+          <button type="button" class="import-dock-close" aria-label="Закрыть" @click="closeImport">✕</button>
+          <ImportChatPanel />
+        </aside>
+      </transition>
+
       <!-- Тур Знакомства (релиз 0.6, тикет 03) — поверх реальной оболочки,
            потому что подсвечивает настоящие пункты NAV, а не их копии. -->
       <OnboardingTour v-if="tourActive" />
@@ -474,3 +506,51 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Чат-панель импорта записей (релиз 0.7, тикет 02) — плавающая кнопка + док.
+   «Тихий» вид: без ярких рамок, цвета из темы интерфейса. */
+.import-fab {
+  position: fixed;
+  right: 1.4rem;
+  bottom: 1.4rem;
+  z-index: 40;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 1px solid var(--border, #e6dfd4);
+  background: var(--card, #fffdf9);
+  color: var(--accent, #9a7b4f);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+.import-fab:hover, .import-fab.active { background: var(--accent, #9a7b4f); color: #fff; }
+
+.import-dock {
+  position: fixed;
+  right: 1.4rem;
+  bottom: 4.6rem;
+  z-index: 41;
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+}
+.import-dock-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground, #756d64);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.import-slide-enter-active, .import-slide-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.import-slide-enter-from, .import-slide-leave-to { opacity: 0; transform: translateY(8px); }
+</style>
+

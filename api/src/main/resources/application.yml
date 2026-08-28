@@ -35,6 +35,15 @@ wolf:
     max-live-accounts: 200
     ttl-hours: 24
     gc-enabled: false
+  telegram:
+    # Telegram import channel (release 0.7, ticket 03). Set via env in prod.
+    bot-username: ${WOLF_TELEGRAM_BOT_USERNAME:}
+    bot-token: ${WOLF_TELEGRAM_BOT_TOKEN:}
+    secret-token: ${WOLF_TELEGRAM_SECRET_TOKEN:}
+    api-base: ${WOLF_TELEGRAM_API_BASE:https://api.telegram.org}
+  import-bot:
+    # Per-user daily cap on LLM parse requests across all import channels (point 6).
+    daily-limit-per-user: ${WOLF_IMPORT_BOT_DAILY_LIMIT:20}
 
 server:
   port: ${SERVER_PORT:8082}
