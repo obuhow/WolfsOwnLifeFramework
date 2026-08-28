@@ -1,6 +1,6 @@
 # Канал чат-панель: карточка предпросмотра и подтверждение
 
-Status: open
+Status: resolved
 Blocked by: 01
 
 ## Question
@@ -26,3 +26,30 @@ Blocked by: 01
 ## Out of Scope
 
 Telegram и Max каналы (тикеты 03, 04) — используют тот же бэкенд-контракт, но не эту UI-реализацию.
+
+## Answer
+
+Реализован первый (приоритетный) канал импорта — чат-панель (ветка `release-0.7/feature/02-chat-panel-channel`, от тикета 01, **не слита в `develop`** — каденция new-feature релиза: ветки держим до завершения релиза).
+
+**Бэкенд (поверх `ImportParserService` из тикета 01):**
+- `ImportController` (`/api/v1/import`): `POST /parse` (делегирует `ImportParserService.parse`) и `POST /confirm` (делегирует `ImportConfirmService.confirm`). Контроллер — только HTTP: `@AuthenticationPrincipal User` (инфраструктурный бин Spring Security, не Repository), без бизнес-логики, без `@Repository`.
+- `ImportConfirmService` — единая точка записи канала; делегирует существующим сервисам (`DeloService`/`ProjectService`/`RoutineService`/`RecurrenceService`), чтобы их бизнес-правила остались авторитетными. Создаёт Дело/Проект/Рутину/повторение из подтверждённых кандидатов.
+- DTO-records в `importer/dto`: `ParseImportRequest`, `ConfirmCandidate`, `ConfirmImportRequest`, `CreatedEntity`, `ConfirmImportResponse`.
+
+**Решения по тикету:**
+- Занятый слот — всегда `CREATE_OVER` (параллельный интервал, дефолтная модель WOLF `PARALLEL_SLOTS`); фронт показывает одну поясняющую строку, три кнопки-варианта не нужны (решено с владельцем).
+- Проект бота кладётся в собственную LifeArea «Импорт» (`findByUserAndNameIgnoreCase`, иначе создаётся) — NOT NULL у `life_area_id` закрыт.
+- `unparsed` — бот отвечает одним уточняющим вопросом текстом, сущности не создаются (`ParseResult.unparsed`).
+- `projectRef` («в проекте X») резолвится по имени и линкуется к Делу.
+
+**Фронтенд:**
+- `ImportChatPanel.vue` — самостоятельный компонент карточки предпросмотра в «тихом контракте 0.3»: без ярких рамок/иконок; CONFIDENT-поля заполнены сразу, NEEDS_CONFIRMATION — приглушённым (курсив, не красным) текстом; несколько кандидатов — одна общая карточка с одним подтверждением.
+- Точка входа: плавающая кнопка «＋» в `App.vue` открывает док поверх контента + маршрут `/import/chat` в `main.js`. Тема — через CSS-переменные интерфейса.
+
+**Проверки (минимальные, полное IT-тестирование — после завершения релиза 0.7 согласно договорённости):**
+- `./gradlew clean compileJava compileTestJava` — BUILD SUCCESSFUL.
+- 7 DB-free unit-тестов `ImportConfirmServiceTest` (Mockito, без Spring-контекста): Дело без start не создаёт TimeEntry; Дело со start → параллельный слот (floor до 15 мин, статус DONE для прошлого); projectRef линкуется; Проект в LifeArea «Импорт»; RECURRENCE → `RecurrenceService.apply`; Рутина → `RoutineService.create`; пустой title пропускается. BUILD SUCCESSFUL.
+- `vite build` (web) — BUILD SUCCESSFUL, компонент попал в `web/dist` (бандл содержит «Импорт записей»).
+- Структурные: `ImportController` не инжектит Repository; `ImportConfirmService` без веб-аннотаций (`@RestController`/`@RequestMapping`/…); все 9 DTO в `importer/dto` — records (плюс 3 enums).
+
+**Не сделано (в скоупе других тикетов / после релиза):** полные `*ApiIT`-фикстуры примеров А/Б в браузере, ручная приёмка чат-панели, лимит LLM для гостей демо (тикеты 03/04 — Telegram/Max), слияние в `develop` и редеплой.

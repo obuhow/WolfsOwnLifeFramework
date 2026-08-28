@@ -49,6 +49,7 @@ import WaveStatsView from './components/WaveStatsView.vue'
 import ChecklistReportView from './components/ChecklistReportView.vue'
 import DataSyncView from './components/DataSyncView.vue'
 import BacklogView from './components/BacklogView.vue'
+import ImportChatPanel from './components/ImportChatPanel.vue'
 import SpheresView from './components/SpheresView.vue'
 import PlaceholderView from './components/PlaceholderView.vue'
 import DocsIndexView from './components/docs/DocsIndexView.vue'
@@ -113,6 +114,9 @@ const routes = [
   { path: '/admin/invites', component: AdminInvitesView, meta: { requiresAuth: true } },
   { path: '/import/xlsx', component: XlsxImportView, meta: { requiresAuth: true } },
   { path: '/data-sync', component: DataSyncView, meta: { requiresAuth: true } },
+  // Релиз 0.7, тикет 02: канал чат-панели импорта записей (плавающая панель в
+  // App.vue, маршрут — для прямой ссылки / открытия в основной области).
+  { path: '/import/chat', component: ImportChatPanel, meta: { requiresAuth: true } },
   // Документация — доступна без аутентификации (см. тикет 02 релиза 0.5)
   { path: '/docs', component: DocsIndexView, meta: { public: true } },
   { path: '/docs/manifesto', component: ManifestoView, meta: { public: true } },
