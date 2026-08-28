@@ -28,6 +28,7 @@ import { computed, onMounted, onBeforeUnmount, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiBase, authHeaders } from '../api'
 import { useLoadChartWrite } from '../loadChartsWrite'
+import CurvesTab from './CurvesTab.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -168,7 +169,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <!-- Панели вкладок. В этом тикете — заглушки; контент приходит тикетами 03–05. -->
+      <!-- Панели вкладок. Кривые (03) реализованы; Бюджет/Лестница/Очередь — тикеты 04/05. -->
       <div
         v-for="t in TABS"
         v-show="activeTab === t.key"
@@ -178,7 +179,8 @@ onBeforeUnmount(() => {
         role="tabpanel"
         :aria-labelledby="`load-chart-tab-${t.key}`"
       >
-        <p class="chart-placeholder muted">подключается в тикете {{ t.ticket }}</p>
+        <CurvesTab v-if="t.key === 'curves'" />
+        <p v-else class="chart-placeholder muted">подключается в тикете {{ t.ticket }}</p>
       </div>
     </div>
   </section>
