@@ -41,13 +41,15 @@ public interface DeloProjectRepository extends JpaRepository<DeloProject, DeloPr
             """)
     List<DeloProject> findByProjectId(@Param("projectId") Long projectId);
 
-    @Query("""
-            SELECT dp FROM DeloProject dp
-            JOIN FETCH dp.project
-            WHERE dp.delo.id = :deloId
-            ORDER BY dp.project.title ASC
-            """)
+    @Query("SELECT dp FROM DeloProject dp JOIN FETCH dp.project WHERE dp.delo.id = :deloId ORDER BY dp.project.title ASC")
     List<DeloProject> findByDeloId(@Param("deloId") Long deloId);
+
+    /** Число Дел проекта с учётом режима учёта часов (release 0.8). */
+    @Query("SELECT COUNT(dp) FROM DeloProject dp WHERE dp.project.id = :projectId")
+    long countByProjectId(@Param("projectId") Long projectId);
+
+    @Query("SELECT COUNT(dp) FROM DeloProject dp WHERE dp.project.id = :projectId AND dp.isPrimary = true")
+    long countPrimaryByProjectId(@Param("projectId") Long projectId);
 
     /**
      * Связка Дело↔Проект своего user_id не имеет — чистится через владельца Дела.

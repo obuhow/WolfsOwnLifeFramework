@@ -8,30 +8,31 @@
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * but WITHOUT ANY WARRANTY; without even implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not see <https://www.gnu.org/licenses/>.
  */
-package ru.wolf.api.user.dto;
+package ru.wolf.api.loadcharts.dto;
 
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
+import ru.wolf.api.routine.Routine;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
-public record UpdateSettingsRequest(
-        @NotBlank String timezone,
-        @NotBlank String nightStart,
-        @NotBlank String nightEnd,
-        /** Optional for backward compat; default 02:00 on entity */
-        String dayEnd,
-        String defaultSleepEnd,
-        @NotBlank String hourAccountingMode,
-        String timeCaptureMode,
-        @DecimalMin(value = "0.0", inclusive = true) BigDecimal availableWeeklyHours,
-        @DecimalMin(value = "0.0", inclusive = false) BigDecimal hoursPerDelo
+/** Рутина в суммарной загрузке (release 0.8). Дорожек и прогноза финиша не имеет. */
+public record LoadChartsRoutineResponse(
+        Long id,
+        String title,
+        BigDecimal weeklyHours
 ) {
+    public static LoadChartsRoutineResponse from(Routine r) {
+        return new LoadChartsRoutineResponse(
+                r.getId(),
+                r.getTitle(),
+                r.getWeeklyHours() == null ? null : r.getWeeklyHours().setScale(2, RoundingMode.HALF_UP)
+        );
+    }
 }

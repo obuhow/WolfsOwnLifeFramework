@@ -79,6 +79,11 @@ public class User implements UserDetails {
     @Column(name = "available_weekly_hours", nullable = false, precision = 6, scale = 2)
     private java.math.BigDecimal availableWeeklyHours = java.math.BigDecimal.valueOf(30);
 
+    /** «Часов на одно Дело» — оценка для проектов без заданного объёма (release 0.8). */
+    @Builder.Default
+    @Column(name = "hours_per_delo", nullable = false, precision = 5, scale = 2)
+    private java.math.BigDecimal hoursPerDelo = java.math.BigDecimal.valueOf(1.5);
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private java.time.Instant createdAt;
 

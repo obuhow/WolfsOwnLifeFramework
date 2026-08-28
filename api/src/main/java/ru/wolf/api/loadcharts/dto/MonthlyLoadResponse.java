@@ -8,30 +8,27 @@
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * but WITHOUT ANY WARRANTY; without even implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not see <https://www.gnu.org/licenses/>.
  */
-package ru.wolf.api.user.dto;
-
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
+package ru.wolf.api.loadcharts.dto;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
-public record UpdateSettingsRequest(
-        @NotBlank String timezone,
-        @NotBlank String nightStart,
-        @NotBlank String nightEnd,
-        /** Optional for backward compat; default 02:00 on entity */
-        String dayEnd,
-        String defaultSleepEnd,
-        @NotBlank String hourAccountingMode,
-        String timeCaptureMode,
-        @DecimalMin(value = "0.0", inclusive = true) BigDecimal availableWeeklyHours,
-        @DecimalMin(value = "0.0", inclusive = false) BigDecimal hoursPerDelo
+/** Суммарная загрузка недели по месяцу горизонта (release 0.8). */
+public record MonthlyLoadResponse(
+        String month,
+        BigDecimal hours,
+        boolean overLimit
 ) {
+    public static MonthlyLoadResponse of(String month, BigDecimal hours, BigDecimal weeklyLimit) {
+        BigDecimal scaled = hours.setScale(2, RoundingMode.HALF_UP);
+        boolean over = scaled.compareTo(weeklyLimit) > 0;
+        return new MonthlyLoadResponse(month, scaled, over);
+    }
 }

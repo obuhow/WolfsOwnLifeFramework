@@ -147,6 +147,23 @@ public class GanttForecastService {
         visiting.remove(projectId);
     }
 
+    /**
+     * Накопленный факт от эпохи до «сейчас» по каждому проекту пользователя,
+     * с соблюдением режима учёта часов ({@code hourAccountingMode}).
+     * Переиспользуется release 0.8 (диаграммы нагрузки), чтобы вторая формула
+     * подсчёта факта не появилась.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, BigDecimal> accumulatedFactByProject(User user) {
+        ZoneId zone = ZoneId.of(user.getTimezone());
+        LocalDateTime accumulatedTo = LocalDateTime.now(zone);
+        LocalDateTime epoch = LocalDateTime.of(1970, 1, 1, 0, 0);
+        List<TimeEntry> allEntries = timeEntryRepository.findByUserIdAndStatusOverlapping(
+                user.getId(), TimeEntry.Status.DONE, epoch, accumulatedTo);
+        Map<Long, List<DeloProject>> linksByDelo = loadDeloLinks(allEntries, allEntries);
+        return aggregateProjectFact(user, allEntries, linksByDelo, epoch, accumulatedTo);
+    }
+
     private Map<Long, List<DeloProject>> loadDeloLinks(
             List<TimeEntry> recentEntries,
             List<TimeEntry> allEntries
@@ -163,7 +180,7 @@ public class GanttForecastService {
         return links;
     }
 
-    private Map<Long, BigDecimal> aggregateProjectFact(
+    public Map<Long, BigDecimal> aggregateProjectFact(
             User user,
             List<TimeEntry> entries,
             Map<Long, List<DeloProject>> linksByDelo,

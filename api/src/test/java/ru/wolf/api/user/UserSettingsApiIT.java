@@ -138,6 +138,51 @@ class UserSettingsApiIT extends ApiIntegrationTest {
     }
 
     @Test
+    void hours_per_delo_persisted_validated_and_default_for_new_user() {
+        WebTestClient authed = authedAdminClient();
+
+        // default 1.5 for seed admin
+        authed.get()
+                .uri("/api/v1/settings")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.hoursPerDelo").isEqualTo(1.5);
+
+        // update persists
+        var request = new java.util.HashMap<String, Object>();
+        request.put("timezone", "Europe/Moscow");
+        request.put("nightStart", "23:00:00");
+        request.put("nightEnd", "07:00:00");
+        request.put("hourAccountingMode", "PRIMARY_ONLY");
+        request.put("availableWeeklyHours", 30);
+        request.put("hoursPerDelo", 2.5);
+
+        authed.put()
+                .uri("/api/v1/settings")
+                .bodyValue(request)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.hoursPerDelo").isEqualTo(2.5);
+
+        // rejected when <= 0
+        var bad = new java.util.HashMap<String, Object>();
+        bad.put("timezone", "Europe/Moscow");
+        bad.put("nightStart", "23:00:00");
+        bad.put("nightEnd", "07:00:00");
+        bad.put("hourAccountingMode", "PRIMARY_ONLY");
+        bad.put("availableWeeklyHours", 30);
+        bad.put("hoursPerDelo", 0);
+
+        authed.put()
+                .uri("/api/v1/settings")
+                .bodyValue(bad)
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
     void unauthenticated_access_rejected() {
         webTestClient.get()
                 .uri("/api/v1/settings")

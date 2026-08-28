@@ -45,6 +45,15 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             SELECT DISTINCT p FROM Project p
             JOIN FETCH p.lifeArea
             LEFT JOIN FETCH p.parent
+            WHERE p.user = :user AND p.status = ru.wolf.api.project.Project.Status.IN_PROGRESS
+            ORDER BY p.title ASC
+            """)
+    List<Project> findInProgressByUserOrderByTitleAsc(@Param("user") User user);
+
+    @Query("""
+            SELECT DISTINCT p FROM Project p
+            JOIN FETCH p.lifeArea
+            LEFT JOIN FETCH p.parent
             WHERE p.user = :user AND p.lifeArea.id = :lifeAreaId
             ORDER BY p.title ASC
             """)
