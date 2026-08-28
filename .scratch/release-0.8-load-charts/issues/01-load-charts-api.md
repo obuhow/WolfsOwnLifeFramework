@@ -34,6 +34,22 @@ Blocks: 02, 03, 04, 05
 - Существующие `LoadCurveApiIT`, `PlanDistributionApiIT`, `RoutineApiIT` проходят **без правок их кода**.
 - Прогон по одному классу за раз (`--tests "*.LoadChartsApiIT"`), согласно принятой в проекте стратегии.
 
-## Out of Scope
+Status: resolved
 
-Вёрстка вкладок и сами диаграммы (тикеты 02–05). Запись изменений — идёт через существующие `PUT /projects/{id}/load-curve` и `PUT /gantt/week-plans`, новых пишущих эндпоинтов этот тикет не создаёт. Миграция на слоистую архитектуру релиза 0.9 — контроллер пишется по текущей конвенции проекта.
+## Answer
+
+Реализовано и покрыто тестами. Ветка `release-0.8/feature/01-load-charts-api`, коммит `9976ffe`.
+
+1. **Миграция** — `V41__hours_per_delo.sql` (V39/V40 уже были заняты в develop на момент работы; номер сверен перед созданием). Колонка `user.hours_per_delo NUMERIC(5,2) NOT NULL DEFAULT 1.5`.
+2. **`User.hoursPerDelo`** (`BigDecimal`, default `1.5`), проброшен в `UserSettingsResponse`/`UpdateSettingsRequest` с валидацией `@DecimalMin(inclusive=false)` (> 0). У нового пользователя = 1.5.
+3. **`GET /api/v1/planning/load-charts`** — новый `LoadChartsController` + `LoadChartsService` (по текущей конвенции, без слоистой архитектуры). Параметры `horizonMonths` (default 18), `lifeAreaIds` (CSV, как на Гантте). Структура ответа — дословно по спеки (`weeklyLimit`, `hoursPerDelo`, `hourAccountingMode`, `horizonMonths`, `startMonday`, `projects[]`, `routines[]`, `monthlyLoad[]`).
+4. **Объём** — `totalPlanHours` (если > 0) → `effortSource: PLAN`; иначе `deloCount × hoursPerDelo` → `ESTIMATED`. `deloCount` по `delo_project` с учётом `hourAccountingMode` (`PRIMARY_ONLY` → только основные, `ALL_PROJECTS` → все).
+5. **Накопленный факт** — переиспользована формула из `GanttForecastService` (добавлен публичный `accumulatedFactByProject` + расширен `aggregateProjectFact` до public), **без второй формулы**. `remainingHours = max(0, effort − fact)`.
+6. **Прогнозы** — `forecastByRate` (по `WeekPlan` текущей ISO-недели; ставка 0 или объём 0 → `null`) и `forecastByCurve` (помесячное накопление `hoursAt × 4.33`; первый месяц с накоплением ≥ remaining → финиш; не уложились → `null`).
+7. **`monthlyLoad`** — часы проектов (по кривой, без кривой — по ставке `WeekPlan`) + `weeklyHours` рутин; `overLimit` = сумма > `availableWeeklyHours`.
+8. **Отбор** — `IN_PROGRESS` (как в `PlanningCapacityController`); рутины отдельным массивом, без дорожек/финиша.
+9. **`GET /planning/capacity` не тронут.**
+
+Тесты: `LoadChartsApiIT` (6 сценариев из тикета) — зелёный; `UserSettingsApiIT` дополнен (hoursPerDelo сохраняется/валидируется/по умолчанию 1.5) — зелёный; обратная совместимость `LoadCurveApiIT`, `PlanDistributionApiIT`, `RoutineApiIT` — зелёные (без правок их кода).
+
+Примечание: в `RoutineApiIT` при массовом прогоне наблюдался `Connection refused` от Testcontainers (docker flaky на слабом хосте) — при отдельном прогоне класс зелёный; не связано с изменениями тикета.
