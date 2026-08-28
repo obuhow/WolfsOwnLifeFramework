@@ -10,31 +10,31 @@
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
+ * GNU Affero General License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. if not, see <https://www.gnu.org/licenses/>.
  */
-package ru.wolf.api.telegram;
+package ru.wolf.api.max;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
-import ru.wolf.api.importer.ImportBotProperties;
-
 /**
- * Wires the Telegram import channel: configuration properties and the dedicated
- * {@code RestClient} used by {@link HttpTelegramAdapter}. No web/HTTP
- * annotations here — this is infrastructure only.
+ * Wires the Max import channel: configuration properties and the dedicated
+ * {@code RestClient} used by {@link HttpMaxAdapter}. No web/HTTP annotations here
+ * — this is infrastructure only. {@link MaxProperties} is enabled here; the shared
+ * {@code ImportBotProperties} rate-limit is enabled by
+ * {@code ru.wolf.api.importer.ImporterConfiguration}.
  */
 @Configuration
-@EnableConfigurationProperties({TelegramProperties.class})
-public class TelegramConfiguration {
+@EnableConfigurationProperties(MaxProperties.class)
+public class MaxConfiguration {
 
     @Bean
-    RestClient telegramRestClient() {
+    RestClient maxRestClient() {
         return RestClient.builder().build();
     }
 }

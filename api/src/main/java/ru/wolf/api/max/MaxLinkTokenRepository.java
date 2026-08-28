@@ -10,25 +10,20 @@
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
+ * GNU Affero General License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. if not, see <https://www.gnu.org/licenses/>.
  */
-package ru.wolf.api.telegram;
+package ru.wolf.api.max;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface TelegramDailyUsageRepository extends JpaRepository<TelegramDailyUsage, Long> {
-    Optional<TelegramDailyUsage> findByUserIdAndUsageDate(Long userId, LocalDate usageDate);
-
-    @Query("SELECT COALESCE(SUM(u.requestCount), 0) FROM TelegramDailyUsage u WHERE u.userId = :userId")
-    long totalCount(@Param("userId") Long userId);
+public interface MaxLinkTokenRepository extends JpaRepository<MaxLinkToken, UUID> {
+    Optional<MaxLinkToken> findByToken(String token);
 }

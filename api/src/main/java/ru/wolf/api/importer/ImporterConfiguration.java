@@ -10,31 +10,22 @@
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
+ * GNU Affero General License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program. if not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-package ru.wolf.api.telegram;
+package ru.wolf.api.importer;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestClient;
-
-import ru.wolf.api.importer.ImportBotProperties;
 
 /**
- * Wires the Telegram import channel: configuration properties and the dedicated
- * {@code RestClient} used by {@link HttpTelegramAdapter}. No web/HTTP
- * annotations here — this is infrastructure only.
+ * Channel-independent import configuration (release 0.7, ticket 04). Holds the
+ * shared {@link ImportBotProperties} rate-limit settings, consumed by every
+ * import channel (chat-panel, Telegram, Max).
  */
 @Configuration
-@EnableConfigurationProperties({TelegramProperties.class})
-public class TelegramConfiguration {
-
-    @Bean
-    RestClient telegramRestClient() {
-        return RestClient.builder().build();
-    }
+@EnableConfigurationProperties(ImportBotProperties.class)
+public class ImporterConfiguration {
 }

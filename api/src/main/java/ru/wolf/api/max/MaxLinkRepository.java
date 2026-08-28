@@ -15,22 +15,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. if not, see <https://www.gnu.org/licenses/>.
  */
-package ru.wolf.api.telegram;
+package ru.wolf.api.max;
 
-import lombok.Getter;
-import lombok.Setter;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-/**
- * Rate-limit settings for the AI import bot across all channels (ticket 03,
- * point 6). {@code dailyLimitPerUser} caps LLM parse requests per WOLF user
- * per UTC day; exceeding it yields a polite text refusal while the normal
- * chat-panel form stays available.
- */
-@Getter
-@Setter
-@ConfigurationProperties(prefix = "wolf.import-bot")
-public class ImportBotProperties {
-    /** Max import-bot parse requests per user per day. 0 disables the limit. */
-    private int dailyLimitPerUser = 20;
+import java.util.Optional;
+
+@Repository
+public interface MaxLinkRepository extends JpaRepository<MaxLink, Long> {
+    Optional<MaxLink> findByChatId(String chatId);
+    Optional<MaxLink> findByUserId(Long userId);
+    boolean existsByChatId(String chatId);
+    void deleteByUserId(Long userId);
 }
