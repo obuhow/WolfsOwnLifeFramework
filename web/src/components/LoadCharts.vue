@@ -24,10 +24,12 @@
  * передаются будущим вкладкам (03–05) через provide/inject. Сами диаграммы в этом тикете
  * — заглушки («подключается в тикете NN»).
  */
-import { computed, onMounted, onBeforeUnmount, provide, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiBase, authHeaders } from '../api'
 import { useLoadChartWrite } from '../loadChartsWrite'
+import BudgetTab from './BudgetTab.vue'
+import LadderTab from './LadderTab.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -97,16 +99,37 @@ const loading = ref(true)
 const error = ref('')
 const empty = computed(() => !loading.value && !error.value && data.value && data.value.projects.length === 0)
 
+// Общий стейт ставки «часов в неделю» по проектам (п.12 тикета 04):
+// изменение на «Бюджете» отражается на «Лестнице» без перезагрузки.
+// Инициализируется из data.projects[].weeklyPlanHours при загрузке.
+const rates = reactive({})
+
 async function load() {
   const headers = authHeaders()
   if (!headers) return
   loading.value = true
   error.value = ''
   try {
-    const res = await fetch(`${apiBase()}/planning/load-charts`, { headers })
-    if (res.status === 401 || res.status === 403) return // authHeaders уже увёл на логин
-    if (!res.ok) throw new Error(`Диаграммы нагрузки: HTTP ${res.status}`)
-    data.value = await res.json()
+    const [chartsRes, forecastRes] = await Promise.all([
+      fetch(`${apiBase()}/planning/load-charts`, { headers }),
+      fetch(`${apiBase()}/gantt/forecast`, { headers }),
+    ])
+    if (chartsRes.status === 401 || chartsRes.status === 403) return // authHeaders уже увёл на логин
+    if (!chartsRes.ok) throw new Error(`Диаграммы нагрузки: HTTP ${chartsRes.status}`)
+    const charts = await chartsRes.json()
+    // Фактический прогноз из существующего /gantt/forecast (п.5 тикета 04).
+    if (forecastRes.ok) {
+      const forecast = await forecastRes.json()
+      const byProject = new Map((forecast || []).map((f) => [f.projectId, f.forecastEnd || null]))
+      charts.actualForecast = byProject
+    } else {
+      charts.actualForecast = new Map()
+    }
+    data.value = charts
+    // синхронизируем общий стейт ставки с серверными значениями
+    for (const p of charts.projects) {
+      rates[p.id] = p.weeklyPlanHours
+    }
   } catch (e) {
     error.value = e.message
   } finally {
@@ -121,6 +144,7 @@ function makeWriter(url, body, opts) {
 }
 provide('loadCharts', {
   data,
+  rates,
   makeWriter,
 })
 
@@ -168,7 +192,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <!-- Панели вкладок. В этом тикете — заглушки; контент приходит тикетами 03–05. -->
+      <!-- Панели вкладок. Кривые (03) подключаются своим тикетом; Бюджет/Лестница — тикет 04. -->
       <div
         v-for="t in TABS"
         v-show="activeTab === t.key"
@@ -178,7 +202,9 @@ onBeforeUnmount(() => {
         role="tabpanel"
         :aria-labelledby="`load-chart-tab-${t.key}`"
       >
-        <p class="chart-placeholder muted">подключается в тикете {{ t.ticket }}</p>
+        <BudgetTab v-if="t.key === 'budget'" />
+        <LadderTab v-else-if="t.key === 'ladder'" />
+        <p v-else class="chart-placeholder muted">подключается в тикете {{ t.ticket }}</p>
       </div>
     </div>
   </section>
