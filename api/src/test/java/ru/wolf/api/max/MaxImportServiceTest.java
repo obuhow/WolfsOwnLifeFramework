@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. if not, see <https://www.gnu.org/licenses/>.
  */
-package ru.wolf.api.telegram;
+package ru.wolf.api.max;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,41 +41,46 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ru.wolf.api.importer.ImportConfirmService;
-import ru.wolf.api.importer.ImportBotDailyUsage;
-import ru.wolf.api.importer.ImportBotDailyUsageRepository;
 import ru.wolf.api.importer.ImportBotProperties;
+import ru.wolf.api.importer.ImportConfirmService;
 import ru.wolf.api.importer.ImportParserService;
 import ru.wolf.api.importer.dto.ConfirmImportRequest;
 import ru.wolf.api.importer.dto.EntityKind;
 import ru.wolf.api.importer.dto.ParseResult;
 import ru.wolf.api.importer.dto.ParsedCandidate;
 import ru.wolf.api.importer.dto.ParsedField;
-import ru.wolf.api.telegram.dto.TelegramCallbackQuery;
-import ru.wolf.api.telegram.dto.TelegramMessage;
+import ru.wolf.api.max.dto.MaxCallbackQuery;
+import ru.wolf.api.max.dto.MaxDisconnectRequest;
+import ru.wolf.api.max.dto.MaxLinkStatus;
+import ru.wolf.api.max.dto.MaxMessage;
+import ru.wolf.api.max.dto.MaxUpdate;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
 /**
- * DB-free unit tests for the Telegram import channel (release 0.7, ticket 03).
+ * DB-free unit tests for the Max import channel (release 0.7, ticket 04).
  *
- * <p>Covers the ticket's Testing Decisions: (a) an unlinked chat creates nothing,
- * (b) chat A cannot affect user B's data, (c) daily limit yields a polite refusal
- * and resets conceptually on the next day's row. The shared parser/confirm path
- * is mocked; isolation comes from resolving {@code userId} solely by {@code chat_id}.
+ * <p>Mirrors the Telegram channel's Testing Decisions: (a) an unlinked chat
+ * creates nothing, (b) chat A cannot affect user B's data, (c) daily limit yields
+ * a polite refusal. The shared parser/confirm path is mocked; isolation comes from
+ * resolving {@code userId} solely by {@code chat_id}.
+ *
+ * <p>The {@code bot_started} deep-link bind is covered here too (unique to Max vs
+ * Telegram's {@code /start}): a {@code bot_started} update carrying the token
+ * binds the chat id.
  */
 @ExtendWith(MockitoExtension.class)
-class TelegramImportServiceTest {
+class MaxImportServiceTest {
 
-    @Mock private TelegramLinkService linkService;
+    @Mock private MaxLinkService linkService;
     @Mock private ImportParserService parserService;
     @Mock private ImportConfirmService confirmService;
-    @Mock private TelegramPendingImportRepository pendingRepository;
-    @Mock private ImportBotDailyUsageRepository usageRepository;
-    @Mock private TelegramPort telegramPort;
+    @Mock private MaxPendingImportRepository pendingRepository;
+    @Mock private ru.wolf.api.importer.ImportBotDailyUsageRepository usageRepository;
+    @Mock private MaxPort maxPort;
     @Mock private UserRepository userRepository;
 
-    private TelegramImportService service;
+    private MaxImportService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ImportBotProperties props = new ImportBotProperties();
 
@@ -85,20 +90,42 @@ class TelegramImportServiceTest {
     @BeforeEach
     void setUp() {
         props.setDailyLimitPerUser(2);
-        service = new TelegramImportService(linkService, parserService, confirmService,
-                pendingRepository, usageRepository, telegramPort, userRepository, props, objectMapper);
+        service = new MaxImportService(linkService, parserService, confirmService,
+                pendingRepository, usageRepository, maxPort, userRepository, props, objectMapper);
         userA = User.builder().id(1L).username("alice").timezone("Europe/Moscow").build();
         userB = User.builder().id(2L).username("bob").timezone("Europe/Moscow").build();
     }
 
-    private TelegramMessage msg(String chatId, String text) {
-        return new TelegramMessage(10L,
-                new TelegramMessage.TelegramChat(chatId), text);
+    private MaxMessage msg(String chatId, String text) {
+        return new MaxMessage(
+                new MaxMessage.MaxMessageBody("m-" + chatId, text),
+                new MaxMessage.MaxRecipient(chatId));
     }
 
     private ParseResult parsed() {
         List<ParsedField> fields = List.of(ParsedField.confident("title", "тренировка"));
         return ParseResult.parsed(List.of(new ParsedCandidate(EntityKind.DELO, fields)), List.of());
+    }
+
+    // --- bot_started deep link binds the chat ---
+
+    @Test
+    void botStarted_withValidToken_bindsChat() {
+        when(linkService.linkAccount("tok123", "chatA")).thenReturn(true);
+
+        service.handleUpdate(new MaxUpdate("bot_started", null, null, "chatA", "tok123"));
+
+        verify(linkService).linkAccount("tok123", "chatA");
+        verify(maxPort).sendMessage(eq("chatA"), contains("привязан"));
+    }
+
+    @Test
+    void botStarted_withInvalidToken_doesNotBind() {
+        when(linkService.linkAccount(anyString(), anyString())).thenReturn(false);
+
+        service.handleUpdate(new MaxUpdate("bot_started", null, null, "chatX", "bad"));
+
+        verify(maxPort).sendMessage(eq("chatX"), contains("не привязан"));
     }
 
     // --- Isolation: unlinked chat creates nothing ---
@@ -111,7 +138,7 @@ class TelegramImportServiceTest {
 
         verify(parserService, never()).parse(any(), anyString());
         verify(confirmService, never()).confirm(anyString(), any(ConfirmImportRequest.class));
-        verify(telegramPort).sendMessage(eq("chatX"), contains("не привязан"));
+        verify(maxPort).sendMessage(eq("chatX"), contains("не привязан"));
     }
 
     // --- Isolation: chat A cannot touch user B ---
@@ -122,9 +149,9 @@ class TelegramImportServiceTest {
         when(linkService.resolveUserId("chatA")).thenReturn(Optional.of(1L));
         when(usageRepository.findByUserIdAndUsageDate(eq(1L), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
-        TelegramPendingImport pending = TelegramPendingImport.builder()
+        MaxPendingImport pending = MaxPendingImport.builder()
                 .id(java.util.UUID.randomUUID()).chatId("chatA").userId(1L)
-                .payload("[]").build();
+                .messageId("m-chatA").payload("[]").build();
         when(pendingRepository.save(any())).thenReturn(pending);
         when(parserService.parse(eq(userA), anyString())).thenReturn(parsed());
 
@@ -133,25 +160,23 @@ class TelegramImportServiceTest {
         verify(parserService).parse(eq(userA), anyString());
         verify(parserService, never()).parse(eq(userB), anyString());
         verify(confirmService, never()).confirm(eq("bob"), any());
-        verify(telegramPort).sendCard(eq("chatA"), anyString(), anyString(), anyString());
+        verify(maxPort).sendCard(eq("chatA"), anyString(), anyString(), anyString());
     }
 
     @Test
     void acceptCallback_onlyCreatesForPendingOwner() {
         java.util.UUID pid = java.util.UUID.randomUUID();
-        TelegramPendingImport pending = TelegramPendingImport.builder()
-                .id(pid).chatId("chatA").userId(1L)
+        MaxPendingImport pending = MaxPendingImport.builder()
+                .id(pid).chatId("chatA").userId(1L).messageId("m1")
                 .payload(toJson(List.of(ParsedField.confident("title", "тренировка")), EntityKind.DELO))
                 .build();
         when(pendingRepository.findById(pid)).thenReturn(Optional.of(pending));
         when(userRepository.findById(1L)).thenReturn(Optional.of(userA));
 
-        TelegramCallbackQuery cb = new TelegramCallbackQuery("cb1",
-                new TelegramCallbackQuery.TelegramChat("chatA"),
-                new TelegramCallbackQuery.TelegramCallbackMessage(99L,
-                        new TelegramCallbackQuery.TelegramChat("chatA")),
-                new TelegramCallbackQuery.TelegramFrom("chatA"),
-                "accept:" + pid);
+        MaxCallbackQuery cb = new MaxCallbackQuery("cb1", "accept:" + pid,
+                new MaxCallbackQuery.MaxCallbackMessage(
+                        new MaxCallbackQuery.MaxCallbackMessage.MaxCallbackBody("m1"),
+                        new MaxMessage.MaxRecipient("chatA")));
         service.handleCallback(cb);
 
         verify(confirmService).confirm(eq("alice"), any(ConfirmImportRequest.class));
@@ -159,12 +184,12 @@ class TelegramImportServiceTest {
         verify(pendingRepository).delete(pending);
     }
 
-    // --- Rate limit ---
+    // --- Rate limit (shared counter, see ImportBotSharedLimitTest) ---
 
     @Test
     void dailyLimitExceeded_politeRefusal_noParse() {
         when(linkService.resolveUserId("chatA")).thenReturn(Optional.of(1L));
-        ImportBotDailyUsage usage = ImportBotDailyUsage.builder()
+        ru.wolf.api.importer.ImportBotDailyUsage usage = ru.wolf.api.importer.ImportBotDailyUsage.builder()
                 .userId(1L).usageDate(LocalDate.now(java.time.ZoneId.of("UTC"))).requestCount(2).build();
         when(usageRepository.findByUserIdAndUsageDate(eq(1L), any(LocalDate.class)))
                 .thenReturn(Optional.of(usage));
@@ -173,27 +198,41 @@ class TelegramImportServiceTest {
 
         verify(parserService, never()).parse(any(), anyString());
         verify(confirmService, never()).confirm(anyString(), any());
-        verify(telegramPort).sendMessage(eq("chatA"), contains("лимит"));
+        verify(maxPort).sendMessage(eq("chatA"), contains("лимит"));
     }
 
     @Test
     void withinLimit_incrementsCounter_andParses() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(userA));
         when(linkService.resolveUserId("chatA")).thenReturn(Optional.of(1L));
-        ImportBotDailyUsage usage = ImportBotDailyUsage.builder()
+        ru.wolf.api.importer.ImportBotDailyUsage usage = ru.wolf.api.importer.ImportBotDailyUsage.builder()
                 .userId(1L).usageDate(LocalDate.now(java.time.ZoneId.of("UTC"))).requestCount(1).build();
         when(usageRepository.findByUserIdAndUsageDate(eq(1L), any(LocalDate.class)))
                 .thenReturn(Optional.of(usage));
-        TelegramPendingImport pending = TelegramPendingImport.builder()
-                .id(java.util.UUID.randomUUID()).chatId("chatA").userId(1L).payload("[]").build();
+        MaxPendingImport pending = MaxPendingImport.builder()
+                .id(java.util.UUID.randomUUID()).chatId("chatA").userId(1L)
+                .messageId("m-chatA").payload("[]").build();
         when(pendingRepository.save(any())).thenReturn(pending);
         when(parserService.parse(eq(userA), anyString())).thenReturn(parsed());
 
         service.handleMessage(msg("chatA", "задача в 9:00"));
 
-        verify(usageRepository).save(any(ImportBotDailyUsage.class));
+        verify(usageRepository).save(any(ru.wolf.api.importer.ImportBotDailyUsage.class));
         verify(parserService).parse(eq(userA), anyString());
-        verify(telegramPort).sendCard(eq("chatA"), anyString(), anyString(), anyString());
+        verify(maxPort).sendCard(eq("chatA"), anyString(), anyString(), anyString());
+    }
+
+    // --- Link status deep link uses max.ru host (point 4 of ticket) ---
+
+    @Test
+    void linkStatus_deepLinkUsesMaxHost() {
+        when(linkService.getStatus("alice")).thenReturn(
+                new MaxLinkStatus(false, null, "tok", "https://max.ru/bot_alice?start=tok", "bot_alice"));
+
+        MaxLinkStatus status = linkService.getStatus("alice");
+
+        assertThat(status.linkUrl()).startsWith("https://max.ru/");
+        assertThat(status.botUsername()).isEqualTo("bot_alice");
     }
 
     private String toJson(List<ParsedField> fields, EntityKind kind) {

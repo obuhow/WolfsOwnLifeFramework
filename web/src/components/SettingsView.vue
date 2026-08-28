@@ -211,6 +211,17 @@ const telegramBusy = ref(false)
 const telegramError = ref('')
 const telegramSuccess = ref('')
 
+// Импорт из Max (релиз 0.7, тикет 04). Зеркально Telegram: генерация токена и
+// deep-ссылки max.ru/<bot>?start=<token>, статус привязки, отвязка.
+const maxLinked = ref(false)
+const maxChatId = ref('')
+const maxLinkUrl = ref('')
+const maxToken = ref('')
+const maxBot = ref('')
+const maxBusy = ref(false)
+const maxError = ref('')
+const maxSuccess = ref('')
+
 async function loadTelegramStatus() {
   telegramError.value = ''
   try {
@@ -287,9 +298,86 @@ async function unlinkTelegram() {
   }
 }
 
+async function loadMaxStatus() {
+  maxError.value = ''
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) return
+    const res = await fetch(`${apiBase()}/bot/max/link`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    maxLinked.value = data.linked
+    maxChatId.value = data.chatId || ''
+    maxLinkUrl.value = data.linkUrl || ''
+    maxToken.value = data.pendingToken || ''
+    maxBot.value = data.botUsername || ''
+  } catch (e) {
+    maxError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function linkMax() {
+  if (maxBusy.value) return
+  maxBusy.value = true
+  maxError.value = ''
+  maxSuccess.value = ''
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) { window.location.hash = '#/login'; return }
+    const res = await fetch(`${apiBase()}/bot/max/link`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    maxLinked.value = data.linked
+    maxChatId.value = data.chatId || ''
+    maxLinkUrl.value = data.linkUrl || ''
+    maxToken.value = data.pendingToken || ''
+    maxBot.value = data.botUsername || ''
+    maxSuccess.value = 'Ссылка готова — откройте и отправьте боту токен.'
+  } catch (e) {
+    maxError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    maxBusy.value = false
+  }
+}
+
+async function unlinkMax() {
+  if (maxBusy.value) return
+  maxBusy.value = true
+  maxError.value = ''
+  maxSuccess.value = ''
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) { window.location.hash = '#/login'; return }
+    const res = await fetch(`${apiBase()}/bot/max/link/disconnect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ chatId: maxChatId.value })
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    maxLinked.value = false
+    maxChatId.value = ''
+    maxLinkUrl.value = ''
+    maxToken.value = ''
+    maxSuccess.value = 'Max отвязан.'
+  } catch (e) {
+    maxError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    maxBusy.value = false
+  }
+}
+
 onMounted(loadSettings)
 onMounted(loadRole)
 onMounted(loadTelegramStatus)
+onMounted(loadMaxStatus)
 </script>
 
 <template>
@@ -494,6 +582,51 @@ onMounted(loadTelegramStatus)
 
         <div v-if="telegramError" class="alert alert-error">{{ telegramError }}</div>
         <div v-if="telegramSuccess" class="alert alert-success">{{ telegramSuccess }}</div>
+      </fieldset>
+    </section>
+
+    <section class="card">
+      <fieldset class="settings-fieldset">
+        <legend>Импорт из Max</legend>
+        <p class="hint">
+          Привяжите аккаунт Max к WOLF: нажмите кнопку, откройте ссылку и отправьте боту
+          одноразовый токен. После привязки присылайте заметки боту — он разберёт их на Дела и
+          Проекты. Бот не пишет первым.
+        </p>
+
+        <div v-if="maxLinked" class="telegram-status">
+          <span class="badge badge-ok">Привязан</span>
+          <span class="hint">chat_id: {{ maxChatId }}</span>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            :disabled="maxBusy"
+            @click="unlinkMax"
+          >Отвязать Max</button>
+        </div>
+
+        <div v-else>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="maxBusy"
+            @click="linkMax"
+          >Привязать Max</button>
+
+          <div v-if="maxLinkUrl" class="telegram-link-box">
+            <p class="hint">Откройте ссылку и отправьте боту токен:</p>
+            <a :href="maxLinkUrl" target="_blank" rel="noopener" class="telegram-deeplink">
+              {{ maxLinkUrl }}
+            </a>
+          </div>
+          <div v-else-if="maxBot" class="telegram-link-box">
+            <p class="hint">Ссылка появится после настройки бота на сервере. Ваш токен:</p>
+            <code class="telegram-token">{{ maxToken }}</code>
+          </div>
+        </div>
+
+        <div v-if="maxError" class="alert alert-error">{{ maxError }}</div>
+        <div v-if="maxSuccess" class="alert alert-success">{{ maxSuccess }}</div>
       </fieldset>
     </section>
 

@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/v1/demo/**").permitAll()
                         .requestMatchers("/api/v1/bot/telegram/webhook").permitAll()
+                        .requestMatchers("/api/v1/bot/max/webhook").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
