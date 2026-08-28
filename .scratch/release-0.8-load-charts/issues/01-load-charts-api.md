@@ -1,6 +1,6 @@
 # Бэкенд диаграмм нагрузки: настройка `hoursPerDelo` и `GET /planning/load-charts`
 
-Status: ready-for-agent
+Status: claimed
 Blocked by:
 Blocks: 02, 03, 04, 05
 

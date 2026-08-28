@@ -28,9 +28,9 @@ public record UserSettingsResponse(
         LocalTime defaultSleepEnd,
         String hourAccountingMode,
         String timeCaptureMode,
-        BigDecimal availableWeeklyHours
+        BigDecimal availableWeeklyHours,
+        BigDecimal hoursPerDelo
 ) {
-
     public static UserSettingsResponse from(ru.wolf.api.user.User user) {
         return new UserSettingsResponse(
                 user.getTimezone(),
@@ -40,7 +40,8 @@ public record UserSettingsResponse(
                 user.getDefaultSleepEnd(),
                 user.getHourAccountingMode(),
                 user.getTimeCaptureMode(),
-                user.getAvailableWeeklyHours()
+                user.getAvailableWeeklyHours(),
+                user.getHoursPerDelo()
         );
     }
 }

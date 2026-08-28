@@ -62,6 +62,9 @@ public class UserSettingsService {
         if (request.availableWeeklyHours() != null) {
             user.setAvailableWeeklyHours(request.availableWeeklyHours());
         }
+        if (request.hoursPerDelo() != null) {
+            user.setHoursPerDelo(request.hoursPerDelo());
+        }
 
         return UserSettingsResponse.from(userRepository.save(user));
     }
