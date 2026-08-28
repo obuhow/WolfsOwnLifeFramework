@@ -197,8 +197,99 @@ async function loadRole() {
   }
 }
 
+/**
+ * Импорт из Telegram (релиз 0.7, тикет 03). Блок в Настройках: генерация
+ * одноразового токена и ссылки, статус привязки, отвязка. Бот не инициирует
+ * диалог — связывание начинает пользователь из интерфейса.
+ */
+const telegramLinked = ref(false)
+const telegramChatId = ref('')
+const telegramLinkUrl = ref('')
+const telegramToken = ref('')
+const telegramBot = ref('')
+const telegramBusy = ref(false)
+const telegramError = ref('')
+const telegramSuccess = ref('')
+
+async function loadTelegramStatus() {
+  telegramError.value = ''
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) return
+    const res = await fetch(`${apiBase()}/bot/telegram/link`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    telegramLinked.value = data.linked
+    telegramChatId.value = data.chatId || ''
+    telegramLinkUrl.value = data.linkUrl || ''
+    telegramToken.value = data.pendingToken || ''
+    telegramBot.value = data.botUsername || ''
+  } catch (e) {
+    telegramError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function linkTelegram() {
+  if (telegramBusy.value) return
+  telegramBusy.value = true
+  telegramError.value = ''
+  telegramSuccess.value = ''
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) { window.location.hash = '#/login'; return }
+    const res = await fetch(`${apiBase()}/bot/telegram/link`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    telegramLinked.value = data.linked
+    telegramChatId.value = data.chatId || ''
+    telegramLinkUrl.value = data.linkUrl || ''
+    telegramToken.value = data.pendingToken || ''
+    telegramBot.value = data.botUsername || ''
+    telegramSuccess.value = 'Токен готов — отправьте его боту в Telegram.'
+  } catch (e) {
+    telegramError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    telegramBusy.value = false
+  }
+}
+
+async function unlinkTelegram() {
+  if (telegramBusy.value) return
+  telegramBusy.value = true
+  telegramError.value = ''
+  telegramSuccess.value = ''
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) { window.location.hash = '#/login'; return }
+    const res = await fetch(`${apiBase()}/bot/telegram/link/disconnect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ chatId: telegramChatId.value })
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    telegramLinked.value = false
+    telegramChatId.value = ''
+    telegramLinkUrl.value = ''
+    telegramToken.value = ''
+    telegramSuccess.value = 'Telegram отвязан.'
+  } catch (e) {
+    telegramError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    telegramBusy.value = false
+  }
+}
+
 onMounted(loadSettings)
 onMounted(loadRole)
+onMounted(loadTelegramStatus)
 </script>
 
 <template>
@@ -361,6 +452,51 @@ onMounted(loadRole)
       </fieldset>
     </section>
 
+    <section class="card">
+      <fieldset class="settings-fieldset">
+        <legend>Импорт из Telegram</legend>
+        <p class="hint">
+          Привяжите аккаунт Telegram к WOLF: нажмите кнопку, откройте ссылку и отправьте боту
+          одноразовый токен. После привязки присылайте заметки боту — он разберёт их на Дела и
+          Проекты. Бот не пишет первым.
+        </p>
+
+        <div v-if="telegramLinked" class="telegram-status">
+          <span class="badge badge-ok">Привязан</span>
+          <span class="hint">chat_id: {{ telegramChatId }}</span>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            :disabled="telegramBusy"
+            @click="unlinkTelegram"
+          >Отвязать Telegram</button>
+        </div>
+
+        <div v-else>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="telegramBusy"
+            @click="linkTelegram"
+          >Привязать Telegram</button>
+
+          <div v-if="telegramLinkUrl" class="telegram-link-box">
+            <p class="hint">Откройте ссылку и отправьте боту токен:</p>
+            <a :href="telegramLinkUrl" target="_blank" rel="noopener" class="telegram-deeplink">
+              {{ telegramLinkUrl }}
+            </a>
+          </div>
+          <div v-else-if="telegramBot" class="telegram-link-box">
+            <p class="hint">Ссылка появится после настройки бота на сервере. Ваш токен:</p>
+            <code class="telegram-token">{{ telegramToken }}</code>
+          </div>
+        </div>
+
+        <div v-if="telegramError" class="alert alert-error">{{ telegramError }}</div>
+        <div v-if="telegramSuccess" class="alert alert-success">{{ telegramSuccess }}</div>
+      </fieldset>
+    </section>
+
     <section v-if="isAdmin" class="card admin-section">
       <fieldset class="settings-fieldset">
         <legend>Администрирование</legend>
@@ -389,6 +525,45 @@ onMounted(loadRole)
 
 .profile-picker {
   margin-top: 1rem;
+}
+
+.telegram-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border, #ccc);
+}
+
+.badge-ok {
+  border-color: var(--accent, #3a7);
+  color: var(--accent, #3a7);
+}
+
+.telegram-link-box {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.telegram-deeplink {
+  word-break: break-all;
+  color: var(--accent, #3a7);
+}
+
+.telegram-token {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--card, #f4f4f4);
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  word-break: break-all;
 }
 
 @media (max-width: 560px) {

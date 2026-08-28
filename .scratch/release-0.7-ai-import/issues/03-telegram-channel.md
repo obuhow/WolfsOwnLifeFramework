@@ -1,6 +1,6 @@
 # Канал Telegram: связывание аккаунта и webhook
 
-Status: open
+Status: resolved
 Blocked by: 02
 
 ## Question
@@ -27,3 +27,23 @@ Blocked by: 02
 ## Out of Scope
 
 Max-канал (тикет 04) — отдельная реализация по аналогичному контракту. Редактирование полей карточки прямо в Telegram — не реализуется, только Принять/Отклонить.
+
+## Answer
+Реализован второй канал импорта — Telegram-бот с изолированным связыванием аккаунта (ветка `release-0.7/feature/03-telegram-channel`, от тикета 02; **не слита в `develop`** — каденция new-feature релиза: ветки держим до завершения релиза; при вливании притянет 01+02).
+
+**Бэкенд (поверх `ImportParserService`/`ImportConfirmService` из тикета 02):**
+- Сущность связки `TelegramLink` (`chat_id` ↔ `user_id`, уникальный `chat_id`) — отдельная таблица, `User` не расширяется. Flyway `V39__telegram_import_channel.sql`: `telegram_link`, `telegram_link_token` (одноразовый, TTL 10 мин), `telegram_pending_import` (карточка до подтверждения), `telegram_daily_usage` (лимит).
+- Связывание: `TelegramLinkController` (`/api/v1/bot/telegram/link`, JWT) — `GET` выдаёт одноразовый токен + ссылку `https://t.me/<bot_username>?start=<token>`; блок «Импорт из Telegram» в `SettingsView.vue` генерирует токен и отвязывает аккаунт. Бот на `/start <token>` биндит `chat_id` к `userId`.
+- Webhook `TelegramWebhookController.POST /api/v1/bot/telegram/webhook` — вне JWT (`permitAll` в `SecurityConfig`), проверяет `X-Telegram-Bot-Api-Secret-Token` (отдельный секрет, не JWT). `TelegramImportService` резолвит `userId` **только** из `TelegramLink` по `chat_id` из тела — без синтетического `SecurityContext`, без неявных допущений о личности.
+- Карточка в Telegram — inline-кнопки Принять/Отклонить; точечное редактирование полей недоступно (только в чат-панели) — при необходимости правки бот отвечает «Поправьте в WOLF». `unparsed` — один уточняющий вопрос, сущности не создаются.
+- Лимит `wolf.import-bot.daily-limit-per-user` (20/день, через `ImportBotProperties`): превышение — вежливый отказ, обычная форма остаётся доступной; счётчик на UTC-день.
+- Бот не инициирует диалог: каждое исходящее сообщение — прямой ответ на входящее. Транспорт вынесен в порт `TelegramPort` с адаптерами `HttpTelegramAdapter` (`@Profile("!test")`) / `FakeTelegramAdapter` (`@Profile("test")`) — по образцу `note/assistant`.
+
+**Фронтенд:** блок «Импорт из Telegram» в `SettingsView.vue` — кнопка «Привязать Telegram», статус привязки (badge + chat_id), ссылка-глубинная для бота, кнопка отвязки. В тихом контракте 0.3 (CSS-переменные интерфейса).
+
+**Проверки (минимальные, полное IT-тестирование — после завершения релиза 0.7 согласно договорённости):**
+- `./gradlew clean compileJava compileTestJava` — BUILD SUCCESSFUL.
+- 5 DB-free unit-тестов `TelegramImportServiceTest` (Mockito, без Spring-контекста): несвязанный chat не создаёт сущностей; chat A резолвит только user A, никогда не трогает B; accept-колбэк создаёт только для владельца pending; превышение лимита — вежливый отказ без parse; в рамках лимита — инкремент счётчика и parse. BUILD SUCCESSFUL.
+- Структурные: `TelegramWebhookController`/`TelegramLinkController` не инжектят Repository; сервисы/порты/адаптеры без веб-аннотаций; webhook вне JWT (`permitAll` + секрет-заголовок).
+
+**Не сделано (в скоупе других тикетов / после релиза):** полные `*ApiIT` через реальный Telegram (ручная приёмка `/start <token>` в клиенте), реальная настройка `wolf.telegram.bot-token`/`secret-token` на стенде, слияние в `develop` и редеплой.
