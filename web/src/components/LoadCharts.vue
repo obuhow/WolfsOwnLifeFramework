@@ -30,6 +30,7 @@ import { apiBase, authHeaders } from '../api'
 import { useLoadChartWrite } from '../loadChartsWrite'
 import BudgetTab from './BudgetTab.vue'
 import LadderTab from './LadderTab.vue'
+import QueueTab from './QueueTab.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -204,6 +205,7 @@ onBeforeUnmount(() => {
       >
         <BudgetTab v-if="t.key === 'budget'" />
         <LadderTab v-else-if="t.key === 'ladder'" />
+        <QueueTab v-else-if="t.key === 'queue'" />
         <p v-else class="chart-placeholder muted">подключается в тикете {{ t.ticket }}</p>
       </div>
     </div>
