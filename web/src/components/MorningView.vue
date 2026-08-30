@@ -26,6 +26,31 @@ const expanded = ref(new Set())
 
 const hasContent = computed(() => digest.value && (digest.value.projects?.length || digest.value.ideas?.length || digest.value.goalsFact?.length))
 
+// Есть ли у проекта дочерние узлы (плоский список pre-order с depth/parentId).
+function hasChildren(projectId) {
+  return !!digest.value?.projects?.some(p => p.parentId === projectId)
+}
+
+// Строка видна, если раскрыты ВСЕ её предки. Идём вверх по parentId.
+function isVisible(project) {
+  let parentId = project.parentId
+  const byId = projectsById.value
+  let guard = 0
+  while (parentId != null && guard++ < 100) {
+    if (!expanded.value.has(parentId)) return false
+    parentId = byId.get(parentId)?.parentId ?? null
+  }
+  return true
+}
+
+const projectsById = computed(() => {
+  const map = new Map()
+  for (const p of digest.value?.projects ?? []) map.set(p.id, p)
+  return map
+})
+
+const visibleProjects = computed(() => (digest.value?.projects ?? []).filter(isVisible))
+
 function toggle(projectId) {
   const next = new Set(expanded.value)
   next.has(projectId) ? next.delete(projectId) : next.add(projectId)
@@ -83,11 +108,11 @@ onMounted(load)
           <span class="muted">{{ digest.projects.length }}</span>
         </div>
         <div v-if="!digest.projects.length" class="muted-block">Активных проектов пока нет.</div>
-        <article v-for="project in digest.projects" :key="project.id" class="morning-project">
+        <article v-for="project in visibleProjects" :key="project.id" class="morning-project" :class="{ 'morning-project-nested': project.depth > 0 }" :style="{ marginLeft: (project.depth * 20) + 'px' }">
           <div class="morning-project-heading">
             <router-link :to="`/projects/${project.id}`" class="morning-project-link">{{ project.title }}</router-link>
             <button class="btn btn-ghost" :aria-expanded="expanded.has(project.id)" @click="toggle(project.id)">
-              {{ expanded.has(project.id) ? 'Свернуть' : 'Развернуть' }}
+              {{ expanded.has(project.id) ? 'Свернуть' : 'Развернуть' }}<span v-if="hasChildren(project.id)" class="morning-child-hint"> · подпроекты</span>
             </button>
           </div>
           <div v-if="expanded.has(project.id)" class="morning-project-detail">
@@ -137,6 +162,8 @@ onMounted(load)
 
 <style scoped>
 .morning-project + .morning-project { border-top: 1px solid var(--wolf-subrule); }
+.morning-project-nested { border-left: 1px solid var(--wolf-subrule); padding-left: 14px; }
+.morning-child-hint { color: var(--wolf-muted); font-size: 11px; }
 .morning-project-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .morning-project-link, .morning-delo { color: var(--wolf-ink); text-decoration: none; border-bottom: 1px solid var(--wolf-rule); }
 .morning-project-link { font-size: 18px; }
