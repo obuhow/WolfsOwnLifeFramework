@@ -22,12 +22,18 @@ spring:
       mode: never
 
 wolf:
+  jwt:
+    # Ключ подписи токенов. Значения по умолчанию нет намеренно: приложение
+    # не должно стартовать на общеизвестном ключе. Задаётся через .env
+    # (переменная WOLF_JWT_SECRET), см. .env.example.
+    secret: ${WOLF_JWT_SECRET}
+    expiration-ms: ${WOLF_JWT_EXPIRATION_MS:86400000}
   agent:
     cron: ${WOLF_AGENT_CRON:0 0 4 * * *}
   llm:
     enabled: ${WOLF_LLM_ENABLED:false}
     url: ${WOLF_LLM_URL:https://api.x.ai/v1}
-    api-key: ${WOLF...EY:}
+    api-key: ${WOLF_LLM_API_KEY:}
     model: ${WOLF_LLM_MODEL:grok-3-mini}
     audio-directory: ${WOLF_AUDIO_DIRECTORY:${user.home}/.wolf/audio}
   demo:
