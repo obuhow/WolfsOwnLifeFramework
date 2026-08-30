@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.0-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue" />
   <img alt="Status" src="https://img.shields.io/badge/status-alpha-orange" />
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-green" />
   <img alt="Stack" src="https://img.shields.io/badge/stack-Spring%20Boot%203%20%7C%20Vue%203%20%7C%20Postgres-blue" />
@@ -241,8 +241,15 @@ Compose, а запросы к API идут через nginx контейнера
 
 ## Статус и дорожная карта
 
-**Текущая стабильная версия:** `v0.6.0` (alpha). Активная разработка ведётся в ветке
-`develop` (релиз 0.9 — миграция API на слоистую архитектуру завершена, тикеты 01–11).
+**Текущая стабильная версия:** `v1.0.0` (alpha). Активная разработка ведётся в ветке
+`develop` (релиз 1.0 — закрытие техдолгов 0.6–0.9 и правки живого сайта).
+
+> **Чеклист релиза — единая версия.** Версия — единый источник правды в двух файлах
+> сборки: `web/package.json` (`"version"`) и `api/build.gradle` (`version = '…'`). При
+> **каждом** релизе оба файла бампятся **синхронно** до одного значения; шапка SPA берёт
+> версию из `web/package.json` через `__APP_VERSION__` (`web/vite.config.js`), поэтому
+> отдельных правок `App.vue` не требуется. Не забудьте обновить бейдж версии и эту строку
+> в `README.md`.
 
 Реализовано в 0.1–0.6:
 
