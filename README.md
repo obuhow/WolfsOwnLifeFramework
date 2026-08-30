@@ -209,7 +209,9 @@ Compose, а запросы к API идут через nginx контейнера
 отладки в `docker-compose.yml` есть закомментированные проброски на `127.0.0.1`.
 
 > **Публичная установка.** Перед тем как открыть WOLF в интернет, поставьте перед ним
-> обратный прокси с TLS и убедитесь, что наружу открыты только 80/443.
+> обратный прокси с TLS и убедитесь, что наружу открыты только 80/443. Пошаговая
+> инструкция по подключению HTTPS-сертификата (Caddy с авто-ACME, certbot+nginx или
+> self-signed для теста) — [`docs/self-hosting-https.md`](docs/self-hosting-https.md).
 
 ---
 
@@ -234,6 +236,7 @@ Compose, а запросы к API идут через nginx контейнера
 
 - Глоссарий: [`CONTEXT.md`](CONTEXT.md)
 - ADR: [`docs/adr/`](docs/adr/)
+- Подключение HTTPS к самохостингу: [`docs/self-hosting-https.md`](docs/self-hosting-https.md)
 - Конвенции разработки: [`AGENTS.md`](AGENTS.md), [`docs/agents/`](docs/agents/)
 - Спеки и тикеты релизов: [`.scratch/`](.scratch/)
 
