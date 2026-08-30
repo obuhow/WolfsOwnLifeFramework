@@ -371,6 +371,10 @@ onMounted(loadAll)
             <input id="project-start" v-model="form.startDate" type="date" class="input" :disabled="loading" />
           </div>
           <div class="form-group">
+            <label for="project-end">Финальный срок</label>
+            <input id="project-end" v-model="form.endDate" type="date" class="input" :disabled="loading" />
+          </div>
+          <div class="form-group">
             <label for="project-hours">План, часы</label>
             <input
               id="project-hours"
