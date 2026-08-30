@@ -37,6 +37,7 @@ import DocsShell from './DocsShell.vue'
       <a href="#requirements">Требования к серверу</a>
       <a href="#compose">docker compose</a>
       <a href="#steps">Шаги развёртывания</a>
+      <a href="#https">HTTPS-сертификат</a>
     </nav>
 
     <section id="legal" class="docs-section">
@@ -107,6 +108,17 @@ volumes:
         <li>Настроить резервное копирование тома <code>wolf_pgdata</code> — WOLF не делает это автоматически.</li>
       </ol>
       <p class="docs-note">Готового публичного дистрибутива (образы в реестре, установщик в один клик) пока нет — актуальный способ развернуть WOLF у себя — сборка из исходников по шагам выше.</p>
+    </section>
+
+    <section id="https" class="docs-section">
+      <h2>HTTPS-сертификат</h2>
+      <p>По умолчанию контейнер <code>web</code> слушает порт 80. Перед публичным доступом поставьте перед ним TLS. SPA обращается к API по относительному пути <code>/api/v1</code> (тот же origin), поэтому после включения HTTPS смешанного контента не возникает и <code>VITE_API_BASE</code> менять не нужно.</p>
+      <ul>
+        <li><strong>Вариант A (рекомендован) — Caddy:</strong> ставится перед <code>web</code>, сам получает и продлевает сертификат Let's Encrypt (ACME). Один блок <code>reverse_proxy web:80</code> в <code>Caddyfile</code>.</li>
+        <li><strong>Вариант B — certbot + nginx:</strong> TLS терминирует сам nginx контейнера <code>web</code>: получить <code>fullchain.pem</code>/<code>privkey.pem</code>, включить <code>listen 443 ssl;</code>, редирект с 80 на 443 и HSTS. Автопродление — таймер certbot с <code>nginx -s reload</code>.</li>
+        <li><strong>Вариант C — self-signed:</strong> только для локальной проверки без домена.</li>
+      </ul>
+      <p>Полная пошаговая инструкция с готовыми <code>Caddyfile</code>, конфигом nginx, командами certbot, настройкой автопродления и проверкой (<code>curl -I https://…</code>) — в файле репозитория <code>docs/self-hosting-https.md</code>.</p>
     </section>
   </DocsShell>
 </template>
