@@ -1,20 +1,31 @@
+# Секреты не хранятся в этом файле. Значения берутся из `.env` рядом с docker-compose.yml
+# (файл в .gitignore и в репозиторий не попадает). Шаблон — .env.example, инструкция — README.md.
+#
+# Синтаксис ${VAR:?текст ошибки} намеренно оставлен без значения по умолчанию: если переменная
+# не задана, `docker compose` откажется стартовать с этим текстом. Это лучше, чем молча
+# подняться на общеизвестном пароле.
+
 services:
   db:
     image: postgres:16-alpine
     container_name: wolf-db
     environment:
-      POSTGRES_DB: wolf
-      POSTGRES_USER: wolf
-      POSTGRES_PASSWORD: wolf
-    ports:
-      - "5434:5432"
+      POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB не задан, скопируйте .env.example в .env}"
+      POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER не задан, скопируйте .env.example в .env}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан, скопируйте .env.example в .env}"
+    # Порт БД наружу НЕ публикуется: контейнеры общаются по внутренней сети compose.
+    # Для локальной отладки раскомментируйте и слушайте только петлевой интерфейс:
+    #   ports:
+    #     - "127.0.0.1:5434:5432"
+    # Публиковать 0.0.0.0:5434 на сервере с публичным адресом нельзя.
     volumes:
       - wolf_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wolf -d wolf"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   api:
     build:
@@ -23,15 +34,26 @@ services:
       network: host
     container_name: wolf-api
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wolf
-      SPRING_DATASOURCE_USERNAME: wolf
-      SPRING_DATASOURCE_PASSWORD: wolf
-      SERVER_PORT: 8080
-    ports:
-      - "8082:8080"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://db:5432/${POSTGRES_DB:?POSTGRES_DB не задан}"
+      SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:?POSTGRES_USER не задан}"
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан}"
+      # Ключ подписи JWT. Без него подделывается любой токен, включая администраторский,
+      # поэтому значения по умолчанию здесь нет и быть не должно.
+      # Сгенерировать: openssl rand -base64 48
+      WOLF_JWT_SECRET: "${WOLF_JWT_SECRET:?WOLF_JWT_SECRET не задан, см. .env.example}"
+      WOLF_LLM_ENABLED: "${WOLF_LLM_ENABLED:-false}"
+      WOLF_LLM_URL: "${WOLF_LLM_URL:-https://api.x.ai/v1}"
+      WOLF_LLM_API_KEY: "${WOLF_LLM_API_KEY:-}"
+      WOLF_LLM_MODEL: "${WOLF_LLM_MODEL:-grok-3-mini}"
+      SERVER_PORT: "8080"
+    # Порт API наружу не публикуется: запросы идут через nginx контейнера web (/api/).
+    # Для локальной отладки — только петлевой интерфейс:
+    #   ports:
+    #     - "127.0.0.1:8082:8080"
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
 
   web:
     build:
@@ -40,7 +62,7 @@ services:
       network: host
     container_name: wolf-web
     ports:
-      - "80:80"
+      - "${WEB_HTTP_PORT:-80}:80"
     volumes:
       # nginx.conf вынесен в bind-mount: правка маршрутов (в т.ч. /docs)
       # применяется через `up -d --force-recreate web`, без пересборки образа.
@@ -48,6 +70,7 @@ services:
     depends_on:
       - api
       - docs
+    restart: unless-stopped
 
   docs:
     # Документация отдаётся отдельным контейнером. Контент — bind-mount:
@@ -56,8 +79,7 @@ services:
     container_name: wolf-docs
     volumes:
       - ./docs-site:/usr/share/nginx/html:ro
-    ports:
-      - "8090:80"
+    # Наружу не публикуется: доступ через /docs/ на контейнере web.
     restart: unless-stopped
 
 volumes:

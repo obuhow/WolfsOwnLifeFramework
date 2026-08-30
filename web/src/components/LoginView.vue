@@ -19,8 +19,12 @@
 import { onMounted, ref } from 'vue'
 import { apiBase } from '../api'
 
-const username = ref('admin')
-const password = ref('admin')
+// Поля входа пустые: предзаполнять форму учётными данными нельзя.
+// Исторически здесь стояло admin/admin от однопользовательского режима до релиза 0.4;
+// seed-аккаунт admin заблокирован с тикета 0.4/13, а на публичном стенде подсказка
+// общеизвестного логина в форме — прямое приглашение к перебору.
+const username = ref('')
+const password = ref('')
 const error = ref('')
 const loading = ref(false)
 

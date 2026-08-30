@@ -58,22 +58,24 @@ import DocsShell from './DocsShell.vue'
     <section id="compose" class="docs-section">
       <h2>docker compose</h2>
       <p>Минимальный набор сервисов — точная копия того, что использует сама WOLF в проде: <code>db</code> (Postgres 16), <code>api</code> (Java 21 / Spring Boot), <code>web</code> (Vue 3 за nginx), <code>docs</code> (эта документация, отдельным контейнером).</p>
+      <p class="docs-note">Секреты не пишутся в <code>docker-compose.yml</code>: они берутся из файла <code>.env</code> рядом с ним (шаблон — <code>.env.example</code> в репозитории). Запись <code>${VAR:?…}</code> означает, что без заданной переменной стек намеренно не стартует.</p>
       <pre><code>services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: wolf
-      POSTGRES_USER: wolf
-      POSTGRES_PASSWORD: wolf
+      POSTGRES_DB: "${POSTGRES_DB:?не задан}"
+      POSTGRES_USER: "${POSTGRES_USER:?не задан}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?не задан}"
     volumes:
       - wolf_pgdata:/var/lib/postgresql/data
 
   api:
     build: ./api
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wolf
-      SPRING_DATASOURCE_USERNAME: wolf
-      SPRING_DATASOURCE_PASSWORD: wolf
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://db:5432/${POSTGRES_DB}"
+      SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER}"
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD}"
+      WOLF_JWT_SECRET: "${WOLF_JWT_SECRET:?не задан}"
     depends_on:
       - db
 

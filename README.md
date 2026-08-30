@@ -178,7 +178,19 @@ WolfsOwnLifeFramework/
 
 ## Быстрый старт
 
-Сначала соберите артефакты на хосте, затем соберите runtime-образы и запустите Compose:
+**Шаг 1. Секреты.** Скопируйте шаблон окружения и подставьте свои значения:
+
+```bash
+cp .env.example .env
+openssl rand -base64 24   # → POSTGRES_PASSWORD
+openssl rand -base64 48   # → WOLF_JWT_SECRET
+```
+
+Файл `.env` не попадает в git. Без заданных `POSTGRES_PASSWORD` и `WOLF_JWT_SECRET`
+стек намеренно не стартует: значений по умолчанию у них нет, чтобы установка
+не оказалась в сети на общеизвестном пароле.
+
+**Шаг 2. Сборка и запуск.** Соберите артефакты, затем runtime-образы:
 
 ```bash
 cd api && ./gradlew bootJar --no-daemon && cd ..
@@ -190,9 +202,14 @@ docker compose up -d --no-build
 Production workflow собирает образы на VPS внутри Docker. На удалённом хосте не требуются Java, Gradle, Node.js или npm — только Docker Compose и доступ к базовым Docker-образам.
 
 - UI: http://localhost
-- API: http://localhost:8082
-- Health: http://localhost:8082/api/v1/health
-- Postgres: `localhost:5434`, db/user/pass `wolf` / `wolf` / `wolf`
+- Health: http://localhost/api/v1/health
+
+Порты Postgres и API наружу **не публикуются**: контейнеры общаются по внутренней сети
+Compose, а запросы к API идут через nginx контейнера `web` по пути `/api/`. Для локальной
+отладки в `docker-compose.yml` есть закомментированные проброски на `127.0.0.1`.
+
+> **Публичная установка.** Перед тем как открыть WOLF в интернет, поставьте перед ним
+> обратный прокси с TLS и убедитесь, что наружу открыты только 80/443.
 
 ---
 
@@ -200,13 +217,16 @@ Production workflow собирает образы на VPS внутри Docker. 
 
 | Сервис | Host port | Внутри compose |
 |--------|-----------|----------------|
-| Postgres | **5434** | 5432 |
-| API | **8082** | 8080 |
-| Web | **80** | 80 |
-| Docs | **8090** | 80 |
+| Web (nginx) | **80** | 80 |
+| API | не публикуется | 8080 |
+| Postgres | не публикуется | 5432 |
+| Docs | не публикуется | 80 |
 
-Порты выбраны так, чтобы не пересекаться с типичным system Postgres `:5432` и другими
-локальными стеками.
+Наружу открыт только веб-контейнер: запросы к API идут через nginx по пути `/api/`,
+документация — по `/docs/`. Postgres и API снаружи недоступны, чтобы установка не
+оказалась в сети открытой базой. Для локальной отладки в `docker-compose.yml` есть
+закомментированные проброски на `127.0.0.1:5434` и `127.0.0.1:8082` — петлевой
+интерфейс, не `0.0.0.0`. Порт веб-интерфейса меняется переменной `WEB_HTTP_PORT`.
 
 ---
 
@@ -214,8 +234,8 @@ Production workflow собирает образы на VPS внутри Docker. 
 
 - Глоссарий: [`CONTEXT.md`](CONTEXT.md)
 - ADR: [`docs/adr/`](docs/adr/)
-- Release 0.1 spec: [`.scratch/release-0.1/spec.md`](.scratch/release-0.1/spec.md)
-- Тикеты: [`.scratch/release-0.1/issues/`](.scratch/release-0.1/issues/)
+- Конвенции разработки: [`AGENTS.md`](AGENTS.md), [`docs/agents/`](docs/agents/)
+- Спеки и тикеты релизов: [`.scratch/`](.scratch/)
 
 ---
 
