@@ -1,7 +1,7 @@
 # Мастер первого входа 0.4-08: реализован только API, экрана нет
 
 Type: bug
-Status: open
+Status: resolved
 Blocked by:
 Найдено при: релиз 0.6, тикет 04 (Финальный выбор и очистка профиля)
 Регрессия в: `release-0.4-multiuser-demo`, тикет 08 (`Status: resolved`)
