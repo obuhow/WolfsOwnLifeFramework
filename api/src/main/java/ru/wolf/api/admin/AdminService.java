@@ -29,7 +29,10 @@ import ru.wolf.api.admin.dto.UserAdminResponse;
 import ru.wolf.api.invite.InviteCode;
 import ru.wolf.api.invite.InviteCodeRepository;
 import ru.wolf.api.invite.InviteService;
+import ru.wolf.api.lifearea.LifeAreaRepository;
+import ru.wolf.api.lifesphere.LifeSphereRepository;
 import ru.wolf.api.user.User;
+import ru.wolf.api.user.UserPurgeService;
 import ru.wolf.api.user.UserRepository;
 
 import java.util.List;
@@ -44,6 +47,9 @@ public class AdminService {
     private final InviteCodeRepository inviteCodeRepository;
     private final InviteService inviteService;
     private final PasswordEncoder passwordEncoder;
+    private final UserPurgeService userPurgeService;
+    private final LifeAreaRepository lifeAreaRepository;
+    private final LifeSphereRepository lifeSphereRepository;
 
     @Transactional(readOnly = true)
     public List<UserAdminResponse> listUsers(boolean includeDemo) {
@@ -107,6 +113,13 @@ public class AdminService {
         }
         if (!target.getUsername().equals(request.confirmUsername())) {
             throw new IllegalArgumentException("Имя пользователя не совпадает");
+        }
+        if ("DEMO".equals(target.getAccountType())) {
+            // Демо-профиль содержит связанные данные. Сначала чистим их в FK-порядке,
+            // затем удаляем пользовательские области/сферы и сам аккаунт.
+            userPurgeService.purgeProfileData(target);
+            lifeAreaRepository.deleteAllByUser(target);
+            lifeSphereRepository.deleteAllByUser(target);
         }
         userRepository.delete(target);
     }

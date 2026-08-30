@@ -28,6 +28,58 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
+// Демо-режим (тикет 07): список профилей + плашка с выданными кредами.
+const demoOpen = ref(false)
+const demoProfiles = ref([])
+const demoLoading = ref(false)
+const demoCreds = ref(null)
+
+const FALLBACK_PROFILES = [
+  { slug: 'worker-class', displayName: 'Рабочий класс' },
+  { slug: 'wise-freelancer', displayName: 'Мудрый фрилансер' },
+  { slug: 'free-artist', displayName: 'Свободный художник' }
+]
+
+async function openDemo() {
+  demoOpen.value = true
+  error.value = ''
+  try {
+    const res = await fetch(`${apiBase()}/demo/profiles`)
+    demoProfiles.value = res.ok ? await res.json() : FALLBACK_PROFILES
+  } catch {
+    demoProfiles.value = FALLBACK_PROFILES
+  }
+}
+
+async function startDemo(slug) {
+  error.value = ''
+  demoLoading.value = true
+  try {
+    const res = await fetch(`${apiBase()}/demo/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileSlug: slug })
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${res.status}`)
+    }
+    const data = await res.json()
+    localStorage.setItem('wolf_token', data.token)
+    // Показать выданные креды перед входом (на случай повторного входа).
+    demoCreds.value = { username: data.username, password: data.password }
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    demoLoading.value = false
+  }
+}
+
+function enterDemo() {
+  window.location.hash = '#/today'
+  window.location.reload()
+}
+
 async function login() {
   error.value = ''
   loading.value = true
@@ -81,6 +133,38 @@ onMounted(() => {
       </form>
 
       <p class="login-hint"><a href="#/register">У меня есть код</a></p>
+
+      <div class="demo-block">
+        <button v-if="!demoOpen" type="button" class="btn btn-ghost btn-block" @click="openDemo">Демо-режим</button>
+
+        <template v-else-if="!demoCreds">
+          <p class="demo-lead">Выберите готовый профиль — WOLF создаст демо-пользователя с предзаполненными данными:</p>
+          <div class="demo-profiles">
+            <button
+              v-for="profile in demoProfiles"
+              :key="profile.slug"
+              type="button"
+              class="btn btn-ghost demo-profile"
+              :disabled="demoLoading"
+              @click="startDemo(profile.slug)"
+            >{{ profile.displayName }}</button>
+          </div>
+          <p v-if="demoLoading" class="demo-lead">Создаём демо-профиль…</p>
+        </template>
+
+        <div v-else class="demo-creds">
+          <p class="demo-lead">Демо-пользователь <strong>{{ demoCreds.username }}</strong>, пароль совпадает с логином — сохраните, чтобы войти повторно.</p>
+          <button type="button" class="btn btn-primary btn-block" @click="enterDemo">Войти в демо</button>
+        </div>
+      </div>
     </section>
   </main>
 </template>
+
+<style scoped>
+.demo-block { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--wolf-subrule, #e5e5e5); }
+.demo-lead { margin: 0 0 10px; color: var(--wolf-muted, #666); font-size: 13px; }
+.demo-profiles { display: flex; flex-direction: column; gap: 8px; }
+.demo-profile { width: 100%; }
+.demo-creds { display: flex; flex-direction: column; gap: 10px; }
+</style>
