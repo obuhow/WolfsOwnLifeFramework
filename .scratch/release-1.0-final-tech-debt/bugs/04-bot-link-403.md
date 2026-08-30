@@ -1,7 +1,7 @@
 # Баг Б-4 — кнопки «Привязать Telegram» / «Привязать Max» дают HTTP 403
 
 Type: bug
-Status: open
+Status: resolved
 Найдено при: релиз 1.0 (живой сайт, Настройки → Импорт из Telegram/Max)
 Регрессия в: `release-0.7-ai-import`, тикеты 03 (Telegram) / 04 (Max), Status: resolved
 

@@ -1,6 +1,6 @@
 # Тикет 05 — Вложенность проектов в Утреннем обходе
 
-Status: ready-for-agent
+Status: resolved
 Blocked by:
 Type: task
 
@@ -45,3 +45,37 @@ Type: task
 ## Закрывает
 
 Доработка 1 заявки.
+
+## Answer
+
+Реализовано в ветке `release-1.0/feature/05-morning-nested` (от `origin/develop`).
+Формат зафиксирован: **плоский pre-order список с `depth`/`parentId`** (как в
+`gantt/dto/ProjectRow`), без вложенных `children` в JSON.
+
+**Бэкенд:**
+- `morning/dto/ProjectDigest` — добавлены `Long parentId` и `int depth` (порядок полей:
+  `id, parentId, depth, title, lastNotes, topDelos`).
+- `MorningDigestService` — метод `build` теперь зовёт `buildProjectTree(user, week)`:
+  берёт `IN_PROGRESS` проекты (`findByUserOrderByTitleAsc` — уже по title), делит на
+  корни и `childrenByParent` (LinkedHashMap хранит title-порядок), затем pre-order
+  обходом `appendSubtree` строит плоский список: корень по title → его дети по title →
+  их дети и т.д. `depth` = число видимых предков, `parentId` = ближайший видимый предок.
+- `nearestVisibleParentId` — если родитель не `IN_PROGRESS` (не отображается), ребёнок
+  поднимается в корни (не теряется под скрытым родителем). Guard от циклов (100).
+
+**Фронт (`MorningView.vue`):**
+- Цикл рендерит `visibleProjects` (computed): строка видна, только если раскрыты ВСЕ её
+  предки (`isVisible` идёт вверх по `parentId` через `projectsById`). Раскрытие корня
+  через существующий `toggle`/`expanded` показывает поддерево.
+- Отступ по глубине `:style="marginLeft: depth*20px"`, класс `morning-project-nested`
+  (левый субрул), подсказка «· подпроекты» у узлов с детьми (`hasChildren`).
+- Тихий контракт 0.3: только отступ и левая линия, без цветных маркеров.
+
+**Приёмка:**
+- `MorningDigestApiIT` — **3/3 PASSED** (BUILD SUCCESSFUL). Новый тест
+  `digest_nests_child_project_under_parent_with_depth`: WOLF (root, depth 0, parentId
+  null) + WOLF MVP (depth 1, parentId = WOLF), ровно 2 записи в pre-order. Два прежних
+  теста зелёные — DTO-изменение обратно совместимо, регрессии нет.
+- `npm run build` в `web/` — компонент компилируется.
+
+Доработка 1 закрыта.

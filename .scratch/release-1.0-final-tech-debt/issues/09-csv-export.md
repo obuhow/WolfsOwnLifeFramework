@@ -1,6 +1,6 @@
 # Тикет 09 — CSV-экспорт всех сущностей (раунд-трип)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by:
 Type: task
 
@@ -56,3 +56,25 @@ Type: task
 ## Закрывает
 
 Доработка 5 заявки. Дополняет существующий механизм Синхронизации данных (ADR-0004).
+
+## Answer
+
+Реализовано в `release-1.0/feature/09-csv-export`:
+
+**Бэкенд:**
+- `DataSyncCsvCodec`: сериализация contract-rows → единый CSV со всеми листами (секции `# sheet:<name>` + заголовки колонок контракта), RFC 4180 экранирование (`, " \n \r`); обратный парсинг CSV → xlsx-workbook для раунд-трипа. `looksLikeCsv` детектирует наш формат по маркеру.
+- `DataSyncExportService.buildRows(User)` выделен из `export` — переиспользуется CSV-экспортом (тот же набор строк, что и xlsx).
+- `DataSyncControllerService`: `export(format=csv)` → CSV; `preview` конвертирует загруженный CSV в workbook (`maybeConvertCsv`) и прогоняет существующий пайплайн валидации/применения. Формат-валидатор принимает xlsx и csv.
+- `ByteArrayMultipartFile`: обёртка байтов CSV-derived workbook для существующего preview.
+- `DataSyncExportController`: ветка csv → `Content-Type: text/csv; charset=utf-8`, `filename=wolf-data-0.21.csv`.
+- Миграция не нужна — колонки уже определены контрактом.
+
+**Фронт** (`DataSyncView.vue`):
+- Кнопка «Экспорт в CSV» рядом со «Скачать XLSX» → скачивание `wolf-data-0.21.csv`.
+- `<input accept=".xlsx,.csv">` — импорт принимает оба формата (единый пайплайн).
+
+**Тесты** (`DataSyncCsvApiIT`, 2/2 PASSED):
+1. `export_csv_carries_all_sheet_headers_and_project_columns`: `GET /export?format=csv` → 200, `text/csv`, тело содержит `# sheet:<name>` + заголовки всех 17 листов контракта; projects несёт `parentExternalId`, даты, `EVEN_WEEKDAYS` (закрывает перенос вложенности).
+2. `csv_round_trips_back_through_import`: экспортированный CSV загружен обратно через `/import/preview` → `VALID`, `applyAllowed=true`, счётчики projects/life_areas корректны.
+
+Сборка фронтенда: `vite build` — 117 модулей, без ошибок.

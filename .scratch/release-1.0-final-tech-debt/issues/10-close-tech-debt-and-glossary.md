@@ -1,6 +1,6 @@
 # Тикет 10 — Закрытие техдолгов предыдущих релизов + глоссарий
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01,02,03,04,05,06,07,08,09
 Type: task
 
@@ -71,3 +71,23 @@ _Avoid_: онбординг (тот требует уже аутентифици
 ## Закрывает
 
 Финальную часть релиза 1.0 (укладка): техдолги закрыты, глоссарий пополнен.
+
+## Answer
+
+Выполнено в `release-1.0/feature/10-tech-debt-glossary` (code/docs в develop) + docs-ветке трекера:
+
+**10.1 Перенесённые баги → resolved (с доказательством):**
+- `release-0.6-demo-onboarding/bugs/01-first-run-wizard-missing-ui.md` → `resolved`. Доказательство: `OnboardingWizardView.vue` + маршрут `/onboarding` в `main.js` присутствуют; `OnboardingApiIT` содержит 4 теста (verified `grep -c @Test`). Статус исходного 0.4-08 оставлен владельцу (Out of Scope).
+- `wayfinder-release-0.9-layered-arch/bugs/01-delo-dto-not-in-dto-package.md` → `resolved`. Доказательство: `ls api/src/main/java/ru/wolf/api/delo/dto/` → ровно 9 record-классов (DeloResponse, DeloDetailResponse, CreateDeloRequest, UpdateDeloRequest, ApplyRecurrenceRequest, ApplyRecurrenceResponse, RecurrenceSlotDto, ProjectLink, ImportResponse); `grep @Deprecated` в delo/ пуст.
+
+**10.2 Глоссарий CONTEXT.md:**
+- Три термина («Демо-профиль», «Демо-пользователь», «Демо-режим») добавлены после «Seed-аккаунт admin», перед «Ночные часы» — как в grill.md.
+
+**10.3 Итоговая сверка:**
+- `spec.md`: Status → `resolved`, раздел «Тикеты» отражает фактическое состояние (все 01–10 ✅ merged), добавлен итог релиза.
+- Баги Б-1..Б-4 закрыты тикетами 01–04; Б-5 остаётся `needs-info` (ждёт Павла).
+
+**Гейты (Testing Decisions) — все зелёные:**
+- `ls delo/dto/` → 9 файлов ✅
+- заголовки `**Демо-профиль/Демо-пользователь/Демо-режим**` в CONTEXT.md ✅
+- каждый баг — отдельный файл с доказательством и разделом «Как закрыт» ✅

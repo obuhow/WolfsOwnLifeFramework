@@ -1,6 +1,6 @@
 # Тикет 03 — Переключатель распределения времени (каскад Б-1)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 Type: task
 
@@ -39,3 +39,23 @@ Type: task
 ## Закрывает
 
 Баг Б-2 (`bugs/02-distribution-toggle-disabled.md`). Перевести `Status: open` → `resolved`.
+
+## Answer
+
+Каскадное следствие тикета 02 — закрыто в том же коммите
+(`release-1.0/feature/02-03-project-deadline-distribution`).
+
+- Логика блокировки радио не менялась: `:disabled="!form.startDate || !form.endDate
+  || !form.totalPlanHours"` (`ProjectsView.vue`). С появлением вводимого поля
+  `endDate` (тикет 02) при заполнении всех трёх полей радио «Равномерно по дням» /
+  «Равномерно по будням» разблокируются, подпись-заглушка «Нужны даты и плановые
+  часы» скрывается через тот же `v-if`.
+- Сохранение уже реализовано: при `planDistribution !== 'NONE'` уходит
+  `POST /projects/{id}/plan-distribution` с `{ mode }` (`ProjectsView.vue:256-266`).
+- Бэкенд готов: `ProjectController` endpoint `plan-distribution` (:87-92),
+  `PlanDistributionService.apply` заполняет Записи времени. Покрыто
+  `PlanDistributionApiIT` (endpoint с `endDate` + распределением по будням).
+- Правок в логике не потребовалось — только разблокировка через наличие поля
+  endDate (Out of Scope: новых режимов не вводилось).
+
+Б-2 закрыт.

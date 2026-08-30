@@ -1,6 +1,6 @@
 # Тикет 04 — POST /link для Telegram и Max (закрывает 403)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by:
 Type: task
 
@@ -53,3 +53,27 @@ Type: task
 ## Закрывает
 
 Баг Б-4 (`bugs/04-bot-link-403.md`). Перевести `Status: open` → `resolved`.
+
+## Answer
+
+Реализовано в ветке `release-1.0/feature/04-bot-link-post` (от `origin/develop`).
+
+- `TelegramLinkController` — добавлен голый `@PostMapping` `issue(@AuthenticationPrincipal
+  User user)` → `linkService.issueToken(user.getUsername())` → 200 c `TelegramLinkStatus`
+  (рядом с `GET /link` и `POST /link/disconnect`).
+- `MaxLinkController` — зеркально `@PostMapping` → `MaxLinkStatus`.
+- `SecurityConfig` не менялся: `POST /link` покрывается `anyRequest().authenticated()`,
+  требует JWT (аноним получает 403 — корректно).
+- Фронт не менялся: `SettingsView.linkTelegram/linkMax` уже шлёт `POST /link` и читает
+  тело статуса.
+- Тесты (новые, чёрный ящик через `ApiIntegrationTest` + Testcontainers Postgres):
+  `TelegramLinkApiIT`, `MaxLinkApiIT` — по 2 теста:
+  1. `POST /bot/{telegram,max}/link` под JWT → 200, `pendingToken` непустой, `linked=false`;
+  2. тот же POST без JWT → 403.
+- Прогон: `MaxLinkApiIT` — 2/2 PASSED сразу; `TelegramLinkApiIT` — на первом прогоне
+  позитивный тест упал ровно на 5.027s (дефолтный `WebTestClient` responseTimeout) —
+  инфра-таймаут перегруженного хоста, не регрессия (эндпоинт идентичен рабочему Max).
+  Перезапуск класса в одиночку: **BUILD SUCCESSFUL, 2/2 PASSED** (позитивный 0.771s).
+
+Б-4 закрыт. Статус исходных 0.7-03/0.7-04 не трогался (по решению владельца —
+сервис `issueToken` был готов, не выложен был только контроллерный маппинг).

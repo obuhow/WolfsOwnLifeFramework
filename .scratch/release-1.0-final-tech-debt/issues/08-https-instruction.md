@@ -1,6 +1,6 @@
 # Тикет 08 — Инструкция по подключению HTTPS-сертификата
 
-Status: ready-for-agent
+Status: resolved
 Blocked by:
 Type: task
 
@@ -45,3 +45,31 @@ HTTPS-сертификат к самохостингу WOLF (Доработка 
 ## Закрывает
 
 Доработка 4 заявки.
+
+## Answer
+
+Реализовано в ветке `release-1.0/feature/08-https-instruction` (от `origin/develop`).
+
+- Создан `docs/self-hosting-https.md` — пошаговая инструкция под текущий стек
+  (docker-compose: nginx `web` слушает 80 и проксирует `/api/` на `api:8080`,
+  отдельный контейнер `docs`). Покрывает:
+  - **Вариант A (рекомендован) — Caddy**: сервис `caddy` перед `web`, готовый
+    `Caddyfile` с `reverse_proxy web:80`, авто-ACME (Let's Encrypt), тома
+    `caddy_data`/`caddy_config`, авто-продление.
+  - **Вариант B — certbot + nginx**: получение `fullchain.pem`/`privkey.pem`,
+    полный 443-`server` в `nginx.conf` (перенос текущих `location` `/api/`,
+    `/docs/`, `/`), редирект 80→443, HSTS, применение через
+    `up -d --force-recreate web`, авто-продление deploy-hook'ом `nginx -s reload`.
+  - **Вариант C — self-signed**: только для локального теста.
+  - Проверка: `curl -I https://<domain>`, отсутствие смешанного контента
+    (SPA грузит `/api/v1` относительным путём — mixed content не возникает).
+  - Явно указано: `VITE_API_BASE` по умолчанию `/api/v1` (относительный) — при HTTPS
+    менять не нужно; абсолютный `http://` → заменить на `https://` и пересобрать.
+- Ссылка на инструкцию добавлена в `README.md` (блок «Публичная установка» в
+  «Быстром старте» и раздел «Документация»).
+- В `web/src/components/docs/SelfHostingView.vue` добавлена секция «HTTPS-сертификат»
+  (пункт оглавления `#https` + краткое описание трёх вариантов и ссылка на файл).
+- Приёмка: `npm run build` в `web/` — компонент компилируется (визуально проверяется
+  на общем этапе приёмки; кодовых тестов у документа нет по Testing Decisions).
+
+Доработка 4 закрыта.

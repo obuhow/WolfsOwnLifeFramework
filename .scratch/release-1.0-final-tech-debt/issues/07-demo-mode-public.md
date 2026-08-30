@@ -1,6 +1,6 @@
 # Тикет 07 — Демо-режим для гостя + админ-пользователи
 
-Status: ready-for-agent
+Status: resolved
 Blocked by:
 Type: task
 
@@ -83,3 +83,24 @@ Type: task
 Публичный `POST /api/v1/demo/register` создаёт пользователя с паролем = логин. Митигация:
 логины не угадываемы (`GoodEnoughDemoUser-<буква><N>`), аккаунты изолированы по tenant,
 удаляются админом. Брутфорс ограничен префиксом. Зафиксировано в `grill.md`.
+
+## Answer
+
+Реализовано в `release-1.0/feature/07-demo-mode`:
+
+**Бэкенд** (demo-патч):
+- `DemoPublicController`: `GET /api/v1/demo/profiles` (список 3-х профилей) и `POST /api/v1/demo/register` (анонимная регистрация, permitAll).
+- `DemoRegisterService`: генерация следующего свободного слота `GoodEnoughDemoUser-A1…Z1,A2…` с учётом всех DEMO-статусов (ACTIVE/BLOCKED), создание `User(accountType=DEMO, role=USER)`, bcrypt(password=username), загрузка профиля через существующий `DemoFixtureGenerator.populate`, выдача JWT.
+- `AdminService.deleteUser`: для DEMO-аккаунтов сначала `UserPurgeService.purgeProfileData`, затем удаление пользовательских областей/сфер, потом сам аккаунт — FK-порядок гарантирует успешное удаление предзаполненных данных.
+
+**Фронт** (`LoginView.vue`):
+- Кнопка «Демо-режим» под формой входа.
+- Загрузка профилей через `GET /demo/profiles` (фоллбэк на 3 жестко заданных).
+- Выбор профиля → POST регистрация → сохранение токена в `localStorage` → показ плашки «Демо-пользователь <login>, пароль совпадает с логином» → кнопка «Войти в демо» (переход на `/today`).
+
+**Тесты** (`DemoRegisterApiIT`, 3/3 PASSED):
+1. `anonymous_registration_creates_prefilled_demo_and_admin_can_delete_it`: регистрация профиля «worker-class», JWT открывает `/auth/me`, логин/пароль работают через `/auth/login`, админ видит в `includeDemo=true` и удаляет вместе с данными.
+2. `repeated_registration_allocates_next_demo_slot`: последовательные регистрации выдают A1, B1.
+3. `invalid_profile_is_rejected_without_creating_account`: неизвестный slug → 400, DEMO-счётчик не растёт.
+
+Сборка фронтенда: `vite build` — 115 модулей, без ошибок.

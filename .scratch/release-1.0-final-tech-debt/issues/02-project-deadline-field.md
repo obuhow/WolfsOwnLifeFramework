@@ -1,6 +1,6 @@
 # Тикет 02 — Поле финального срока проекта в форме
 
-Status: ready-for-agent
+Status: resolved
 Blocked by:
 Type: task
 
@@ -44,3 +44,25 @@ Type: task
 ## Закрывает
 
 Баг Б-1 (`bugs/01-project-no-deadline-field.md`). Перевести `Status: open` → `resolved`.
+
+## Answer
+
+Реализовано в ветке `release-1.0/feature/02-03-project-deadline-distribution`
+(от `origin/develop`, уже на 1.0.0).
+
+- `web/src/components/ProjectsView.vue`: после поля «Начало» добавлен блок
+  `<div class="form-group"><label for="project-end">Финальный срок</label>
+  <input id="project-end" v-model="form.endDate" type="date" class="input"
+  :disabled="loading" /></div>`.
+- Скрипт не трогался: `form.endDate` уже инициализировался `''`, читался из
+  `project.endDate` при редактировании и уходил в payload как `endDate || null`.
+- Бэкенд не менялся (Out of Scope): колонка `end_date` (`Project.java:70-71`),
+  `CreateProjectRequest.endDate` (:37) и endpoint plan-distribution уже на месте.
+  Round-trip endDate покрыт `ProjectApiIT` (assert `created.endDate()` = 2026-09-30).
+- Приёмка build-гейт: `npm run build` в `web/` проходит (шаблон компилируется).
+  Полная браузерная приёмка (создать проект с датой → перезагрузить `/projects` →
+  колонка срока показывает дату) идёт на общем визуальном этапе релиза; поле
+  и его связи с state подтверждены в коде.
+
+Б-1 закрыт. Статус исходного релиза 0.2 не трогался (по решению владельца —
+модель была закрыта, недоделан был только вертикальный срез формы).

@@ -1,7 +1,7 @@
 # Баг Б-1 — при создании проекта нет поля финального срока (endDate)
 
 Type: bug
-Status: open
+Status: resolved
 Найдено при: релиз 1.0 (живой сайт, экран создания проекта)
 Регрессия в: `release-0.2` (модель `Project` + `CreateProjectRequest`), Status: resolved
 
