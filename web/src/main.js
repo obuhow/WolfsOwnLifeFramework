@@ -29,6 +29,7 @@ import { apiBase } from './api'
 import { isTourActive, isOnboardingKnownCompleted, markOnboardingCompleted } from './onboardingTour'
 import SettingsView from './components/SettingsView.vue'
 import AdminInvitesView from './components/AdminInvitesView.vue'
+import AdminUsersView from './components/AdminUsersView.vue'
 import LifeAreasView from './components/LifeAreasView.vue'
 import ProjectsView from './components/ProjectsView.vue'
 import ProjectDetailView from './components/ProjectDetailView.vue'
@@ -112,6 +113,7 @@ const routes = [
   // Настройки (в т.ч. Импорт XLSX + Синхронизация)
   { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
   { path: '/admin/invites', component: AdminInvitesView, meta: { requiresAuth: true } },
+  { path: '/admin/users', component: AdminUsersView, meta: { requiresAuth: true } },
   { path: '/import/xlsx', component: XlsxImportView, meta: { requiresAuth: true } },
   { path: '/data-sync', component: DataSyncView, meta: { requiresAuth: true } },
   // Релиз 0.7, тикет 02: канал чат-панели импорта записей (плавающая панель в
