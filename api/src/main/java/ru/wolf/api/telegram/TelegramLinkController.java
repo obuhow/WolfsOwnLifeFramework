@@ -47,6 +47,11 @@ public class TelegramLinkController {
         return ResponseEntity.ok(linkService.getStatus(user.getUsername()));
     }
 
+    @PostMapping
+    public ResponseEntity<TelegramLinkStatus> issue(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(linkService.issueToken(user.getUsername()));
+    }
+
     @PostMapping("/disconnect")
     public ResponseEntity<Void> disconnect(
             @AuthenticationPrincipal User user,
