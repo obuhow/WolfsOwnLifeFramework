@@ -389,9 +389,9 @@
           <tr>
             <td class="num">1.1</td>
             <td>Планирование и UX Ежедневника: раскрытие названия в Утреннем обходе, «План нагрузки» отдельной страницей, порядок вкладок, редактор кривой «Распределить время», переименование h1, полоса заполнения проекта, режим «Карандаш+»</td>
-            <td class="num">7 + 1 баг</td>
-            <td><span class="chip">01 в ветке (не смёржен)</span></td>
-            <td><span class="chip">1 resolved · 6 ready · баг open</span></td>
+            <td class="num">8 + 1 баг</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip done">5 resolved · 3 ready · баг open</span></td>
           </tr>
         </tbody>
       </table>
@@ -439,8 +439,8 @@
           <tr>
             <td class="num">04</td>
             <td>Кнопка «Распределить время» + ручной редактор кривой (дополняет стратегии, сумма плановых часов неизменна)</td>
-            <td><span class="chip faint">ready-for-agent</span></td>
-            <td>Не начат. <span class="chip">Blocked by 02</span></td>
+            <td><span class="chip done">resolved</span></td>
+            <td>Кнопка у плановых часов проекта на вкладке «Бюджет» → окно с датами начала/завершения (предзаполнение), прямая по <code>totalPlanHours</code> на ISO-недели диапазона, клик по неделе — разбивка на 2 сегмента, перетаскивание с инвариантом Σ = const (проверено в браузере: 120.0 == 120.0). Запись — в <code>PUT /gantt/week-plans</code> (тот же эндпоинт, что Гантт), дебаунс + откат через общий write-helper. Смёржено в <code>develop</code>.</td>
           </tr>
           <tr>
             <td class="num">05</td>
@@ -470,8 +470,8 @@
       </table>
 
       <div class="note">
-        Итог: <b>2 из 8 закрыт</b> (02 и 03 смёржены), 01 — частично (без мержа/приёмки), 4 доработки и 1 баг ждут исполнителя.
-        Зависимости: 04 всё ещё блокируется 02 (статус трекера обновлён, код смёржен); 06 требует ADR-0006. Остальные независимы.
+        Итог: <b>5 из 8 закрыт</b> (01–04 и 08 смёржены в <code>develop</code>), 05–07 и баг Б-01 ждут
+        исполнителя. Блокер 04 (02) снят — код 02 в <code>develop</code>; 06 требует ADR-0006. Остальные независимы.
       </div>
     </section>
 
@@ -485,14 +485,14 @@
         </thead>
         <tbody>
           <tr>
-            <td><b>Стенд отдаёт старую сборку <code>0.6.0</code></b></td>
-            <td>Контейнер <code>wolf-web</code> раздаёт <code>index-DgbvRH0b.js</code> с версией <code>0.6.0</code>, тогда как <code>web/package.json</code> в <code>develop</code> уже <code>1.0.0</code>. Образы <code>wolf-web</code>/<code>wolf-api</code> не пересобирались из свежего кода.</td>
-            <td><span class="chip ink">передеплой</span></td>
+            <td><b>Стенд обновлён до кода релиза 1.1 (тикет 04)</b></td>
+            <td>Контейнер <code>wolf-web</code> пересобран из <code>release-1.1/feature/04</code> (после мержа = <code>develop</code>): served bundle <code>index-C6Xt-Qak.js</code> (версия 1.0.0) содержит окно «Распределить время», проверено браузером. Прежний разрыв «стенд отдаёт 0.6.0» закрыт.</td>
+            <td><span class="chip done">передеплой выполнен</span></td>
           </tr>
           <tr>
-            <td><b>Тикет 1.1/01 закрыт как <code>resolved</code>, но не смёржен</b></td>
-            <td>Ветка <code>release-1.1/feature/01-...</code> на 1 коммит впереди <code>develop</code>; в <code>## Answer</code> тикета прямо указано, что мерж и передеплой оставлены отдельным шагом, а браузерная приёмка не проводилась.</td>
-            <td><span class="chip ink">приёмка + мерж</span></td>
+            <td><b>Тикет 1.1/01 смёржен, браузерная приёмка не проводилась</b></td>
+            <td>Ветка <code>release-1.1/feature/01-...</code> смержена в <code>develop</code> (<code>ab7b910</code>); в <code>## Answer</code> тикета мерж и приёмка значились отдельным шагом. Код на стенде есть, ручная приёмка «клик по названию раскрывает блок» осталась.</td>
+            <td><span class="chip ink">браузерная приёмка</span></td>
           </tr>
           <tr>
             <td><b>Релиз 0.4: тикет 09 (приёмка) — <code>open</code></b></td>
