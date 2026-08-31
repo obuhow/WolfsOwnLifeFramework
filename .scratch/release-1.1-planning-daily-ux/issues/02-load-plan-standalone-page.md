@@ -1,6 +1,6 @@
 # Тикет 02 — «План нагрузки» выносится в отдельную страницу /load-plan
 
-Status: ready-for-agent
+Status: claimed
 Blocked by:
 Type: task
 
