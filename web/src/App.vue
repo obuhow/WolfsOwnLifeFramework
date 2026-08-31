@@ -82,7 +82,14 @@ const NAV = [
       { label: 'Личная база знаний', to: '/knowledge' },
     ],
   },
-  { kind: 'link', label: 'Документация', to: '/docs', tour: 'docs' },
+  {
+    kind: 'group', key: 'docs', label: 'Документация', tour: 'docs',
+    children: [
+      { label: 'Манифест WOLF', to: '/docs/manifesto' },
+      { label: 'Сценарии использования', to: '/docs/scenarios' },
+      { label: 'Технические инструкции', to: '/docs/self-hosting' },
+    ],
+  },
   { kind: 'link', label: 'Администрирование', to: '/admin/users', adminOnly: true },
   { kind: 'action', label: 'Приветственный тур', action: 'tour', tour: 'intro' },
   {

@@ -23,6 +23,10 @@
  * thin neutral rules, no accent colors, no shadowed cards, no progress bars.
  * Available to unauthenticated visitors — /docs is outside the router's
  * auth guard (see main.js).
+ *
+ * Баг Б-1 (релиз 1.1): под залогиненным пользователем глобальная шапка
+ * (App.vue .app-shell) уже рисуется на /docs — вторая шапка раздела лишняя.
+ * docs-topbar рендерится только для гостя (без токена).
  */
 defineProps({
   active: { type: String, required: true }, // 'manifesto' | 'scenarios' | 'self-hosting'
@@ -33,11 +37,13 @@ const TABS = [
   { key: 'scenarios', label: 'Сценарии использования', to: '/docs/scenarios' },
   { key: 'self-hosting', label: 'Технические инструкции', to: '/docs/self-hosting' },
 ]
+
+const token = localStorage.getItem('wolf_token') || ''
 </script>
 
 <template>
   <div class="docs-shell">
-    <header class="docs-topbar">
+    <header v-if="!token" class="docs-topbar">
       <router-link to="/docs" class="docs-brand">WOLF</router-link>
       <nav class="docs-tabs" aria-label="Разделы документации">
         <router-link
