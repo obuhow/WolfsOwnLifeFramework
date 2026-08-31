@@ -9,6 +9,10 @@
   --wolf-hover: #f7f7f5;
   --wolf-done-surface: #f1f7f0;
   --wolf-done-ink: #5d7a5e;
+  /* Fill bar tokens (ADR-0006: exception for Daily backlog project fill bar) */
+  --wolf-fill-fact: #2e7d32;       /* тёмный зелёный — выполненный факт */
+  --wolf-fill-plan: #a5d6a7;       /* светло-зелёный — план */
+  --wolf-fill-neutral: var(--wolf-subrule); /* нейтральный остаток/перегруз */
   --wolf-focus: #1a1a1a;
   --wolf-space-1: 4px;
   --wolf-space-2: 8px;

@@ -96,9 +96,9 @@ public class GanttService {
         }
 
         Map<String, BigDecimal> planByKey = loadPlans(user, first, last);
-        Map<String, BigDecimal> factByKey = computeFacts(user, dayEnd, weekColumns);
+        HourMaps hourMaps = computeHours(user, dayEnd, weekColumns);
 
-        List<ProjectRow> rows = buildProjectRows(filtered, weekColumns, planByKey, factByKey);
+        List<ProjectRow> rows = buildProjectRows(filtered, weekColumns, planByKey, hourMaps.fact(), hourMaps.pending());
 
         return new GanttResponse(
                 user.getHourAccountingMode(),
@@ -169,9 +169,18 @@ public class GanttService {
         );
     }
 
-    // --- fact aggregation ---
+    // --- fact/pending aggregation ---
 
-    private Map<String, BigDecimal> computeFacts(User user, LocalTime dayEnd, List<WeekColumn> weeks) {
+    /** Result of {@link #computeHours}: parallel fact (DONE) and pending (PLANNED) maps, same cellKey. */
+    private record HourMaps(Map<String, BigDecimal> fact, Map<String, BigDecimal> pending) {}
+
+    /**
+     * Aggregates confirmed (DONE → fact) and not-yet-confirmed (PLANNED → pending) hours
+     * per project×ISO-week in one pass, using the same primary/ALL_PROJECTS attribution
+     * rule for both statuses (ticket 06, release 1.1 — «Полоса заполнения проекта»
+     * needs pending alongside the existing fact aggregate).
+     */
+    private HourMaps computeHours(User user, LocalTime dayEnd, List<WeekColumn> weeks) {
         LocalDate firstMonday = LocalDate.parse(weeks.get(0).weekStart());
         LocalDate lastNextMonday = LocalDate.parse(weeks.get(weeks.size() - 1).weekEndExclusive());
         LocalDateTime rangeFrom = DayBounds.forDay(firstMonday, dayEnd).start();
@@ -192,15 +201,21 @@ public class GanttService {
 
         boolean primaryOnly = !"ALL_PROJECTS".equalsIgnoreCase(user.getHourAccountingMode());
 
-        // week key -> projectId -> hours
-        Map<String, Map<Long, BigDecimal>> acc = new HashMap<>();
+        // week key -> projectId -> hours, one accumulator per status
+        Map<String, Map<Long, BigDecimal>> factAcc = new HashMap<>();
+        Map<String, Map<Long, BigDecimal>> pendingAcc = new HashMap<>();
 
         for (TimeEntry entry : entries) {
-            // Fact = confirmed work only
-            if (entry.getStatus() != TimeEntry.Status.DONE) {
+            // Only DONE (fact) or PLANNED (pending) count; UNKNOWN import cells are neither.
+            Map<String, Map<Long, BigDecimal>> acc;
+            if (entry.getStatus() == TimeEntry.Status.DONE) {
+                acc = factAcc;
+            } else if (entry.getStatus() == TimeEntry.Status.PLANNED) {
+                acc = pendingAcc;
+            } else {
                 continue;
             }
-            // Ad-hoc excluded from project fact
+            // Ad-hoc excluded from project fact/pending
             if (entry.getDelo() == null) {
                 continue;
             }
@@ -248,6 +263,10 @@ public class GanttService {
             }
         }
 
+        return new HourMaps(flatten(factAcc), flatten(pendingAcc));
+    }
+
+    private static Map<String, BigDecimal> flatten(Map<String, Map<Long, BigDecimal>> acc) {
         Map<String, BigDecimal> flat = new HashMap<>();
         for (var weekEntry : acc.entrySet()) {
             for (var pe : weekEntry.getValue().entrySet()) {
@@ -353,7 +372,8 @@ public class GanttService {
             List<Project> projects,
             List<WeekColumn> weeks,
             Map<String, BigDecimal> planByKey,
-            Map<String, BigDecimal> factByKey
+            Map<String, BigDecimal> factByKey,
+            Map<String, BigDecimal> pendingByKey
     ) {
         // Tree order: roots first, children nested by title
         Map<Long, List<Project>> byParent = new HashMap<>();
@@ -366,13 +386,13 @@ public class GanttService {
         }
 
         List<ProjectRow> rows = new ArrayList<>();
-        walkTree(null, 0, byParent, weeks, planByKey, factByKey, rows);
+        walkTree(null, 0, byParent, weeks, planByKey, factByKey, pendingByKey, rows);
 
         // Orphans (parent not in filtered set) — already expanded with ancestors, but safety
         Set<Long> shown = rows.stream().map(ProjectRow::id).collect(Collectors.toSet());
         for (Project p : projects) {
             if (!shown.contains(p.getId())) {
-                rows.add(toRow(p, 0, weeks, planByKey, factByKey));
+                rows.add(toRow(p, 0, weeks, planByKey, factByKey, pendingByKey));
             }
         }
         return rows;
@@ -385,12 +405,13 @@ public class GanttService {
             List<WeekColumn> weeks,
             Map<String, BigDecimal> planByKey,
             Map<String, BigDecimal> factByKey,
+            Map<String, BigDecimal> pendingByKey,
             List<ProjectRow> acc
     ) {
         List<Project> kids = byParent.getOrDefault(parentId, List.of());
         for (Project p : kids) {
-            acc.add(toRow(p, depth, weeks, planByKey, factByKey));
-            walkTree(p.getId(), depth + 1, byParent, weeks, planByKey, factByKey, acc);
+            acc.add(toRow(p, depth, weeks, planByKey, factByKey, pendingByKey));
+            walkTree(p.getId(), depth + 1, byParent, weeks, planByKey, factByKey, pendingByKey, acc);
         }
     }
 
@@ -399,7 +420,8 @@ public class GanttService {
             int depth,
             List<WeekColumn> weeks,
             Map<String, BigDecimal> planByKey,
-            Map<String, BigDecimal> factByKey
+            Map<String, BigDecimal> factByKey,
+            Map<String, BigDecimal> pendingByKey
     ) {
         List<CellHours> cells = new ArrayList<>(weeks.size());
         for (WeekColumn w : weeks) {
@@ -408,7 +430,8 @@ public class GanttService {
                     w.isoYear(),
                     w.isoWeek(),
                     planByKey.get(ck),
-                    factByKey.getOrDefault(ck, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
+                    factByKey.getOrDefault(ck, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)),
+                    pendingByKey.getOrDefault(ck, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
             ));
         }
         return new ProjectRow(
