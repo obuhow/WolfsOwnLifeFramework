@@ -17,11 +17,12 @@
 -->
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { apiBase } from '../api'
 import ConfirmInline from './ConfirmInline.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 const areas = ref([])
 const projects = ref([])
@@ -164,11 +165,24 @@ async function loadAll() {
   try {
     await loadAreas()
     await loadProjects()
+    applyEditQuery()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
   }
+}
+
+// Внешняя точка входа: /projects?edit={id} открывает форму редактирования
+// проекта (используется из «Утреннего обхода»). Форма не меняется — лишь
+// переиспользуется существующий openEdit.
+function applyEditQuery() {
+  const rawId = route.query.edit
+  if (rawId == null) return
+  const id = Number(Array.isArray(rawId) ? rawId[0] : rawId)
+  if (!Number.isFinite(id)) return
+  const project = projects.value.find(p => p.id === id)
+  if (project) openEdit(project)
 }
 
 function openCreate(parent = null) {
