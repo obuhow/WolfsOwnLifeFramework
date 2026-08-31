@@ -71,6 +71,7 @@ Type: task
   `{"inviteAccessOpen":true}`; `PUT` под admin → меняет значение; снятая галочка скрывает
   ссылку на `/login`; `POST /api/v1/auth/register` с валидным кодом при выключенном флаге →
   400 «Регистрация по инвайтам отключена».
+- Браузерная приёмка: headless Chromium + CDP — ссылка видна при ON, скрыта при OFF.
 
 ## Out of Scope
 
@@ -122,5 +123,8 @@ Type: task
   отключена"}`; флаг восстановлен в `true`; V42 применена (таблица
   `instance_config` существует, строка `1 | t`). Бандл в `wolf-web` содержит маркеры
   `inviteAccessOpen`/`instance/registration`/«Открыть доступ по инвайтам».
-- Браузерная приёмка (клик по чекбоксу в Настройках, скрытие ссылки на `/login`) —
-  на ручную приёмку владельцем.
+- **Браузерная приёмка (headless Chromium + CDP, скрипт по образцу
+  `scripts/cdp_driver.py`):** при флаге ON ссылка «У меня есть код» видна
+  (`visible:true`); PUT false под admin → 200; при флаге OFF ссылки в DOM нет
+  (`querySelector('a[href="#/register"]')` → `null`); флаг восстановлен в true.
+  `BROWSER_GATE_PASSED`.
