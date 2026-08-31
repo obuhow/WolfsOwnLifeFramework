@@ -1,6 +1,6 @@
 # Тикет 02 — «План нагрузки» выносится в отдельную страницу /load-plan
 
-Status: claimed
+Status: resolved
 Blocked by:
 Type: task
 
@@ -58,3 +58,51 @@ Type: task
 
 `CONTEXT.md` «План нагрузки» уже переведён из «(секция)» в «(страница)» (`/load-plan`,
 302 со старого якоря) в docs-проходе grill-with-docs.
+
+## Answer
+
+Реализовано на ветке `release-1.1/feature/02-load-plan-standalone-page` (форк от
+`origin/develop`, коммит `add7d45`). Трекер (этот файл, claim/resolved) — на docs-ветке
+`release/1.1-planning-daily-ux-docs`, как принято в проекте.
+
+**Что сделано (все 5 пунктов «Что сделать»):**
+
+1. `main.js` — добавлен маршрут `{ path: '/load-plan', component: LoadPlanView, meta: { requiresAuth: true } }`
+   (+ импорт `LoadPlanView`). Создан `web/src/components/LoadPlanView.vue` — тонкая
+   обёртка-страница: `page-header` c `<h1>План нагрузки</h1>` + eyebrow «Планирование ·
+   нагрузка по Проектам и Рутинам», ниже `<LoadCharts/>` (четыре вкладки над единым
+   источником load-charts).
+2. `PlanningView.vue` (`/roadmap`) — встроенная `<LoadCharts/>` убрана; вместо неё
+   навигационная ссылка «Открыть План нагрузки →» на `/load-plan` (без дублирования
+   диаграмм). Страница теперь = только Гантт + ссылка.
+3. Совместимость якоря: navigation guard в `main.js` — `/roadmap#load-plan` →
+   redirect на `/load-plan` (302-аналог для hash-history SPA), query пробрасывается,
+   так что deep-link `?chart=<key>` сохраняется. В `LoadCharts.setTab` базовый путь
+   `'/roadmap'` заменён на `'/load-plan'` (вид пишется в query без перезагрузки данных).
+4. `App.vue` — пункт меню «План нагрузки»: `to: '/roadmap#load-plan'` → `to: '/load-plan'`.
+5. Пункт «Дорожная карта» (`/roadmap`) сохранён — теперь показывает только Гантт.
+
+Дополнительно: из `LoadCharts.vue` убрана внутренняя `section-heading` (дублирующая
+`<h2>План нагрузки</h2>` + eyebrow «Нагрузка») — заголовок теперь даёт страница-обёртка,
+иначе была бы двойная шапка (антипаттерн `bugs/01`); удалён ставший мёртвым CSS
+`.section-heading`. Логика `isChildActive`/`baseOf` в `App.vue` корректно подсвечивает
+пункт при новом пути без изменений.
+
+**Как проверено (headless, без браузера):**
+- `cd web && npm run build` — зелёный (vite, 119 модулей).
+- Греп собранного бандла: маршрут/guard `/load-plan` присутствуют; склеенной строки
+  `roadmap#load-plan` в шаблонах нет (guard сравнивает `to.path` и `to.hash` раздельно).
+- Vite SSR-рендер `LoadPlanView`: `<h1>План нагрузки</h1>` + `page-header` + eyebrow
+  присутствуют; `LoadCharts` монтируется (`section#load-plan`, скелет «Загрузка
+  диаграмм…» из onMounted-фетча); дублирующей `<h2>План нагрузки</h2>` нет.
+
+**Что НЕ проверено (браузер недоступен — ручная приёмка, п. Testing Decisions):**
+- Живой переход по меню «План нагрузки» → `/load-plan` со всеми вкладками.
+- Живой редирект `/roadmap#load-plan` → `/load-plan` в рантайме.
+- `/load-plan?chart=ladder` открывает вкладку «Лестница» без перезагрузки данных.
+- `/roadmap` рендерит Гантт без встроенной секции и без её дубля.
+
+Мерж в `develop` и передеплой `wolf-web` — по договорённости (см. skill
+`wolf-web-release-dev`, references/merge-and-deploy-via-worktree.md). После мержа снимается
+блокировка с тикетов 03 и 04.
+
