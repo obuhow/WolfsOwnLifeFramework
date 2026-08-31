@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.0-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue" />
   <img alt="Status" src="https://img.shields.io/badge/status-alpha-orange" />
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-green" />
   <img alt="Stack" src="https://img.shields.io/badge/stack-Spring%20Boot%203%20%7C%20Vue%203%20%7C%20Postgres-blue" />
@@ -178,7 +178,19 @@ WolfsOwnLifeFramework/
 
 ## Быстрый старт
 
-Сначала соберите артефакты на хосте, затем соберите runtime-образы и запустите Compose:
+**Шаг 1. Секреты.** Скопируйте шаблон окружения и подставьте свои значения:
+
+```bash
+cp .env.example .env
+openssl rand -base64 24   # → POSTGRES_PASSWORD
+openssl rand -base64 48   # → WOLF_JWT_SECRET
+```
+
+Файл `.env` не попадает в git. Без заданных `POSTGRES_PASSWORD` и `WOLF_JWT_SECRET`
+стек намеренно не стартует: значений по умолчанию у них нет, чтобы установка
+не оказалась в сети на общеизвестном пароле.
+
+**Шаг 2. Сборка и запуск.** Соберите артефакты, затем runtime-образы:
 
 ```bash
 cd api && ./gradlew bootJar --no-daemon && cd ..
@@ -190,9 +202,16 @@ docker compose up -d --no-build
 Production workflow собирает образы на VPS внутри Docker. На удалённом хосте не требуются Java, Gradle, Node.js или npm — только Docker Compose и доступ к базовым Docker-образам.
 
 - UI: http://localhost
-- API: http://localhost:8082
-- Health: http://localhost:8082/api/v1/health
-- Postgres: `localhost:5434`, db/user/pass `wolf` / `wolf` / `wolf`
+- Health: http://localhost/api/v1/health
+
+Порты Postgres и API наружу **не публикуются**: контейнеры общаются по внутренней сети
+Compose, а запросы к API идут через nginx контейнера `web` по пути `/api/`. Для локальной
+отладки в `docker-compose.yml` есть закомментированные проброски на `127.0.0.1`.
+
+> **Публичная установка.** Перед тем как открыть WOLF в интернет, поставьте перед ним
+> обратный прокси с TLS и убедитесь, что наружу открыты только 80/443. Пошаговая
+> инструкция по подключению HTTPS-сертификата (Caddy с авто-ACME, certbot+nginx или
+> self-signed для теста) — [`docs/self-hosting-https.md`](docs/self-hosting-https.md).
 
 ---
 
@@ -200,13 +219,16 @@ Production workflow собирает образы на VPS внутри Docker. 
 
 | Сервис | Host port | Внутри compose |
 |--------|-----------|----------------|
-| Postgres | **5434** | 5432 |
-| API | **8082** | 8080 |
-| Web | **80** | 80 |
-| Docs | **8090** | 80 |
+| Web (nginx) | **80** | 80 |
+| API | не публикуется | 8080 |
+| Postgres | не публикуется | 5432 |
+| Docs | не публикуется | 80 |
 
-Порты выбраны так, чтобы не пересекаться с типичным system Postgres `:5432` и другими
-локальными стеками.
+Наружу открыт только веб-контейнер: запросы к API идут через nginx по пути `/api/`,
+документация — по `/docs/`. Postgres и API снаружи недоступны, чтобы установка не
+оказалась в сети открытой базой. Для локальной отладки в `docker-compose.yml` есть
+закомментированные проброски на `127.0.0.1:5434` и `127.0.0.1:8082` — петлевой
+интерфейс, не `0.0.0.0`. Порт веб-интерфейса меняется переменной `WEB_HTTP_PORT`.
 
 ---
 
@@ -214,15 +236,23 @@ Production workflow собирает образы на VPS внутри Docker. 
 
 - Глоссарий: [`CONTEXT.md`](CONTEXT.md)
 - ADR: [`docs/adr/`](docs/adr/)
-- Release 0.1 spec: [`.scratch/release-0.1/spec.md`](.scratch/release-0.1/spec.md)
-- Тикеты: [`.scratch/release-0.1/issues/`](.scratch/release-0.1/issues/)
+- Подключение HTTPS к самохостингу: [`docs/self-hosting-https.md`](docs/self-hosting-https.md)
+- Конвенции разработки: [`AGENTS.md`](AGENTS.md), [`docs/agents/`](docs/agents/)
+- Спеки и тикеты релизов: [`.scratch/`](.scratch/)
 
 ---
 
 ## Статус и дорожная карта
 
-**Текущая стабильная версия:** `v0.6.0` (alpha). Активная разработка ведётся в ветке
-`develop` (релиз 0.9 — миграция API на слоистую архитектуру завершена, тикеты 01–11).
+**Текущая стабильная версия:** `v1.0.0` (alpha). Активная разработка ведётся в ветке
+`develop` (релиз 1.0 — закрытие техдолгов 0.6–0.9 и правки живого сайта).
+
+> **Чеклист релиза — единая версия.** Версия — единый источник правды в двух файлах
+> сборки: `web/package.json` (`"version"`) и `api/build.gradle` (`version = '…'`). При
+> **каждом** релизе оба файла бампятся **синхронно** до одного значения; шапка SPA берёт
+> версию из `web/package.json` через `__APP_VERSION__` (`web/vite.config.js`), поэтому
+> отдельных правок `App.vue` не требуется. Не забудьте обновить бейдж версии и эту строку
+> в `README.md`.
 
 Реализовано в 0.1–0.6:
 

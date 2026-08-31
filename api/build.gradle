@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'ru.wolf'
-version = '0.6.0'
+version = '1.0.0'
 
 // SPDX-License-Identifier: AGPL-3.0-only (см. LICENSE в корне репозитория)
 
@@ -65,4 +65,13 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    // Секрет подписи JWT для тестов. В application.yml у wolf.jwt.secret намеренно нет
+    // значения по умолчанию (приложение не должно стартовать на общеизвестном ключе),
+    // поэтому переменную обязан задать тестовый запуск — иначе контекст Spring падает
+    // на резолве плейсхолдера. Задаётся здесь, а не только в application-test.properties,
+    // потому что базовый ApiIntegrationTest не объявляет @ActiveProfiles("test") и
+    // тестовый profile-файл для большинства тестов не подхватывается.
+    // Значение фиктивное и живёт только внутри тестового процесса.
+    environment 'WOLF_JWT_SECRET', 'test-only-secret-not-used-anywhere-outside-tests-32b+'
 }

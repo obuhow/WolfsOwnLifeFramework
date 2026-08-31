@@ -47,6 +47,7 @@ import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -76,17 +77,67 @@ public class MorningDigestService {
         String weekId = currentIsoWeek(user);
         GoalFactService.IsoWeek week = goalFactService.parseWeek(weekId);
 
-        List<ProjectDigest> projects = projectRepository.findByUserOrderByTitleAsc(user).stream()
-                .filter(project -> project.getStatus() == Project.Status.IN_PROGRESS)
-                .map(project -> projectDigest(project, user, week))
-                .toList();
+        List<ProjectDigest> projects = buildProjectTree(user, week);
 
         return new MorningDigestResponse(
                 weekId, projects, selectIdeas(user), goalFactDigest(user, weekId, week));
     }
 
+    /**
+     * Build the morning project cards as a flat, pre-ordered list carrying the project tree:
+     * roots (by title) first, each followed by its children (by title), recursively. Only
+     * {@code IN_PROGRESS} projects are shown; {@code depth}/{@code parentId} are computed against
+     * that visible set (a child whose parent is not in progress is promoted to a displayed root).
+     */
+    private List<ProjectDigest> buildProjectTree(User user, GoalFactService.IsoWeek week) {
+        // Already sorted by title asc — preserves child ordering within each parent.
+        List<Project> inProgress = projectRepository.findByUserOrderByTitleAsc(user).stream()
+                .filter(project -> project.getStatus() == Project.Status.IN_PROGRESS)
+                .toList();
+        Set<Long> visibleIds = inProgress.stream().map(Project::getId).collect(Collectors.toSet());
+
+        List<Project> roots = new ArrayList<>();
+        Map<Long, List<Project>> childrenByParent = new LinkedHashMap<>();
+        for (Project project : inProgress) {
+            Long parentId = nearestVisibleParentId(project, visibleIds);
+            if (parentId == null) {
+                roots.add(project);
+            } else {
+                childrenByParent.computeIfAbsent(parentId, key -> new ArrayList<>()).add(project);
+            }
+        }
+
+        List<ProjectDigest> ordered = new ArrayList<>();
+        for (Project root : roots) {
+            appendSubtree(root, null, 0, childrenByParent, user, week, ordered);
+        }
+        return ordered;
+    }
+
+    private void appendSubtree(
+            Project node, Long parentId, int depth, Map<Long, List<Project>> childrenByParent,
+            User user, GoalFactService.IsoWeek week, List<ProjectDigest> out) {
+        out.add(projectDigest(node, parentId, depth, user, week));
+        for (Project child : childrenByParent.getOrDefault(node.getId(), List.of())) {
+            appendSubtree(child, node.getId(), depth + 1, childrenByParent, user, week, out);
+        }
+    }
+
+    /** Nearest ancestor that is itself displayed (IN_PROGRESS); null when the project is a root. */
+    private Long nearestVisibleParentId(Project project, Set<Long> visibleIds) {
+        Project cursor = project.getParent();
+        int guard = 0;
+        while (cursor != null && guard++ < 100) {
+            if (visibleIds.contains(cursor.getId())) {
+                return cursor.getId();
+            }
+            cursor = cursor.getParent();
+        }
+        return null;
+    }
+
     private ProjectDigest projectDigest(
-            Project project, User user, GoalFactService.IsoWeek week) {
+            Project project, Long parentId, int depth, User user, GoalFactService.IsoWeek week) {
         List<Note> notes = noteRepository.findByUserAndProjectIdOrderByCreatedAtDesc(
                 project.getUser(), project.getId(), PageRequest.of(0, 5));
         List<NoteDigest> noteResponses = notes.stream()
@@ -109,7 +160,7 @@ public class MorningDigestService {
                 .limit(3)
                 .map(delo -> new DeloDigest(delo.getId(), delo.getTitle()))
                 .toList();
-        return new ProjectDigest(project.getId(), project.getTitle(), noteResponses, delos);
+        return new ProjectDigest(project.getId(), parentId, depth, project.getTitle(), noteResponses, delos);
     }
 
     private List<IdeaDigest> selectIdeas(User user) {

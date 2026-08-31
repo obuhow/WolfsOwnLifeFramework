@@ -45,6 +45,29 @@ export function useLoadChartWrite(url, body, opts = {}) {
   let timer = null
   let pending = null
 
+  /**
+   * Удаление точки кривой (DELETE /api/v1/projects/{id}/load-curve/{entryId}).
+   * Тикет 03 расширяет контракт хелпера тикета 02: дебаунс неприменим к удалению —
+   * оно уходит сразу. При ошибке вызывается opts.onError(snapshot), значение откатывается
+   * к серверному (откат реализует вызывающая вкладка, подписанная на onError).
+   *
+   * @param {string} deleteUrl — полный URL удаляемого ресурса (без тела)
+   * @param {object} [snapshot] — серверное значение для отката при ошибке
+   */
+  function remove(deleteUrl, snapshot) {
+    const headers = authHeaders()
+    if (!headers) return
+    error.value = ''
+    fetch(deleteUrl, { method: 'DELETE', headers })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      })
+      .catch((e) => {
+        opts.onError?.(snapshot)
+        error.value = `Не сохранено: удаление точки — ${e.message}`
+      })
+  }
+
   function sendNow() {
     const headers = authHeaders(true)
     if (!headers) return
@@ -93,5 +116,5 @@ export function useLoadChartWrite(url, body, opts = {}) {
     pending = null
   }
 
-  return { error, commit, flush, cancel }
+  return { error, commit, flush, cancel, remove }
 }

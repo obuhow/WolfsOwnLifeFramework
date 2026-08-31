@@ -42,8 +42,7 @@ public class HttpTelegramAdapter implements TelegramPort {
     private final TelegramProperties properties;
     private final RestClient restClient;
 
-    public HttpTelegramAdapter(TelegramProperties properties,
-                               @Qualifier("telegramRestClient") RestClient restClient) {
+    public HttpTelegramAdapter(TelegramProperties properties, @Qualifier("telegramRestClient") RestClient restClient) {
         this.properties = properties;
         this.restClient = restClient;
     }

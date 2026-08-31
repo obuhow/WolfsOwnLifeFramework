@@ -28,6 +28,8 @@ import { computed, onMounted, onBeforeUnmount, provide, reactive, ref, watch } f
 import { useRoute, useRouter } from 'vue-router'
 import { apiBase, authHeaders } from '../api'
 import { useLoadChartWrite } from '../loadChartsWrite'
+import { computeMonthlyLoad } from '../loadChartsForecast'
+import CurvesTab from './CurvesTab.vue'
 import BudgetTab from './BudgetTab.vue'
 import LadderTab from './LadderTab.vue'
 import QueueTab from './QueueTab.vue'
@@ -105,6 +107,58 @@ const empty = computed(() => !loading.value && !error.value && data.value && dat
 // Инициализируется из data.projects[].weeklyPlanHours при загрузке.
 const rates = reactive({})
 
+// --- Фильтр проектов/рутин на общей диаграмме (тикет 07) --------------------
+// Мультивыбор: снятые проекты/рутины выпадают из ОБЩЕЙ суммарной нагрузки
+// (capacity пересчитывается на клиенте). По умолчанию выбрано всё.
+const selectedProjectIds = ref(null) // null = все; иначе Set<Long>
+const selectedRoutineIds = ref(null)
+const filterReady = ref(false)
+const filterCollapsed = ref(false) // panel open by default
+
+function initFiltersIfNeeded() {
+  if (filterReady.value || !data.value) return
+  selectedProjectIds.value = new Set(data.value.projects.map((p) => p.id))
+  selectedRoutineIds.value = new Set(data.value.routines.map((r) => r.id))
+  filterReady.value = true
+}
+function toggleProject(id) {
+  if (!selectedProjectIds.value) selectedProjectIds.value = new Set(data.value.projects.map((p) => p.id))
+  const s = selectedProjectIds.value
+  if (s.has(id)) s.delete(id); else s.add(id)
+  // реактивность Set: пересоздаём ссылку
+  selectedProjectIds.value = new Set(s)
+}
+function toggleRoutine(id) {
+  if (!selectedRoutineIds.value) selectedRoutineIds.value = new Set(data.value.routines.map((r) => r.id))
+  const s = selectedRoutineIds.value
+  if (s.has(id)) s.delete(id); else s.add(id)
+  selectedRoutineIds.value = new Set(s)
+}
+function selectAll() {
+  selectedProjectIds.value = new Set(data.value.projects.map((p) => p.id))
+  selectedRoutineIds.value = new Set(data.value.routines.map((r) => r.id))
+}
+function selectedProjectCount() {
+  return selectedProjectIds.value ? selectedProjectIds.value.size : data.value?.projects.length ?? 0
+}
+function selectedRoutineCount() {
+  return selectedRoutineIds.value ? selectedRoutineIds.value.size : data.value?.routines.length ?? 0
+}
+
+// Пересчёт суммарной загрузки на клиенте по выбранным проектам/рутинам.
+const filteredMonthlyLoad = computed(() => {
+  if (!data.value || !filterReady.value) return data.value?.monthlyLoad ?? []
+  return computeMonthlyLoad(
+    data.value.projects,
+    data.value.routines,
+    data.value.weeklyLimit,
+    data.value.startMonday,
+    data.value.horizonMonths,
+    selectedProjectIds.value,
+    selectedRoutineIds.value
+  )
+})
+
 async function load() {
   const headers = authHeaders()
   if (!headers) return
@@ -131,6 +185,8 @@ async function load() {
     for (const p of charts.projects) {
       rates[p.id] = p.weeklyPlanHours
     }
+    // фильтр (тикет 07): выбираем все проекты/рутины по умолчанию
+    initFiltersIfNeeded()
   } catch (e) {
     error.value = e.message
   } finally {
@@ -172,6 +228,46 @@ onBeforeUnmount(() => {
     <p v-else-if="empty" class="muted">Нет активных проектов</p>
 
     <div v-else class="load-charts-body">
+      <!-- Фильтр проектов/рутин (тикет 07): мультивыбор, capacity пересчитывается. -->
+      <details class="chart-filter" :open="!(filterCollapsed)">
+        <summary>
+          Отображать проекты и рутины
+          <span class="filter-counts">
+            проектов: {{ selectedProjectCount() }}/{{ data.projects.length }} ·
+            рутин: {{ selectedRoutineCount() }}/{{ data.routines.length }}
+          </span>
+        </summary>
+        <div class="filter-grid">
+          <fieldset class="filter-col">
+            <legend>Проекты</legend>
+            <label v-for="p in data.projects" :key="p.id" class="filter-item">
+              <input
+                type="checkbox"
+                :checked="!selectedProjectIds || selectedProjectIds.has(p.id)"
+                @change="toggleProject(p.id)"
+              />
+              <span>{{ p.title }}</span>
+            </label>
+            <p v-if="data.projects.length === 0" class="filter-empty">нет проектов</p>
+          </fieldset>
+          <fieldset class="filter-col">
+            <legend>Рутины</legend>
+            <label v-for="r in data.routines" :key="r.id" class="filter-item">
+              <input
+                type="checkbox"
+                :checked="!selectedRoutineIds || selectedRoutineIds.has(r.id)"
+                @change="toggleRoutine(r.id)"
+              />
+              <span>{{ r.title }}</span>
+            </label>
+            <p v-if="data.routines.length === 0" class="filter-empty">нет рутин</p>
+          </fieldset>
+        </div>
+        <div class="filter-actions">
+          <button type="button" class="btn btn-ghost" @click="selectAll">Выбрать все</button>
+        </div>
+      </details>
+
       <!-- Переключатель вкладок (тихий контракт 0.3: без сигнальных цветов/alert). -->
       <div class="tabs" role="tablist" aria-label="Диаграммы нагрузки">
         <button
@@ -193,7 +289,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <!-- Панели вкладок. Кривые (03) подключаются своим тикетом; Бюджет/Лестница — тикет 04. -->
+      <!-- Панели вкладок. Кривые (03) и Бюджет/Лестница (04) реализованы; Очередь — тикет 05. -->
       <div
         v-for="t in TABS"
         v-show="activeTab === t.key"
@@ -203,7 +299,12 @@ onBeforeUnmount(() => {
         role="tabpanel"
         :aria-labelledby="`load-chart-tab-${t.key}`"
       >
-        <BudgetTab v-if="t.key === 'budget'" />
+        <CurvesTab
+          v-if="t.key === 'curves'"
+          :selected-project-ids="selectedProjectIds"
+          :monthly-load="filteredMonthlyLoad"
+        />
+        <BudgetTab v-else-if="t.key === 'budget'" />
         <LadderTab v-else-if="t.key === 'ladder'" />
         <QueueTab v-else-if="t.key === 'queue'" />
         <p v-else class="chart-placeholder muted">подключается в тикете {{ t.ticket }}</p>
@@ -266,4 +367,54 @@ onBeforeUnmount(() => {
 
 /* Все часы и даты — моноширинные. */
 .tab-panel :deep(*) { font-variant-numeric: tabular-nums; }
+
+/* Фильтр проектов/рутин (тикет 07) — тихий контракт 0.3, без сигнальных цветов. */
+.chart-filter {
+  margin-bottom: 1rem;
+  border: 1px solid var(--wolf-rule);
+  background: var(--wolf-surface);
+}
+.chart-filter > summary {
+  cursor: pointer;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  color: var(--wolf-ink);
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.chart-filter > summary::-webkit-details-marker { display: none; }
+.filter-counts {
+  font-size: 0.75rem;
+  color: var(--wolf-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 0.5rem 0.85rem;
+}
+.filter-col { margin: 0; border: 0; padding: 0; }
+.filter-col legend { font-size: 0.75rem; color: var(--wolf-muted); padding: 0; margin-bottom: 0.35rem; }
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--wolf-ink);
+  padding: 2px 0;
+  cursor: pointer;
+}
+.filter-item input { accent-color: var(--wolf-ink); }
+.filter-empty { font-size: 0.78rem; color: var(--wolf-faint); margin: 0.25rem 0 0; }
+.filter-actions { padding: 0 0.85rem 0.7rem; }
+.filter-actions .btn { font-size: 0.78rem; padding: 0.3rem 0.7rem; }
+
+@media (max-width: 700px) {
+  .filter-grid { grid-template-columns: 1fr; }
+}
 </style>

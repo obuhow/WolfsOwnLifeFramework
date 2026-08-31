@@ -21,6 +21,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { apiBase } from '../api'
 import NotesPanel from './NotesPanel.vue'
 import ConfirmInline from './ConfirmInline.vue'
+import LoadCurveLane from './LoadCurveLane.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,6 +39,9 @@ const selectedDeloId = ref('')
 const dependencySearch = ref('')
 const cascadePreview = ref(null)
 const pendingProjectPayload = ref(null)
+// Модалка редактора кривой нагрузки (тикет 06).
+const curveModalOpen = ref(false)
+const curveLaneRef = ref(null)
 
 const form = ref({
   lifeAreaId: '',
@@ -306,6 +310,19 @@ function cancelCascadeShift() {
   fillFormFromDetail()
 }
 
+// --- Редактор кривой нагрузки (тикет 06) -----------------------------------
+function openCurveModal() {
+  curveModalOpen.value = true
+  // следующий тик рендера гарантирует монтирование LoadCurveLane
+  requestAnimationFrame(() => curveLaneRef.value?.reload?.())
+}
+function closeCurveModal() {
+  curveModalOpen.value = false
+}
+function onCurveModalKey(e) {
+  if (e.key === 'Escape') closeCurveModal()
+}
+
 async function addDependency() {
   const selected = dependencyOptions.value.find(p => p.label === dependencySearch.value)
   if (!selected) {
@@ -475,6 +492,7 @@ onMounted(loadAll)
           <h2 style="margin: 0">Карточка</h2>
           <div class="projects-toolbar-actions">
             <button v-if="!editing" class="btn btn-primary" :disabled="loading" @click="startEdit">Изменить</button>
+            <button v-if="!editing" type="button" class="btn btn-primary" :disabled="loading" :aria-label="`Распределить время по проекту ${detail.title}`" @click="openCurveModal">Распределить время</button>
             <ConfirmInline v-if="!editing" label="Удалить" :question="`Удалить проект «${detail.title}» и все подпроекты?`" confirm-label="Да, удалить" :disabled="loading" @confirm="remove" />
           </div>
         </div>
@@ -729,6 +747,42 @@ onMounted(loadAll)
       </section>
 
       <NotesPanel :project-id="projectId" />
+
+      <!-- Модалка редактора кривой нагрузки (тикет 06). -->
+      <div
+        v-if="curveModalOpen"
+        class="curve-modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`Распределить время: ${detail?.title}`"
+        tabindex="-1"
+        @click.self="closeCurveModal"
+        @keydown="onCurveModalKey"
+      >
+        <section class="curve-modal">
+          <div class="curve-modal-header">
+            <h2 id="curve-modal-title">Распределить время</h2>
+            <button type="button" class="icon-btn" aria-label="Закрыть" @click="closeCurveModal">×</button>
+          </div>
+          <p class="curve-modal-sub">
+            {{ detail?.title }}
+            <span v-if="detail?.totalPlanHours != null" class="curve-modal-volume">· план {{ detail.totalPlanHours }} ч</span>
+          </p>
+          <LoadCurveLane
+            v-if="curveModalOpen && detail"
+            ref="curveLaneRef"
+            :project-id="detail.id"
+            :title="detail.title"
+          />
+          <p class="curve-modal-note">
+            Кривая распределяет общий объём проекта по неделям. Перетащите квадрат-ручку,
+            кликните по дорожке, чтобы добавить точку, двойной клик по точке — убрать.
+          </p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" @click="closeCurveModal">Готово</button>
+          </div>
+        </section>
+      </div>
     </template>
   </div>
 </template>
@@ -780,5 +834,54 @@ onMounted(loadAll)
 .cascade-list span {
   color: var(--wolf-muted);
   font-size: 0.85rem;
+}
+
+/* Модалка редактора кривой нагрузки (тикет 06). */
+.curve-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+.curve-modal {
+  width: min(820px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--wolf-surface);
+  border: 1px solid var(--wolf-ink);
+}
+.curve-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.curve-modal-header h2 { margin: 0; font-size: 1.1rem; color: var(--wolf-ink); }
+.icon-btn {
+  border: 0;
+  background: transparent;
+  color: var(--wolf-ink);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+.curve-modal-sub {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--wolf-muted);
+  font-variant-numeric: tabular-nums;
+}
+.curve-modal-volume { color: var(--wolf-faint); }
+.curve-modal-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--wolf-muted);
 }
 </style>

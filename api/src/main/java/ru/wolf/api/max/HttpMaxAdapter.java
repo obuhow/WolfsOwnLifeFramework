@@ -50,8 +50,7 @@ public class HttpMaxAdapter implements MaxPort {
     private final MaxProperties properties;
     private final RestClient restClient;
 
-    public HttpMaxAdapter(MaxProperties properties,
-                          @Qualifier("maxRestClient") RestClient restClient) {
+    public HttpMaxAdapter(MaxProperties properties, @Qualifier("maxRestClient") RestClient restClient) {
         this.properties = properties;
         this.restClient = restClient;
     }

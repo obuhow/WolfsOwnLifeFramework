@@ -27,6 +27,7 @@ const router = useRouter()
 const route = useRoute()
 const token = ref(localStorage.getItem('wolf_token') || '')
 const username = ref('')
+const isAdmin = ref(false)
 
 // Версия сборки (релиз 0.6, тикет 08). `__APP_VERSION__` — compile-time
 // константа из web/vite.config.js, читающая web/package.json. Смена версии
@@ -82,6 +83,8 @@ const NAV = [
     ],
   },
   { kind: 'link', label: 'Документация', to: '/docs', tour: 'docs' },
+  { kind: 'link', label: 'Администрирование', to: '/admin/users', adminOnly: true },
+  { kind: 'action', label: 'Приветственный тур', action: 'tour', tour: 'intro' },
   {
     kind: 'group', key: 'settings', label: 'Настройки', tour: 'settings',
     children: [
@@ -119,6 +122,17 @@ function isChildActive(to) {
 
 function isGroupActive(group) {
   return flatChildren(group).some((c) => isChildActive(c.to))
+}
+
+// Пункт-действие NAV (напр. «Приветственный тур»): повторный запуск тура из
+// шапки — без firstRun, чтобы не показать существующему пользователю финальный
+// выбор «Очистить» (который удалил бы его реальные данные). Поведение совпадает
+// со старой отдельной кнопкой тура.
+function runNavAction(action) {
+  if (action === 'tour') {
+    startTour()
+    router.push('/morning')
+  }
 }
 
 function groupKeyForPath() {
@@ -236,12 +250,14 @@ async function loadUser() {
       localStorage.removeItem('wolf_token')
       token.value = ''
       username.value = ''
+      isAdmin.value = false
       router.push('/login')
       return
     }
     if (res.ok) {
       const data = await res.json()
       username.value = data.username || 'admin'
+      isAdmin.value = data.role === 'ADMIN'
     }
   } catch (e) {
     // ignore network blips
@@ -252,6 +268,7 @@ async function logout() {
   localStorage.removeItem('wolf_token')
   token.value = ''
   username.value = ''
+  isAdmin.value = false
   if (drawerOpen.value) closeDrawer()
   router.push('/login')
 }
@@ -286,6 +303,7 @@ onBeforeUnmount(() => {
           <!-- Desktop top navigation -->
           <nav class="nav nav-desktop" aria-label="Основная навигация">
             <template v-for="item in NAV" :key="item.label">
+              <template v-if="!item.adminOnly || isAdmin">
               <router-link
                 v-if="item.kind === 'link'"
                 :to="item.to"
@@ -293,6 +311,14 @@ onBeforeUnmount(() => {
                 :data-tour-target="item.tour"
                 :class="{ active: isChildActive(item.to) }"
               >{{ item.label }}</router-link>
+
+              <button
+                v-else-if="item.kind === 'action'"
+                type="button"
+                class="nav-link nav-action"
+                :data-tour-target="item.tour"
+                @click="runNavAction(item.action)"
+              >{{ item.label }}</button>
 
               <div
                 v-else
@@ -346,20 +372,13 @@ onBeforeUnmount(() => {
                   </template>
                 </div>
               </div>
+              </template>
             </template>
           </nav>
 
           <div class="header-right">
             <div class="user-menu">
               <span class="user-name">{{ username }}</span>
-              <button
-                @click="() => { startTour(); router.push('/morning'); }"
-                class="btn btn-ghost tour-btn"
-                aria-label="Приветственный тур"
-                title="Пройти Знакомство заново"
-              >
-                Приветственный тур
-              </button>
               <button @click="logout" class="btn btn-ghost logout-btn" aria-label="Выйти" title="Выйти">Выйти</button>
             </div>
             <button
@@ -400,6 +419,7 @@ onBeforeUnmount(() => {
 
             <div class="drawer-body">
               <template v-for="item in NAV" :key="item.label">
+                <template v-if="!item.adminOnly || isAdmin">
                 <router-link
                   v-if="item.kind === 'link'"
                   :to="item.to"
@@ -408,6 +428,14 @@ onBeforeUnmount(() => {
                   :class="{ active: isChildActive(item.to) }"
                   @click="onDrawerNavigate"
                 >{{ item.label }}</router-link>
+
+                <button
+                  v-else-if="item.kind === 'action'"
+                  type="button"
+                  class="drawer-link drawer-action"
+                  :data-tour-target="item.tour"
+                  @click="() => { runNavAction(item.action); closeDrawer(); }"
+                >{{ item.label }}</button>
 
                 <div v-else class="drawer-group">
                   <button
@@ -447,19 +475,12 @@ onBeforeUnmount(() => {
                     </template>
                   </div>
                 </div>
+                </template>
               </template>
             </div>
 
             <div class="drawer-foot">
               <span class="user-name">{{ username }}</span>
-              <button
-                @click="() => { startTour(); router.push('/morning'); closeDrawer(); }"
-                class="btn btn-ghost tour-btn"
-                aria-label="Приветственный тур"
-                title="Пройти Знакомство заново"
-              >
-                Приветственный тур
-              </button>
               <button type="button" class="btn btn-ghost" @click="logout">Выйти</button>
             </div>
           </nav>
