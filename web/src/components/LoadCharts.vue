@@ -67,8 +67,9 @@ function setTab(key) {
   activeTab.value = key
   localStorage.setItem(LS_KEY, key)
   // Вид передаётся ссылкой через query, без перезагрузки данных.
+  // Базовый путь — /load-plan (release 1.1, тикет 02: страница вынесена с /roadmap).
   if (route.query.chart !== key) {
-    router.replace({ path: '/roadmap', query: { ...route.query, chart: key } })
+    router.replace({ path: '/load-plan', query: { ...route.query, chart: key } })
   }
 }
 
@@ -214,13 +215,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section id="load-plan" class="load-charts" aria-label="План нагрузки">
-    <div class="section-heading">
-      <div>
-        <span class="eyebrow">Нагрузка</span>
-        <h2>План нагрузки</h2>
-      </div>
-    </div>
-
     <p v-if="error" class="banner error">{{ error }}</p>
 
     <div v-else-if="loading" class="muted">Загрузка диаграмм…</div>
@@ -315,16 +309,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .load-charts { width: 100%; }
-
-.section-heading { margin-bottom: 0.85rem; }
-.section-heading h2 { margin: 0; font-size: 1rem; }
-.section-heading .eyebrow {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--wolf-muted);
-}
 
 /* Переключатель — тот же паттерн, что в SpheresView.vue. */
 .tabs {

@@ -17,23 +17,27 @@
 -->
 <script setup>
 /*
- * Страница «Дорожная карта». Верхняя часть — Гантт (GanttView).
- * Секция «План нагрузки» (#load-plan) целиком вынесена в LoadCharts.vue (release 0.8,
- * тикет 02): четыре вкладки диаграмм над единым источником данных load-charts.
- * Старые плоские таблицы capacity-list / curve-list удалены — их данные полностью покрыты
- * новым эндпоинтом.
+ * Страница «Дорожная карта» (/roadmap). Теперь только Гантт (GanttView).
+ * Секция «План нагрузки» (#load-plan) вынесена в самостоятельную страницу /load-plan
+ * (release 1.1, тикет 02, решение владельца B). Здесь остаётся навигационная ссылка на
+ * неё — без дублирования диаграмм. Старый якорь /roadmap#load-plan редиректит на
+ * /load-plan (navigation guard в main.js).
  */
 import GanttView from './GanttView.vue'
-import LoadCharts from './LoadCharts.vue'
 </script>
 
 <template>
   <div class="planning-page">
     <GanttView />
-    <LoadCharts />
+    <p class="load-plan-link">
+      <router-link to="/load-plan">Открыть План нагрузки →</router-link>
+    </p>
   </div>
 </template>
 
 <style scoped>
 .planning-page { width: 100%; }
+.load-plan-link { margin: 24px 0 0; }
+.load-plan-link a { color: var(--wolf-ink); text-decoration: none; border-bottom: 1px solid var(--wolf-rule); }
+.load-plan-link a:hover { border-bottom-color: var(--wolf-ink); }
 </style>

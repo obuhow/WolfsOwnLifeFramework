@@ -40,6 +40,7 @@ import WeekView from './components/WeekView.vue'
 import CalendarView from './components/CalendarView.vue'
 import GanttView from './components/GanttView.vue'
 import PlanningView from './components/PlanningView.vue'
+import LoadPlanView from './components/LoadPlanView.vue'
 import GoalsView from './components/GoalsView.vue'
 import IdeasView from './components/IdeasView.vue'
 import IdeaDetailView from './components/IdeaDetailView.vue'
@@ -83,6 +84,9 @@ const routes = [
   { path: '/gantt', redirect: '/roadmap' },
   { path: '/planning', redirect: '/roadmap' },
   { path: '/roadmap', component: PlanningView, meta: { requiresAuth: true } },
+  // «План нагрузки» вынесен из /roadmap в отдельную страницу (release 1.1, тикет 02,
+  // решение владельца B). Старый якорь /roadmap#load-plan → 302 (navigation guard ниже).
+  { path: '/load-plan', component: LoadPlanView, meta: { requiresAuth: true } },
   { path: '/backlog', component: BacklogView, meta: { requiresAuth: true } },
   { path: '/planning/backlog', redirect: '/backlog' },
   // Управление делами · Сущности
@@ -161,6 +165,12 @@ async function isOnboardingCompleted(token) {
 }
 
 router.beforeEach(async (to) => {
+  // Совместимость якоря: старый /roadmap#load-plan → 302 на самостоятельную
+  // страницу /load-plan (release 1.1, тикет 02). Deep-link на вкладку сохраняется
+  // через query ?chart=, поэтому пробрасываем query дальше.
+  if (to.path === '/roadmap' && to.hash === '#load-plan') {
+    return { path: '/load-plan', query: to.query }
+  }
   const token = localStorage.getItem('wolf_token')
   if (to.meta.requiresAuth && !token) {
     return '/login'

@@ -51,7 +51,7 @@ const NAV = [
         title: 'Планирование',
         children: [
           { label: 'Дорожная карта', to: '/roadmap' },
-          { label: 'План нагрузки', to: '/roadmap#load-plan' },
+          { label: 'План нагрузки', to: '/load-plan' },
           { label: 'Бэклог', to: '/backlog' },
         ],
       },
