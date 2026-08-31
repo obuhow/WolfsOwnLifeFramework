@@ -39,15 +39,15 @@ const router = useRouter()
 
 // --- Контракт вкладок --------------------------------------------------------
 const TABS = [
-  { key: 'curves', label: 'Кривые', ticket: '03' },
   { key: 'budget', label: 'Бюджет', ticket: '04' },
+  { key: 'curves', label: 'Кривые', ticket: '03' },
   { key: 'ladder', label: 'Лестница', ticket: '04' },
   { key: 'queue', label: 'Очередь', ticket: '05' },
 ]
-const DEFAULT_TAB = 'curves'
+const DEFAULT_TAB = 'budget'
 const LS_KEY = 'wolf.loadCharts.tab'
 
-// Приоритет при открытии: query (?chart=) → localStorage → «Кривые».
+// Приоритет при открытии: query (?chart=) → localStorage → «Бюджет».
 function resolveInitialTab() {
   const q = route.query.chart
   if (typeof q === 'string' && TABS.some((t) => t.key === q)) return q
