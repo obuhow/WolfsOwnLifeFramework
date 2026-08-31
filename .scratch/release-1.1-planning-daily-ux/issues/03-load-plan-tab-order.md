@@ -1,7 +1,7 @@
 # Тикет 03 — Порядок вкладок Плана нагрузки: Бюджет, Кривые, Лестница, Очередь
 
-Status: ready-for-agent
-Blocked by: 02
+Status: resolved
+Blocked by:
 Type: task
 
 ## Вопрос
