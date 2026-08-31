@@ -23,7 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import ru.wolf.api.delo.dto.ImportResponse;
+import ru.wolf.api.delo.DeloImportService.ImportResponse;
 
 @RestController
 @RequestMapping("/api/v1/delos")
@@ -31,8 +31,16 @@ import ru.wolf.api.delo.dto.ImportResponse;
 public class DeloImportController {
     private final DeloImportService service;
 
+    @Deprecated
+    public static class ImportResponse extends DeloImportService.ImportResponse {
+        public ImportResponse(int imported, boolean addedToCurrentWeek) {
+            super(imported, addedToCurrentWeek);
+        }
+    }
+
+
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ImportResponse> importCsv(Authentication authentication,
+    public ResponseEntity<DeloImportService.ImportResponse> importCsv(Authentication authentication,
                                                      @RequestParam("file") MultipartFile file,
                                                      @RequestParam(value = "addToCurrentWeek", defaultValue = "false") boolean addToCurrentWeek,
                                                      @RequestParam(value = "skipOverlapCheck", defaultValue = "false") boolean skipOverlapCheck) {

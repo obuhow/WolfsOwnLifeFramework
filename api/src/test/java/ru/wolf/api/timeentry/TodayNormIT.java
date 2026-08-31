@@ -16,8 +16,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.timeentry;
-
-import ru.wolf.api.delo.dto.*;
 import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.Delo;
+import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaRepository;
@@ -233,15 +232,17 @@ class TodayNormIT extends ApiIntegrationTest {
     }
 
     private Long createDelo(WebTestClient client, String title) {
-        CreateDeloRequest req = new CreateDeloRequest(title, null, Delo.ExecutionMode.SELF, null, null);
-        DeloResponse created = client.post()
+        DeloController.CreateDeloRequest req = new DeloController.CreateDeloRequest();
+        req.setTitle(title);
+        req.setExecutionMode(Delo.ExecutionMode.SELF);
+        DeloController.DeloResponse created = client.post()
                 .uri("/api/v1/delos")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloResponse.class)
+                .expectBody(DeloController.DeloResponse.class)
                 .returnResult()
                 .getResponseBody();
-        return created.id();
+        return created.getId();
     }
 }

@@ -16,8 +16,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.aggregate;
-
-import ru.wolf.api.delo.dto.*;
 import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.Delo;
+import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.dto.*;
@@ -191,14 +190,14 @@ class AggregateApiIT extends ApiIntegrationTest {
         putEntry(authed, d2.atTime(9, 0), d2.atTime(12, 0), deloId, TimeEntry.Status.DONE);
         putEntry(authed, d1.atTime(15, 0), d1.atTime(16, 0), deloId, TimeEntry.Status.PLANNED);
 
-        DeloDetailResponse detail = getDelo(authed, deloId);
-        assertThat(detail.aggregates()).isNotNull();
-        assertThat(detail.aggregates().getTotalFactHours()).isEqualByComparingTo("4.00");
-        assertThat(detail.aggregates().getByDay()).hasSize(2);
-        assertThat(detail.aggregates().getByDay().get(0).getDate()).isEqualTo(d1.toString());
-        assertThat(detail.aggregates().getByDay().get(0).getHours()).isEqualByComparingTo("1.00");
-        assertThat(detail.aggregates().getByDay().get(1).getDate()).isEqualTo(d2.toString());
-        assertThat(detail.aggregates().getByDay().get(1).getHours()).isEqualByComparingTo("3.00");
+        DeloController.DeloDetailResponse detail = getDelo(authed, deloId);
+        assertThat(detail.getAggregates()).isNotNull();
+        assertThat(detail.getAggregates().getTotalFactHours()).isEqualByComparingTo("4.00");
+        assertThat(detail.getAggregates().getByDay()).hasSize(2);
+        assertThat(detail.getAggregates().getByDay().get(0).getDate()).isEqualTo(d1.toString());
+        assertThat(detail.getAggregates().getByDay().get(0).getHours()).isEqualByComparingTo("1.00");
+        assertThat(detail.getAggregates().getByDay().get(1).getDate()).isEqualTo(d2.toString());
+        assertThat(detail.getAggregates().getByDay().get(1).getHours()).isEqualByComparingTo("3.00");
     }
 
     @Test
@@ -206,10 +205,10 @@ class AggregateApiIT extends ApiIntegrationTest {
         WebTestClient authed = authedAdminClient();
         Long deloId = createDelo(authed, "Пустое", List.of(), null);
 
-        DeloDetailResponse detail = getDelo(authed, deloId);
-        assertThat(detail.aggregates()).isNotNull();
-        assertThat(detail.aggregates().getTotalFactHours()).isEqualByComparingTo("0.00");
-        assertThat(detail.aggregates().getByDay()).isEmpty();
+        DeloController.DeloDetailResponse detail = getDelo(authed, deloId);
+        assertThat(detail.getAggregates()).isNotNull();
+        assertThat(detail.getAggregates().getTotalFactHours()).isEqualByComparingTo("0.00");
+        assertThat(detail.getAggregates().getByDay()).isEmpty();
     }
 
     @Test
@@ -259,12 +258,12 @@ class AggregateApiIT extends ApiIntegrationTest {
                 .getResponseBody();
     }
 
-    private DeloDetailResponse getDelo(WebTestClient client, Long id) {
+    private DeloController.DeloDetailResponse getDelo(WebTestClient client, Long id) {
         return client.get()
                 .uri("/api/v1/delos/{id}", id)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloDetailResponse.class)
+                .expectBody(DeloController.DeloDetailResponse.class)
                 .returnResult()
                 .getResponseBody();
     }
@@ -296,16 +295,20 @@ class AggregateApiIT extends ApiIntegrationTest {
     }
 
     private Long createDelo(WebTestClient client, String title, List<Long> projectIds, Long primary) {
-        CreateDeloRequest req = new CreateDeloRequest(title, null, Delo.ExecutionMode.SELF, projectIds, primary);
+        DeloController.CreateDeloRequest req = new DeloController.CreateDeloRequest();
+        req.setTitle(title);
+        req.setProjectIds(projectIds);
+        req.setPrimaryProjectId(primary);
+        req.setExecutionMode(Delo.ExecutionMode.SELF);
         return client.post()
                 .uri("/api/v1/delos")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloResponse.class)
+                .expectBody(DeloController.DeloResponse.class)
                 .returnResult()
                 .getResponseBody()
-                .id();
+                .getId();
     }
 
     private void putEntry(

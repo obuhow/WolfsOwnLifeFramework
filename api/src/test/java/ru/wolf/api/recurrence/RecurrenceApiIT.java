@@ -16,8 +16,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package ru.wolf.api.recurrence;
-
-import ru.wolf.api.delo.dto.*;
 import ru.wolf.api.timeentry.dto.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.delo.Delo;
+import ru.wolf.api.delo.DeloController;
 import ru.wolf.api.delo.DeloProjectRepository;
 import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.lifearea.LifeAreaRepository;
@@ -170,7 +169,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(applied.created()).isEqualTo(expectedCreated);
 
         TimeEntryResponse stillDone = listRange(authed, doneStart, doneEnd.plusMinutes(1)).stream()
-                .filter(e -> historicalId.equals(e.id()))
+                .filter(e -> historicalId.equals(e.getId()))
                 .findFirst()
                 .orElseThrow();
         assertThat(stillDone.getStatus()).isEqualTo(TimeEntry.Status.DONE);
@@ -179,7 +178,7 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(stillDone.getDeloId()).isEqualTo(deloId);
 
         TimeEntryResponse futureStillDone = listRange(authed, futureDoneStart, futureDoneStart.plusHours(1)).stream()
-                .filter(e -> futureDone.getId().equals(e.id()))
+                .filter(e -> futureDone.getId().equals(e.getId()))
                 .findFirst()
                 .orElseThrow();
         assertThat(futureStillDone.getStatus()).isEqualTo(TimeEntry.Status.DONE);
@@ -198,18 +197,18 @@ class RecurrenceApiIT extends ApiIntegrationTest {
                 "horizonWeeks", 2
         ));
 
-        DeloDetailResponse detail = authed.get()
+        DeloController.DeloDetailResponse detail = authed.get()
                 .uri("/api/v1/delos/{id}", deloId)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloDetailResponse.class)
+                .expectBody(DeloController.DeloDetailResponse.class)
                 .returnResult()
                 .getResponseBody();
 
         assertThat(detail).isNotNull();
-        assertThat(detail.recurrenceWeekdays()).containsExactly(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
-        assertThat(detail.recurrenceWindowStart()).isEqualTo(LocalTime.of(18, 0));
-        assertThat(detail.recurrenceWindowEnd()).isEqualTo(LocalTime.of(19, 0));
+        assertThat(detail.getRecurrenceWeekdays()).containsExactly(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
+        assertThat(detail.getRecurrenceWindowStart()).isEqualTo(LocalTime.of(18, 0));
+        assertThat(detail.getRecurrenceWindowEnd()).isEqualTo(LocalTime.of(19, 0));
     }
 
     @Test
@@ -254,22 +253,22 @@ class RecurrenceApiIT extends ApiIntegrationTest {
         assertThat(satEntries).allMatch(e -> normalize(e.getStartAt()).endsWith("T10:00:00"));
         assertThat(satEntries).allMatch(e -> normalize(e.getEndAt()).endsWith("T11:00:00"));
 
-        DeloDetailResponse detail = authed.get()
+        DeloController.DeloDetailResponse detail = authed.get()
                 .uri("/api/v1/delos/{id}", deloId)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloDetailResponse.class)
+                .expectBody(DeloController.DeloDetailResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(detail).isNotNull();
-        assertThat(detail.recurrenceSlots()).hasSize(2);
-        assertThat(detail.recurrenceSlots())
-                .extracting(ru.wolf.api.delo.dto.RecurrenceSlotDto::weekday)
+        assertThat(detail.getRecurrenceSlots()).hasSize(2);
+        assertThat(detail.getRecurrenceSlots())
+                .extracting(ru.wolf.api.delo.DeloService.RecurrenceSlotDto::getWeekday)
                 .containsExactly(DayOfWeek.TUESDAY, DayOfWeek.SATURDAY);
-        assertThat(detail.recurrenceSlots().get(0).windowStart()).isEqualTo(LocalTime.of(20, 0));
-        assertThat(detail.recurrenceSlots().get(0).windowEnd()).isEqualTo(LocalTime.of(21, 30));
-        assertThat(detail.recurrenceSlots().get(1).windowStart()).isEqualTo(LocalTime.of(10, 0));
-        assertThat(detail.recurrenceSlots().get(1).windowEnd()).isEqualTo(LocalTime.of(11, 0));
+        assertThat(detail.getRecurrenceSlots().get(0).getWindowStart()).isEqualTo(LocalTime.of(20, 0));
+        assertThat(detail.getRecurrenceSlots().get(0).getWindowEnd()).isEqualTo(LocalTime.of(21, 30));
+        assertThat(detail.getRecurrenceSlots().get(1).getWindowStart()).isEqualTo(LocalTime.of(10, 0));
+        assertThat(detail.getRecurrenceSlots().get(1).getWindowEnd()).isEqualTo(LocalTime.of(11, 0));
     }
 
     @Test
@@ -282,16 +281,16 @@ class RecurrenceApiIT extends ApiIntegrationTest {
     }
 
     private ApplyResult applyRecurrence(WebTestClient client, Long deloId, Map<String, ?> request) {
-        ApplyRecurrenceResponse applied = client.post()
+        DeloController.ApplyRecurrenceResponse applied = client.post()
                 .uri("/api/v1/delos/{id}/apply-recurrence", deloId)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(ApplyRecurrenceResponse.class)
+                .expectBody(DeloController.ApplyRecurrenceResponse.class)
                 .returnResult()
                 .getResponseBody();
         assertThat(applied).isNotNull();
-        return new ApplyResult(applied.created());
+        return new ApplyResult(applied.getCreated());
     }
 
     private List<TimeEntryResponse> listRange(
@@ -339,16 +338,18 @@ class RecurrenceApiIT extends ApiIntegrationTest {
     }
 
     private Long createDelo(WebTestClient client, String title) {
-        var req = new CreateDeloRequest(title, null, Delo.ExecutionMode.SELF, null, null);
-        DeloResponse created = client.post()
+        var req = new DeloController.CreateDeloRequest();
+        req.setTitle(title);
+        req.setExecutionMode(Delo.ExecutionMode.SELF);
+        DeloController.DeloResponse created = client.post()
                 .uri("/api/v1/delos")
                 .bodyValue(req)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(DeloResponse.class)
+                .expectBody(DeloController.DeloResponse.class)
                 .returnResult()
                 .getResponseBody();
-        return created.id();
+        return created.getId();
     }
 
     private static List<LocalDate> expectedFutureDays(
