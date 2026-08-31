@@ -74,6 +74,18 @@ async function downloadExport() {
   } catch (e) { error.value = e instanceof Error ? e.message : String(e) } finally { loading.value = false }
 }
 
+// CSV-экспорт (релиз 1.0, тикет 09): тот же контракт data-sync, что xlsx, но один
+// текстовый CSV со всеми листами — пригоден для обратного импорта (раунд-трип).
+async function downloadExportCsv() {
+  loading.value = true; error.value = ''
+  try {
+    const response = await fetch(`${apiBase()}/data-sync/export?format=csv&version=0.21`, { headers: headers() })
+    if (!response.ok) throw new Error(`Экспорт CSV: HTTP ${response.status} ${await response.text()}`)
+    const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = document.createElement('a')
+    link.href = url; link.download = 'wolf-data-0.21.csv'; link.click(); URL.revokeObjectURL(url)
+  } catch (e) { error.value = e instanceof Error ? e.message : String(e) } finally { loading.value = false }
+}
+
 async function makePreview() {
   if (!file.value) return
   loading.value = true; error.value = ''; result.value = null
@@ -111,12 +123,13 @@ async function applyPreview() {
     <section class="card sync-panel">
       <div class="sync-actions">
         <button class="btn btn-primary" :disabled="loading" @click="downloadExport">Скачать XLSX</button>
-        <label class="file-control">Выбрать workbook
-          <input data-testid="sync-file" type="file" accept=".xlsx" @change="selectFile" />
+        <button class="btn" :disabled="loading" @click="downloadExportCsv">Экспорт в CSV</button>
+        <label class="file-control">Выбрать файл
+          <input data-testid="sync-file" type="file" accept=".xlsx,.csv" @change="selectFile" />
         </label>
         <button class="btn" :disabled="!file || loading" @click="makePreview">Показать preview</button>
       </div>
-      <p class="hint">Канонический формат: manifest + 17 листов, externalId для связей. Загрузка не изменяет данные автоматически.</p>
+      <p class="hint">Канонический формат: manifest + 17 листов, externalId для связей. XLSX или CSV — один и тот же контракт (раунд-трип). Загрузка не изменяет данные автоматически.</p>
       <p v-if="manifest" class="hint" data-testid="sync-manifest">
         Контракт: {{ manifest.format }} версия {{ manifest.version }} · листов: {{ manifest.sheets?.length ?? 0 }}
       </p>

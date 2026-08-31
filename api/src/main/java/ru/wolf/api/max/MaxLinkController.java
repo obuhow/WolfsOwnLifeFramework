@@ -47,6 +47,11 @@ public class MaxLinkController {
         return ResponseEntity.ok(linkService.getStatus(user.getUsername()));
     }
 
+    @PostMapping
+    public ResponseEntity<MaxLinkStatus> issue(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(linkService.issueToken(user.getUsername()));
+    }
+
     @PostMapping("/disconnect")
     public ResponseEntity<Void> disconnect(
             @AuthenticationPrincipal User user,

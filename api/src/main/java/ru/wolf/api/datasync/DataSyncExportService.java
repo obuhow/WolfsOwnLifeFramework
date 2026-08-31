@@ -60,6 +60,17 @@ public class DataSyncExportService {
 
     @Transactional
     public byte[] export(User user) throws Exception {
+        return workbookWriter.write(DataSyncContract.manifest(), buildRows(user));
+    }
+
+    /**
+     * Собирает все сущности пользователя в построчное представление контракта
+     * data-sync (лист → список строк-словарей). Выделено из {@link #export} для
+     * повторного использования CSV-экспортом (релиз 1.0, тикет 09): CSV — это тот
+     * же набор листов/колонок, только сериализованный построчно.
+     */
+    @Transactional
+    public Map<String, List<Map<String, Object>>> buildRows(User user) {
         Map<String, List<Map<String, Object>>> rows = new HashMap<>();
         List<LifeArea> lifeAreas = query("from LifeArea x where x.user = :user order by x.sortOrder, x.name", LifeArea.class, user);
         List<LifeSphere> spheres = query("from LifeSphere x where x.user = :user order by x.sortOrder, x.name", LifeSphere.class, user);
@@ -140,7 +151,7 @@ public class DataSyncExportService {
                 "position", x.getPosition(), "done", x.isDone(), "doneAt", x.getDoneAt())).toList());
         rows.put("activity_mappings", mappings.stream().map(x -> map(
                 "externalId", xid(user, "activity_mapping", x.getId()), "activityText", x.getActivityText(), "deloExternalId", xid(user, "delo", x.getDelo().getId()))).toList());
-        return workbookWriter.write(DataSyncContract.manifest(), rows);
+        return rows;
     }
 
     private <T> List<T> query(String jpql, Class<T> type, User user) {

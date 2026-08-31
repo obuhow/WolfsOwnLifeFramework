@@ -125,3 +125,101 @@ export function isoYearWeek(d) {
   )
   return { isoYear: date.getUTCFullYear(), isoWeek: week }
 }
+
+/**
+ * Пересчёт суммарной загрузки по месяцам на клиенте (release 0.8, тикет 07).
+ *
+ * Дословная копия бэкенд-формулы LoadChartsService.accumulateProjectMonthly +
+ * вклад рутин, чтобы фильтр «какие проекты/рутины отображать» пересчитывал
+ * capacity мгновенно, без перезапроса к серверу. При выборе всех проектов и
+ * всех рутин результат совпадает с серверным monthlyLoad.
+ *
+ * @param {object[]} projects            — data.projects (с полями id, curve, weeklyPlanHours)
+ * @param {object[]} routines            — data.routines (с полями id, weeklyHours)
+ * @param {number}    weeklyLimit        — недельная норма (для флага overLimit)
+ * @param {string}    startMonday        — дата начала горизонта (YYYY-MM-DD)
+ * @param {number}    horizonMonths      — длина горизонта
+ * @param {Set<number>|null} selectedProjectIds — выбранные id проектов (null = все)
+ * @param {Set<number>|null} selectedRoutineIds — выбранные id рутин (null = все)
+ * @returns {{month: string, hours: number, overLimit: boolean}[]}
+ */
+const WEEKS_PER_MONTH = 4.33
+function yearMonthList(startMonday, horizonMonths) {
+  const out = []
+  const d = new Date(startMonday + 'T00:00:00')
+  for (let i = 0; i < horizonMonths; i++) {
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+    d.setMonth(d.getMonth() + 1)
+  }
+  return out
+}
+function monthStartMondayIso(ym) {
+  const [y, m] = ym.split('-').map(Number)
+  let d = new Date(y, m - 1, 1)
+  const dow = (d.getDay() + 6) % 7
+  d = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+// Часы в неделю по кривой для месяца — ступенчато по weekStart.
+// Точная копия LoadChartsService.hoursAt: для первого месяца понедельник
+// начала недели может быть раньше startMonday — тогда берём startMonday.
+function hoursAtMonth(curve, startMonday, ym) {
+  let monthStart = monthStartMondayIso(ym)
+  if (monthStart < startMonday) monthStart = startMonday
+  let rate = 0
+  let active = null
+  for (const e of curve) {
+    if (e.weekStart <= monthStart) {
+      if (active === null || e.weekStart > active) {
+        active = e.weekStart
+        rate = Number(e.hours) || 0
+      }
+    }
+  }
+  return rate
+}
+function scale2(v) {
+  return Math.round(Number(v) * 100) / 100
+}
+export function computeMonthlyLoad(
+  projects,
+  routines,
+  weeklyLimit,
+  startMonday,
+  horizonMonths,
+  selectedProjectIds,
+  selectedRoutineIds
+) {
+  const months = yearMonthList(startMonday, horizonMonths)
+  const projectMonthly = new Array(months.length).fill(0)
+  const selP = selectedProjectIds
+  const selR = selectedRoutineIds
+
+  for (const p of projects) {
+    if (selP && !selP.has(p.id)) continue
+    const curve = p.curve || []
+    if (curve.length === 0) {
+      const monthly = scale2(Number(p.weeklyPlanHours) || 0) * WEEKS_PER_MONTH
+      for (let i = 0; i < months.length; i++) projectMonthly[i] += monthly
+    } else {
+      for (let i = 0; i < months.length; i++) {
+        const hpw = hoursAtMonth(curve, startMonday, months[i])
+        projectMonthly[i] += scale2(hpw) * WEEKS_PER_MONTH
+      }
+    }
+  }
+
+  let routineMonthlyTotal = 0
+  for (const r of routines) {
+    if (selR && !selR.has(r.id)) continue
+    routineMonthlyTotal += scale2(Number(r.weeklyHours) || 0) * WEEKS_PER_MONTH
+  }
+
+  return months.map((m, i) => {
+    const hours = scale2(projectMonthly[i] + routineMonthlyTotal)
+    return { month: m, hours, overLimit: hours > Number(weeklyLimit || 0) }
+  })
+}

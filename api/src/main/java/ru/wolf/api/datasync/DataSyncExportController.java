@@ -32,12 +32,17 @@ public class DataSyncExportController {
             Authentication authentication,
             @RequestParam(defaultValue = "xlsx") String format,
             @RequestParam(defaultValue = DataSyncContract.VERSION) String version) throws Exception {
-        byte[] workbook = controllerService.export(authentication.getName(), format, version);
+        byte[] payload = controllerService.export(authentication.getName(), format, version);
+        boolean csv = "csv".equalsIgnoreCase(format);
+        String mediaType = csv
+                ? "text/csv; charset=utf-8"
+                : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        String filename = "wolf-data-" + DataSyncContract.VERSION + (csv ? ".csv" : ".xlsx");
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .contentType(MediaType.parseMediaType(mediaType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename("wolf-data-0.21.xlsx").build().toString())
-                .contentLength(workbook.length)
-                .body(new ByteArrayResource(workbook));
+                        .filename(filename).build().toString())
+                .contentLength(payload.length)
+                .body(new ByteArrayResource(payload));
     }
 }

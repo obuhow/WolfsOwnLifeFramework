@@ -23,11 +23,27 @@ public class DataSyncControllerService {
     private final DataSyncImportService importService;
     private final DataSyncImportApplyService applyService;
     private final DataSyncExportService exportService;
+    private final DataSyncCsvCodec csvCodec;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     public DataSyncImportService.PreviewResponse preview(String username, MultipartFile file) throws Exception {
-        return importService.preview(currentUser(username), file);
+        return importService.preview(currentUser(username), maybeConvertCsv(file));
+    }
+
+    /**
+     * Если загружен наш CSV-набор (маркеры {@code # sheet:}), конвертирует его в
+     * канонический xlsx-workbook, чтобы дальше работал единый импорт-пайплайн
+     * (валидация + upsert). Обычный xlsx пропускается как есть.
+     */
+    private MultipartFile maybeConvertCsv(MultipartFile file) throws Exception {
+        byte[] bytes = file.getBytes();
+        if (!csvCodec.looksLikeCsv(bytes)) {
+            return file;
+        }
+        byte[] workbook = csvCodec.toWorkbook(bytes);
+        return new ByteArrayMultipartFile(file.getName(), file.getOriginalFilename(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", workbook);
     }
 
     public DataSyncImportService.PreviewResponse getPreview(String username, Long id) throws Exception {
@@ -53,7 +69,11 @@ public class DataSyncControllerService {
 
     public byte[] export(String username, String format, String version) throws Exception {
         validateExportFormat(format, version);
-        return exportService.export(currentUser(username));
+        User user = currentUser(username);
+        if ("csv".equalsIgnoreCase(format)) {
+            return csvCodec.toCsv(DataSyncContract.manifest(), exportService.buildRows(user));
+        }
+        return exportService.export(user);
     }
 
     public User currentUser(String username) {
@@ -62,8 +82,9 @@ public class DataSyncControllerService {
     }
 
     private void validateExportFormat(String format, String version) {
-        if (!"xlsx".equalsIgnoreCase(format) || !DataSyncContract.VERSION.equals(version)) {
-            throw new IllegalArgumentException("Only XLSX data-sync version 0.21 is supported");
+        boolean supportedFormat = "xlsx".equalsIgnoreCase(format) || "csv".equalsIgnoreCase(format);
+        if (!supportedFormat || !DataSyncContract.VERSION.equals(version)) {
+            throw new IllegalArgumentException("Only XLSX/CSV data-sync version 0.21 is supported");
         }
     }
 }

@@ -178,6 +178,44 @@ class MorningDigestApiIT extends ApiIntegrationTest {
                 .containsExactly("В банке");
     }
 
+    @Test
+    void digest_nests_child_project_under_parent_with_depth() {
+        WebTestClient client = authedAdminClient();
+        Long areaId = createLifeArea(client, "Работа");
+
+        // Проект WOLF (корень) и дочерний WOLF MVP — оба IN_PROGRESS по умолчанию.
+        ProjectResponse parent = createProject(client, areaId, "Проект WOLF");
+        ProjectResponse child = client.post().uri("/api/v1/projects")
+                .bodyValue(new CreateProjectRequest(
+                        areaId, parent.id(), "WOLF MVP", null, null, null, null, null, null))
+                .exchange().expectStatus().isOk()
+                .expectBody(ProjectResponse.class)
+                .returnResult().getResponseBody();
+
+        ru.wolf.api.morning.dto.MorningDigestResponse response = client.get()
+                .uri("/api/v1/morning-digest")
+                .exchange().expectStatus().isOk()
+                .expectBody(ru.wolf.api.morning.dto.MorningDigestResponse.class)
+                .returnResult().getResponseBody();
+
+        assertThat(response).isNotNull();
+        // Дерево, а не плоский список: ровно один корень WOLF (depth 0, parentId null),
+        // сразу за ним ребёнок WOLF MVP (depth 1, parentId = WOLF).
+        assertThat(response.projects()).hasSize(2);
+
+        ru.wolf.api.morning.dto.ProjectDigest root = response.projects().get(0);
+        assertThat(root.id()).isEqualTo(parent.id());
+        assertThat(root.title()).isEqualTo("Проект WOLF");
+        assertThat(root.depth()).isEqualTo(0);
+        assertThat(root.parentId()).isNull();
+
+        ru.wolf.api.morning.dto.ProjectDigest nested = response.projects().get(1);
+        assertThat(nested.id()).isEqualTo(child.id());
+        assertThat(nested.title()).isEqualTo("WOLF MVP");
+        assertThat(nested.depth()).isEqualTo(1);
+        assertThat(nested.parentId()).isEqualTo(parent.id());
+    }
+
     private Long createLifeArea(WebTestClient client, String name) {
         return client.post().uri("/api/v1/life-areas")
                 .bodyValue(new CreateLifeAreaRequest(name, "#123456"))

@@ -1,8 +1,10 @@
 # Баг 01 — DTO кластера delo не вынесены в `dto/`-пакет (нарушение DoD ADR 0005)
 
 Type: bug
-Status: open
+Status: resolved
 Найдено при: release-0.9 / тикет 11 (Сквозной аудит)
+Подтверждено в релизе 1.0 (сессия 29.08.2026): `ls api/src/main/java/ru/wolf/api/delo/dto/`
+показывает 9 record-классов, deprecated-наследники в контроллерах убраны.
 Регрессия в: release-0.9 / тикет 06 (Import/Export: DataSync, ImportXlsx, Delo, DeloImport), Status: resolved
 
 ## Доказательство расхождения

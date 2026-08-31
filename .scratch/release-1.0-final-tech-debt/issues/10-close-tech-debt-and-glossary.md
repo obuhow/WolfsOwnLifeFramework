@@ -1,0 +1,93 @@
+# Тикет 10 — Закрытие техдолгов предыдущих релизов + глоссарий
+
+Status: resolved
+Blocked by: 01,02,03,04,05,06,07,08,09
+Type: task
+
+## Вопрос
+
+Финальный тикет релиза 1.0: зафиксировать закрытие перенесённых техдолгов и применить
+результаты grill-with-docs к глоссарию.
+
+## Что сделать
+
+### 10.1 Перенесённые баги (перевести Status → resolved с доказательством)
+
+1. `release-0.6-demo-onboarding/bugs/01-first-run-wizard-missing-ui.md`
+   — уже закрыт фактически: экран мастера написан в 0.6-04, API-покрытие добавлено
+   веткой `fix/01-onboarding-api-it-coverage` (4 теста `OnboardingApiIT`, зелёные).
+   Статус исходного `release-0.4-multiuser-demo/issues/08-first-run-wizard.md`
+   меняет его владелец (Павел) — в этом тикете только подтвердить закрытие бага 0.6.
+2. `wayfinder-release-0.9-layered-arch/bugs/01-delo-dto-not-in-dto-package.md`
+   — подтвердить: `ls api/src/main/java/ru/wolf/api/delo/dto/` показывает 9 record-классов
+   (`DeloResponse`, `DeloDetailResponse`, `CreateDeloRequest`, `UpdateDeloRequest`,
+   `ApplyRecurrenceRequest`, `ApplyRecurrenceResponse`, `RecurrenceSlotDto`,
+   `ProjectLink`, `ImportResponse`); deprecated-наследники убраны. Перевести в `resolved`.
+
+### 10.2 Глоссарий (CONTEXT.md)
+
+По итогам grill-with-docs (`grill.md`) добавить три термина после «Seed-аккаунт admin»
+(строка ~40), перед «Ночные часы»:
+
+```
+**Демо-профиль**:
+Декларативное описание предзаполненного набора данных пользователя
+(`assets/profiles/<slug>.json`): области жизни, проекты (со сроками относительно
+«сегодня»), Дела, цели, рутины, заметки. Загружается в аккаунт при первом входе
+(онбординг) или повторно из Настроек.
+_Avoid_: реальные данные пользователя, аккаунт команды
+
+**Демо-пользователь**:
+Временный аккаунт, созданный из демо-профиля гостем через демо-режим; логин вида
+`GoodEnoughDemoUser-<Буква><N>`, пароль совпадает с логином; помечен `accountType='DEMO'`
+и удаляется администратором вручную. Отличается от seed-аккаунта `admin`.
+_Avoid_: рабочий аккаунт, авто-удаляемый по расписанию, admin как рабочий вход
+
+**Демо-режим**:
+Точка входа на неавторизованном экране: кнопка «Демо-режим» открывает выбор
+демо-профиля и создаёт демо-пользователя.
+_Avoid_: онбординг (тот требует уже аутентифицированного пользователя)
+```
+
+### 10.3 Итоговая сверка релиза
+
+- Все баги `bugs/01`–`bugs/05` (кроме Б-5, ждущего уточнения) переведены в `resolved`
+  соответствующими тикетами 01–04.
+- Все тикеты `issues/01`–`09` выполнены и принимаются.
+- `spec.md` обновлён: раздел «Тикеты» отражает фактическое состояние.
+
+## Testing Decisions
+
+- `ls api/src/main/java/ru/wolf/api/delo/dto/` содержит 9 файлов (структурный гейт 0.9).
+- `grep -n "Демо-профиль\|Демо-пользователь\|Демо-режим" CONTEXT.md` — три вхождения.
+- `docs/agents/issue-tracker.md` соблюдён: каждый баг — отдельный файл, своя нумерация,
+  доказательство расхождения, раздел «Как закрыт».
+
+## Out of Scope
+
+- Изменение ADR — grill-with-docs расхождений с ADR не выявил.
+- Перевод статусов чужих исходных тикетов (0.4-08, 0.9-06) — прерогатива владельца.
+
+## Закрывает
+
+Финальную часть релиза 1.0 (укладка): техдолги закрыты, глоссарий пополнен.
+
+## Answer
+
+Выполнено в `release-1.0/feature/10-tech-debt-glossary` (code/docs в develop) + docs-ветке трекера:
+
+**10.1 Перенесённые баги → resolved (с доказательством):**
+- `release-0.6-demo-onboarding/bugs/01-first-run-wizard-missing-ui.md` → `resolved`. Доказательство: `OnboardingWizardView.vue` + маршрут `/onboarding` в `main.js` присутствуют; `OnboardingApiIT` содержит 4 теста (verified `grep -c @Test`). Статус исходного 0.4-08 оставлен владельцу (Out of Scope).
+- `wayfinder-release-0.9-layered-arch/bugs/01-delo-dto-not-in-dto-package.md` → `resolved`. Доказательство: `ls api/src/main/java/ru/wolf/api/delo/dto/` → ровно 9 record-классов (DeloResponse, DeloDetailResponse, CreateDeloRequest, UpdateDeloRequest, ApplyRecurrenceRequest, ApplyRecurrenceResponse, RecurrenceSlotDto, ProjectLink, ImportResponse); `grep @Deprecated` в delo/ пуст.
+
+**10.2 Глоссарий CONTEXT.md:**
+- Три термина («Демо-профиль», «Демо-пользователь», «Демо-режим») добавлены после «Seed-аккаунт admin», перед «Ночные часы» — как в grill.md.
+
+**10.3 Итоговая сверка:**
+- `spec.md`: Status → `resolved`, раздел «Тикеты» отражает фактическое состояние (все 01–10 ✅ merged), добавлен итог релиза.
+- Баги Б-1..Б-4 закрыты тикетами 01–04; Б-5 остаётся `needs-info` (ждёт Павла).
+
+**Гейты (Testing Decisions) — все зелёные:**
+- `ls delo/dto/` → 9 файлов ✅
+- заголовки `**Демо-профиль/Демо-пользователь/Демо-режим**` в CONTEXT.md ✅
+- каждый баг — отдельный файл с доказательством и разделом «Как закрыт» ✅

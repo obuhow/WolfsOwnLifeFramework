@@ -20,6 +20,9 @@
 # Env
 .env
 .env.*
+# Шаблон окружения — единственный .env-файл, который обязан быть в репозитории:
+# README велит `cp .env.example .env`, без него быстрый старт невозможен.
+!.env.example
 
 # Local office / agent scratch noise
 .~lock.*#
@@ -31,3 +34,4 @@ hermes-verify-*.py
 .scratch/wayfinder-releases-05-07
 testing/.venv/
 testing/__pycache__/
+web/dist/

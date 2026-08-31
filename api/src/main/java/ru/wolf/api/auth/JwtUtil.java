@@ -34,7 +34,11 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    @Value("${wolf.jwt.secret:dev-secret-change-in-production-min-32-chars}")
+    // Значения по умолчанию у секрета намеренно нет: с ним приложение молча поднималось бы
+    // на общеизвестном ключе, которым подделывается токен любого пользователя, включая
+    // администратора. Задаётся через .env → WOLF_JWT_SECRET (см. .env.example);
+    // тестовый профиль задаёт своё значение в application-test.properties.
+    @Value("${wolf.jwt.secret}")
     private String secretString;
 
     @Value("${wolf.jwt.expiration-ms:86400000}")

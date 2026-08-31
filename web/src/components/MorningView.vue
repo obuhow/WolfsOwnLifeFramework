@@ -26,6 +26,31 @@ const expanded = ref(new Set())
 
 const hasContent = computed(() => digest.value && (digest.value.projects?.length || digest.value.ideas?.length || digest.value.goalsFact?.length))
 
+// Есть ли у проекта дочерние узлы (плоский список pre-order с depth/parentId).
+function hasChildren(projectId) {
+  return !!digest.value?.projects?.some(p => p.parentId === projectId)
+}
+
+// Строка видна, если раскрыты ВСЕ её предки. Идём вверх по parentId.
+function isVisible(project) {
+  let parentId = project.parentId
+  const byId = projectsById.value
+  let guard = 0
+  while (parentId != null && guard++ < 100) {
+    if (!expanded.value.has(parentId)) return false
+    parentId = byId.get(parentId)?.parentId ?? null
+  }
+  return true
+}
+
+const projectsById = computed(() => {
+  const map = new Map()
+  for (const p of digest.value?.projects ?? []) map.set(p.id, p)
+  return map
+})
+
+const visibleProjects = computed(() => (digest.value?.projects ?? []).filter(isVisible))
+
 function toggle(projectId) {
   const next = new Set(expanded.value)
   next.has(projectId) ? next.delete(projectId) : next.add(projectId)
@@ -83,19 +108,12 @@ onMounted(load)
           <span class="muted">{{ digest.projects.length }}</span>
         </div>
         <div v-if="!digest.projects.length" class="muted-block">Активных проектов пока нет.</div>
-        <article v-for="project in digest.projects" :key="project.id" class="morning-project">
+        <article v-for="project in visibleProjects" :key="project.id" class="morning-project" :class="{ 'morning-project-nested': project.depth > 0 }" :style="{ marginLeft: (project.depth * 20) + 'px' }">
           <div class="morning-project-heading">
-            <button
-              type="button"
-              class="morning-project-title"
-              :aria-expanded="expanded.has(project.id)"
-              @click="toggle(project.id)"
-            >
-              <span class="morning-project-chevron" aria-hidden="true">{{ expanded.has(project.id) ? '▾' : '▸' }}</span>
-              <span class="morning-project-name">{{ project.title }}</span>
-              <span class="morning-project-hint">{{ expanded.has(project.id) ? '· свернуть' : '· подробнее' }}</span>
+            <router-link :to="`/projects/${project.id}`" class="morning-project-link">{{ project.title }}</router-link>
+            <button class="btn btn-ghost" :aria-expanded="expanded.has(project.id)" @click="toggle(project.id)">
+              {{ expanded.has(project.id) ? 'Свернуть' : 'Развернуть' }}<span v-if="hasChildren(project.id)" class="morning-child-hint"> · подпроекты</span>
             </button>
-            <router-link :to="`/projects?edit=${project.id}`" class="btn btn-ghost morning-project-edit">Редактировать проект</router-link>
           </div>
           <div v-if="expanded.has(project.id)" class="morning-project-detail">
             <div>
@@ -144,15 +162,11 @@ onMounted(load)
 
 <style scoped>
 .morning-project + .morning-project { border-top: 1px solid var(--wolf-subrule); }
+.morning-project-nested { border-left: 1px solid var(--wolf-subrule); padding-left: 14px; }
+.morning-child-hint { color: var(--wolf-muted); font-size: 11px; }
 .morning-project-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.morning-project-title { display: inline-flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: none; font: inherit; color: var(--wolf-ink); text-align: left; cursor: pointer; }
-.morning-project-chevron { color: var(--wolf-muted); font-size: 12px; }
-.morning-project-name { font-size: 18px; border-bottom: 1px solid var(--wolf-rule); }
-.morning-project-hint { color: var(--wolf-muted); font-size: 12px; }
-.morning-project-title:hover .morning-project-name { border-bottom-color: var(--wolf-ink); }
-.morning-project-title:focus-visible { outline: 1px solid var(--wolf-ink); outline-offset: 3px; }
-.morning-project-edit { white-space: nowrap; }
-.morning-delo { color: var(--wolf-ink); text-decoration: none; border-bottom: 1px solid var(--wolf-rule); }
+.morning-project-link, .morning-delo { color: var(--wolf-ink); text-decoration: none; border-bottom: 1px solid var(--wolf-rule); }
+.morning-project-link { font-size: 18px; }
 .morning-project-detail { display: grid; grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr); gap: 28px; padding: 16px 0 20px; }
 .morning-project-detail h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; }
 .morning-note { padding: 10px 0; border-top: 1px solid var(--wolf-subrule); white-space: pre-wrap; }
