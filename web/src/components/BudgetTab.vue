@@ -29,8 +29,9 @@
  * на этой вкладке сразу отражается на «Лестнице» без перезагрузки (п.12).
  */
 import { computed, inject, ref, watch } from 'vue'
-import { apiBase } from '../api'
+import { apiBase, authHeaders } from '../api'
 import { forecastByRate, formatFinish, formatHours, isoYearWeek } from '../loadChartsForecast'
+import DistributeTimeModal from './DistributeTimeModal.vue'
 
 const { data, rates, makeWriter } = inject('loadCharts')
 
@@ -126,6 +127,38 @@ watch(
   },
   { deep: true }
 )
+
+// --- Окно «Распределить время» (release 1.1, тикет 04) ----------------------
+// Кнопка у плановых часов проекта открывает ручной редактор кривой: суммарные
+// плановые часы (totalPlanHours) раскладываются по ISO-неделям диапазона дат,
+// кривая делится на 2 сегмента и перетаскивается с инвариантом Σ = const.
+// Детали проекта (startDate/endDate/totalPlanHours) подтягиваются с бэкенда —
+// в load-charts их нет, а в GET /projects/{id} они есть.
+const dtProject = ref(null) // проект из load-charts (id, title)
+const dtDetail = ref(null) // ProjectDetailResponse
+const dtLoading = ref(false)
+
+async function openDistribute(p) {
+  dtLoading.value = true
+  dtDetail.value = null
+  try {
+    const headers = authHeaders()
+    if (!headers) return
+    const res = await fetch(`${apiBase()}/projects/${p.id}`, { headers })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    dtDetail.value = await res.json()
+    dtProject.value = p
+  } catch (e) {
+    // Тихий контракт: ошибка открытия — нейтральной строкой под диаграммой.
+    sliderErrors.value = { ...sliderErrors.value, [p.id]: `Не удалось открыть: ${e.message}` }
+  } finally {
+    dtLoading.value = false
+  }
+}
+function closeDistribute() {
+  dtProject.value = null
+  dtDetail.value = null
+}
 </script>
 
 <template>
@@ -172,6 +205,14 @@ watch(
             <template v-if="projectRate(p) > 0">{{ formatHours(projectRate(p)) }}</template>
             <template v-else>заморожен</template>
           </span>
+          <!-- Тикет 04: ручной редактор кривой «Распределить время». -->
+          <button
+            type="button"
+            class="b-distribute"
+            :disabled="dtLoading"
+            :aria-label="`Распределить время: ${p.title}`"
+            @click="openDistribute(p)"
+          >Распределить время</button>
           <span v-if="sliderErrors[p.id]" class="b-rate-error">{{ sliderErrors[p.id] }}</span>
         </span>
 
@@ -197,6 +238,14 @@ watch(
         </span>
       </div>
     </div>
+
+    <!-- Окно «Распределить время» (release 1.1, тикет 04). -->
+    <DistributeTimeModal
+      v-if="dtProject && dtDetail"
+      :project="dtProject"
+      :detail="dtDetail"
+      @close="closeDistribute"
+    />
   </div>
 </template>
 
@@ -242,6 +291,22 @@ watch(
 .b-rate input[type='range'] { width: 100%; accent-color: var(--wolf-ink); }
 .b-rate-label { font-size: 0.78rem; color: var(--wolf-muted); font-variant-numeric: tabular-nums; }
 .b-rate-error { font-size: 0.72rem; color: var(--wolf-ink); border-bottom: 1px solid var(--wolf-ink); }
+
+/* Кнопка ручного редактора (тикет 04) — текстовая, тихий контракт. */
+.b-distribute {
+  align-self: flex-start;
+  border: 0;
+  border-bottom: 1px solid var(--wolf-ink);
+  background: transparent;
+  color: var(--wolf-ink);
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0;
+  cursor: pointer;
+  width: fit-content;
+}
+.b-distribute:hover { color: var(--wolf-muted); border-bottom-color: var(--wolf-muted); }
+.b-distribute:disabled { color: var(--wolf-faint); border-bottom-color: transparent; cursor: default; }
 
 .b-effort { font-size: 0.85rem; color: var(--wolf-ink); font-variant-numeric: tabular-nums; }
 .b-estimated { font-size: 0.68rem; color: var(--wolf-faint); margin-left: 0.3rem; }
