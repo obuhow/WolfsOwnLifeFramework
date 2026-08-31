@@ -61,7 +61,7 @@ class InviteServiceInviteAccessUnitTest {
                 inviteCodeRepository, userRepository, passwordEncoder, jwtUtil, lifeSphereSeeder, instanceConfigService);
 
         assertThatThrownBy(() -> service.registerWithInvite("SOMECODE", "newuser", "password123"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Регистрация по инвайтам отключена");
 
         // Пока флаг выключен — код не ищем и не тратим, пользователя не создаём.
