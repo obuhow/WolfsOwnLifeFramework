@@ -17,7 +17,7 @@
 -->
 <script setup>
 /**
- * Календарь: Неделя (ticket 04) и Месяц (ticket 08).
+ * Ежедневник: Неделя (ticket 04) и Месяц (ticket 08).
  * The month view is an overview, not a slot editor: it never creates or mutates
  * TimeEntry rows — opening a day navigates to the week register.
  */
@@ -140,7 +140,7 @@ onMounted(loadMonth)
   <div class="calendar-page">
     <header class="page-header calendar-header">
       <div>
-        <h1>Календарь</h1>
+        <h1>Ежедневник</h1>
         <p class="eyebrow">Неделя или месяц · записи времени</p>
       </div>
       <div class="calendar-controls">
