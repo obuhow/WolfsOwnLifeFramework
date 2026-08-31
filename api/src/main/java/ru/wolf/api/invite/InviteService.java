@@ -82,8 +82,10 @@ public class InviteService {
     public Optional<String> registerWithInvite(String code, String username, String rawPassword) {
         // Release 1.1, тикет 08: глобальный переключатель «Открыть доступ по инвайтам».
         // Выключен — регистрация по коду закрыта на бэкенде, а не только в UI.
+        // IllegalArgumentException: InviteController мапит его в e.getMessage(),
+        // тогда как IllegalStateException заворачивается в общее «Код недействителен».
         if (!instanceConfigService.isInviteAccessOpen()) {
-            throw new IllegalStateException("Регистрация по инвайтам отключена");
+            throw new IllegalArgumentException("Регистрация по инвайтам отключена");
         }
 
         Optional<InviteCode> inviteOpt = inviteCodeRepository.findByCode(code);
