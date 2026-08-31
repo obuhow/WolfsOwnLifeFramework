@@ -1,27 +1,7 @@
+@import './tokens.css';
+
 :root {
-  color-scheme: light;
-  --wolf-surface: #ffffff;
-  --wolf-ink: #1a1a1a;
-  --wolf-muted: #737373;
-  --wolf-faint: #a3a3a3;
-  --wolf-rule: #e5e5e5;
-  --wolf-subrule: #f2f2f2;
-  --wolf-hover: #f7f7f5;
-  --wolf-done-surface: #f1f7f0;
-  --wolf-done-ink: #5d7a5e;
-  /* Fill bar tokens (ADR-0006: exception for Daily backlog project fill bar) */
-  --wolf-fill-fact: #2e7d32;       /* тёмный зелёный — выполненный факт */
-  --wolf-fill-plan: #a5d6a7;       /* светло-зелёный — план */
-  --wolf-fill-neutral: var(--wolf-subrule); /* нейтральный остаток/перегруз */
-  --wolf-focus: #1a1a1a;
-  --wolf-space-1: 4px;
-  --wolf-space-2: 8px;
-  --wolf-space-3: 12px;
-  --wolf-space-4: 16px;
-  --wolf-space-5: 24px;
-  --wolf-space-6: 28px;
-  --wolf-space-7: 40px;
-  font-family: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  font-family: var(--wolf-font);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -38,8 +18,8 @@ body {
   min-height: 100vh;
   background: var(--wolf-surface);
   color: var(--wolf-ink);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: var(--wolf-text-base);
+  line-height: var(--wolf-leading-base);
 }
 
 button,
@@ -431,60 +411,74 @@ textarea:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
-  padding: 3px 0;
-  border: 0;
-  border-bottom: 1px solid transparent;
-  border-radius: 0;
+  gap: var(--wolf-space-2);
+  min-height: var(--wolf-tap);
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--wolf-radius);
   background: transparent;
   color: var(--wolf-muted);
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 400;
+  font-size: var(--wolf-text-sm);
+  font-weight: 500;
   line-height: 1.25;
-  transition: color .12s ease, border-color .12s ease, background .12s ease;
+  transition: color var(--wolf-transition),
+              background var(--wolf-transition),
+              border-color var(--wolf-transition);
 }
 
-.btn:hover:not(:disabled),
-.btn-primary,
-.btn-primary:hover:not(:disabled) {
-  background: transparent;
+.btn:hover:not(:disabled) {
+  background: var(--wolf-fill-strong);
   color: var(--wolf-ink);
-  border-bottom-color: var(--wolf-ink);
+  border-color: transparent;
+}
+
+.btn-primary {
+  background: var(--wolf-ink);
+  color: var(--wolf-on-ink);
+  border-color: var(--wolf-ink);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--wolf-ink-hover);
+  color: var(--wolf-on-ink);
+  border-color: var(--wolf-ink-hover);
 }
 
 .btn-ghost {
   color: var(--wolf-muted);
-  border: 0;
-  border-bottom: 1px solid transparent;
+  border-color: transparent;
   background: transparent;
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: transparent;
+  background: var(--wolf-fill-strong);
   color: var(--wolf-ink);
-  border-bottom-color: var(--wolf-ink);
+  border-color: transparent;
 }
 
 .btn:active:not(:disabled) { transform: none; }
 .btn:disabled { opacity: .42; cursor: not-allowed; }
 
 .icon-btn {
-  width: 32px;
-  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--wolf-tap);
+  height: var(--wolf-tap);
   padding: 0;
-  border: 0;
-  border-bottom: 1px solid transparent;
-  border-radius: 0;
+  border: 1px solid transparent;
+  border-radius: var(--wolf-radius);
   background: transparent;
   color: var(--wolf-muted);
   cursor: pointer;
+  transition: color var(--wolf-transition), background var(--wolf-transition);
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: var(--wolf-hover);
+  background: var(--wolf-fill-strong);
   color: var(--wolf-ink);
-  border-bottom-color: var(--wolf-ink);
+  border-color: transparent;
 }
 
 .icon-btn:disabled { opacity: .36; cursor: not-allowed; }
@@ -512,15 +506,15 @@ textarea.input,
 .filter-select,
 .weeks-select select {
   width: 100%;
-  padding: 7px 0;
-  border: 0;
-  border-bottom: 1px solid var(--wolf-rule);
-  border-radius: 0;
+  min-height: var(--wolf-tap);
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--wolf-radius);
   outline: 0;
-  background: var(--wolf-surface);
+  background: var(--wolf-fill);
   color: var(--wolf-ink);
-  font-size: 14px;
-  transition: border-color .12s ease;
+  font-size: var(--wolf-text-sm);
+  transition: background var(--wolf-transition), border-color var(--wolf-transition);
 }
 
 .input:focus,
@@ -528,7 +522,8 @@ select.input:focus,
 textarea.input:focus,
 .filter-select:focus,
 .weeks-select select:focus {
-  border-bottom-color: var(--wolf-ink);
+  background: var(--wolf-surface);
+  border-color: var(--wolf-rule);
   box-shadow: none;
 }
 
@@ -543,7 +538,7 @@ input[type="radio"] {
 .form-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--wolf-gap-group);
   align-items: center;
   margin-top: 8px;
 }
@@ -623,7 +618,7 @@ input[type="radio"] {
 .life-area-color { width: 10px; height: 10px; border-radius: 0; flex: 0 0 auto; }
 .life-area-name,
 .project-title { color: var(--wolf-ink); font-weight: 500; }
-.life-area-actions { display: flex; gap: 4px; }
+.life-area-actions { display: flex; align-items: center; gap: var(--wolf-gap-inline); }
 .project-row-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .project-meta { color: var(--wolf-muted); font-size: 11px; }
 .orphan-mark { color: var(--wolf-muted); }
@@ -851,4 +846,164 @@ input[type="radio"] {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--wolf-muted);
+}
+
+/* =========================================================================
+   СЛОЙ 2 — КЛАССЫ, КОТОРЫЕ РАЗМЕТКА ИСПОЛЬЗУЕТ, А CSS НЕ ОПИСЫВАЛ.
+   94 таких класса в 30 компонентах из 50. Ниже — те, что встречаются
+   в нескольких компонентах, поэтому им место в глобальном слое.
+   Остальные (одиночные) переезжают в scoped-стили своих компонентов.
+   ========================================================================= */
+
+/* --- Тулбар списка. Встречался в 6 компонентах и не имел ни одного правила:
+       именно поэтому селект и «+ Добавить» стояли вплотную. --- */
+.projects-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--wolf-gap-group);
+  margin-bottom: var(--wolf-space-3);
+}
+
+.projects-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--wolf-gap-group);
+}
+
+/* --- Формы. .form-row описан только в двух scoped-блоках, то есть
+       в остальных компонентах поля не выстраивались в ряд вообще. --- */
+.project-form,
+.life-area-form {
+  display: grid;
+  gap: var(--wolf-gap-block);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--wolf-gap-group);
+}
+
+/* --- Разделитель перед необратимым действием.
+       «Удалить» больше не стоит в четырёх пикселях от «Изменить». --- */
+.life-area-actions > .confirm-inline,
+.projects-toolbar-actions > .confirm-inline,
+.project-link-actions > .confirm-inline {
+  margin-left: var(--wolf-space-1);
+  padding-left: var(--wolf-space-3);
+  border-left: 1px solid var(--wolf-rule);
+}
+
+.project-link-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--wolf-gap-inline);
+}
+
+/* --- Уменьшенные варианты элементов управления --- */
+.btn-sm {
+  min-height: var(--wolf-control-h);
+  padding: 3px var(--wolf-space-2);
+  font-size: var(--wolf-text-xs);
+}
+
+.input-sm {
+  min-height: var(--wolf-control-h);
+  padding: 4px var(--wolf-space-2);
+  font-size: var(--wolf-text-xs);
+}
+
+/* --- Опасное действие: до наведения приглушено, при наведении честно красное --- */
+.btn-danger-text:hover:not(:disabled),
+.btn-danger-text.is-armed {
+  background: var(--wolf-danger-surface);
+  color: var(--wolf-danger-ink);
+}
+
+/* --- Текст только для скринридеров.
+       Класс использовался в разметке и не имел стилей — то есть служебные
+       подписи были видны на экране обычным текстом. --- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Сохранение переносов в пользовательском тексте --- */
+.preserve-lines { white-space: pre-wrap; }
+
+/* --- Списки связанных записей --- */
+.link-list {
+  display: grid;
+  gap: var(--wolf-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* --- Итоговые значения в агрегатах --- */
+.aggregate-mode {
+  color: var(--wolf-muted);
+  font-size: var(--wolf-text-xs);
+  letter-spacing: var(--wolf-track-label);
+  text-transform: uppercase;
+}
+
+.aggregate-total {
+  display: flex;
+  align-items: baseline;
+  gap: var(--wolf-gap-inline);
+}
+
+.aggregate-total-value {
+  color: var(--wolf-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Обёртки страниц: общий вертикальный ритм секций --- */
+.projects-page,
+.project-page,
+.delos-page,
+.ideas-page,
+.idea-detail-page,
+.spheres-page,
+.life-areas-page,
+.backlog-page,
+.calendar-page,
+.morning-page,
+.admin-users-page,
+.invites-page,
+.import-page,
+.settings-page,
+.scaffold-page {
+  display: grid;
+  gap: var(--wolf-gap-block);
+}
+
+.page-intro {
+  margin: 0 0 var(--wolf-gap-block);
+  color: var(--wolf-muted);
+  max-width: 68ch;
+}
+
+/* --- Селект в тулбаре не должен растягиваться на всю строку:
+       .input задаёт width 100%, из-за чего группа действий занимала
+       всю ширину и переносилась под заголовок. --- */
+.projects-toolbar-actions .input,
+.projects-toolbar-actions .filter-select,
+.filter-select {
+  width: auto;
+  min-width: 160px;
+  max-width: 100%;
 }
