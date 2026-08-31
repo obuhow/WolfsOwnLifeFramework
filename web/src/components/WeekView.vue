@@ -18,6 +18,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase } from '../api'
+import { fillBarSegments } from '../backlogGroups'
 
 const loading = ref(false)
 const error = ref('')
@@ -334,6 +335,7 @@ const backlogGroups = computed(() => {
           label: pid == null ? 'Без проекта' : projectTitle(pid),
           fact: pid == null ? null : (hours ? hours.fact : 0),
           plan: pid == null ? null : (hours ? hours.plan : null),
+          pending: pid == null ? null : (hours ? hours.pending : 0),
           items: []
         })
       }
@@ -351,6 +353,11 @@ const backlogGroups = computed(() => {
 function groupHoursLabel(group) {
   if (group.projectId == null) return ''
   return `${hoursOrDash(group.fact ?? 0)} / ${hoursOrDash(group.plan)} ч`
+}
+/** Полоса заполнения проекта (ticket 06, ADR-0006) — сегменты факт/план для одной группы. */
+function groupFillBar(group) {
+  if (group.projectId == null) return null
+  return fillBarSegments(group)
 }
 function executionModeLabel(mode) {
   const found = EXECUTION_MODES.find(m => m.value === mode)
@@ -381,7 +388,7 @@ async function loadWeekBacklog() {
   }
 }
 
-/** Real current-week plan/fact hours per Project from the Gantt aggregate. */
+/** Real current-week plan/fact/pending hours per Project from the Gantt aggregate. */
 async function loadProjectWeekHours() {
   const headers = authHeaders()
   if (!headers || !weekStart.value) return
@@ -394,7 +401,8 @@ async function loadProjectWeekHours() {
       const cell = (row.cells || [])[0] || {}
       map[String(row.id)] = {
         plan: cell.planHours == null ? null : Number(cell.planHours),
-        fact: Number(cell.factHours || 0)
+        fact: Number(cell.factHours || 0),
+        pending: Number(cell.pendingHours || 0)
       }
     }
     projectWeekHours.value = map
@@ -1095,6 +1103,16 @@ onMounted(loadAll)
               <span class="backlog-group-title">{{ group.label }}</span>
               <span v-if="group.projectId != null" class="backlog-group-hours">{{ groupHoursLabel(group) }}</span>
             </header>
+            <div
+              v-if="group.projectId != null && groupFillBar(group)"
+              class="fill-bar"
+              role="img"
+              :aria-label="`Загрузка недели: ${groupHoursLabel(group)}${groupFillBar(group).overLimit ? ' · перегруз' : ''}`"
+            >
+              <span class="fill-bar-fact" :style="{ width: groupFillBar(group).factPct + '%' }"></span>
+              <span class="fill-bar-pending" :style="{ width: groupFillBar(group).pendingPct + '%', left: groupFillBar(group).factPct + '%' }"></span>
+              <span v-if="groupFillBar(group).overLimit" class="fill-bar-over" title="Перегруз: факт + план больше недельного плана"></span>
+            </div>
             <ul class="backlog-group-list">
               <li v-for="delo in group.items" :key="delo.id + '-' + group.key" class="backlog-delo">
                 <div class="backlog-delo-body">
@@ -1647,6 +1665,37 @@ onMounted(loadAll)
 .backlog-group-title { color: var(--wolf-ink); font-size: 13px; font-weight: 600; }
 .backlog-group-hours { color: var(--wolf-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .backlog-group-list { list-style: none; margin: 0; padding: 0; }
+/* Полоса заполнения проекта (ticket 06, ADR-0006 — точечное исключение из 0.3:
+   зелёный факт + зелёный план допущены только на этом экране). */
+.fill-bar {
+  position: relative;
+  height: 6px;
+  margin: 6px 0 2px;
+  background: var(--wolf-fill-neutral);
+  overflow: hidden;
+}
+.fill-bar-fact,
+.fill-bar-pending {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+.fill-bar-fact { background: var(--wolf-fill-fact); }
+.fill-bar-pending { background: var(--wolf-fill-plan); }
+/* Перегруз — нейтральная штриховка по всей ширине, БЕЗ красного (п.3 тикета). */
+.fill-bar-over {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 3px,
+    var(--wolf-ink) 3px,
+    var(--wolf-ink) 4px
+  );
+  opacity: 0.12;
+}
 .backlog-delo { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--wolf-subrule); }
 .backlog-delo-body { display: grid; gap: 2px; min-width: 0; }
 .backlog-delo-title { color: var(--wolf-ink); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
