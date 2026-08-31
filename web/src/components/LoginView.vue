@@ -34,6 +34,22 @@ const demoProfiles = ref([])
 const demoLoading = ref(false)
 const demoCreds = ref(null)
 
+// Релиз 1.1, тикет 08: «Открыть доступ по инвайтам». Анонимный публичный эндпоинт
+// говорит, показывать ли ссылку «У меня есть код». По умолчанию true — при сбое
+// загрузки поведение остаётся «как сейчас».
+const inviteAccessOpen = ref(true)
+
+async function loadInviteAccess() {
+  try {
+    const res = await fetch(`${apiBase()}/instance/registration`)
+    if (!res.ok) return
+    const data = await res.json()
+    inviteAccessOpen.value = data.inviteAccessOpen ?? true
+  } catch {
+    // сеть недоступна — оставляем ссылку видимой (прежнее поведение)
+  }
+}
+
 const FALLBACK_PROFILES = [
   { slug: 'worker-class', displayName: 'Рабочий класс' },
   { slug: 'wise-freelancer', displayName: 'Мудрый фрилансер' },
@@ -107,6 +123,7 @@ async function login() {
 onMounted(() => {
   if (localStorage.getItem('wolf_token')) window.location.hash = '#/life-areas'
 })
+onMounted(loadInviteAccess)
 </script>
 
 <template>
@@ -132,7 +149,7 @@ onMounted(() => {
         </button>
       </form>
 
-      <p class="login-hint"><a href="#/register">У меня есть код</a></p>
+      <p v-if="inviteAccessOpen" class="login-hint"><a href="#/register">У меня есть код</a></p>
 
       <div class="demo-block">
         <button v-if="!demoOpen" type="button" class="btn btn-ghost btn-block" @click="openDemo">Демо-режим</button>

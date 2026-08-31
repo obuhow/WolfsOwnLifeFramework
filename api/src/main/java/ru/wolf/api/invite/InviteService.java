@@ -22,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.auth.JwtUtil;
+import ru.wolf.api.instance.InstanceConfigService;
 import ru.wolf.api.lifesphere.LifeSphereSeeder;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
@@ -39,6 +40,7 @@ public class InviteService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final LifeSphereSeeder lifeSphereSeeder;
+    private final InstanceConfigService instanceConfigService;
 
     private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int CODE_LENGTH = 10;
@@ -78,6 +80,12 @@ public class InviteService {
 
     @Transactional
     public Optional<String> registerWithInvite(String code, String username, String rawPassword) {
+        // Release 1.1, тикет 08: глобальный переключатель «Открыть доступ по инвайтам».
+        // Выключен — регистрация по коду закрыта на бэкенде, а не только в UI.
+        if (!instanceConfigService.isInviteAccessOpen()) {
+            throw new IllegalStateException("Регистрация по инвайтам отключена");
+        }
+
         Optional<InviteCode> inviteOpt = inviteCodeRepository.findByCode(code);
         if (inviteOpt.isEmpty()) {
             return Optional.empty();

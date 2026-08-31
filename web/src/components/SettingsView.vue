@@ -36,6 +36,58 @@ const error = ref('')
 const success = ref('')
 const isAdmin = ref(false)
 
+// Глобальный переключатель «Открыть доступ по инвайтам» (релиз 1.1, тикет 08).
+// Настройка всего экземпляра — отдельное хранилище instance_config, не персональные
+// настройки пользователя. Читается/пишется только в админ-секции.
+const inviteAccessOpen = ref(true)
+const inviteBusy = ref(false)
+const inviteError = ref('')
+const inviteSuccess = ref('')
+
+async function loadInviteAccess() {
+  inviteError.value = ''
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) return
+    const res = await fetch(`${apiBase()}/instance/registration`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    inviteAccessOpen.value = data.inviteAccessOpen ?? true
+  } catch (e) {
+    inviteError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function saveInviteAccess() {
+  if (inviteBusy.value) return
+  inviteBusy.value = true
+  inviteError.value = ''
+  inviteSuccess.value = ''
+  try {
+    const token = localStorage.getItem('wolf_token')
+    if (!token) { window.location.hash = '#/login'; return }
+    const res = await fetch(`${apiBase()}/instance/invite-access`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ inviteAccessOpen: inviteAccessOpen.value })
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    inviteAccessOpen.value = data.inviteAccessOpen ?? inviteAccessOpen.value
+    inviteSuccess.value = 'Доступ по инвайтам обновлён'
+    setTimeout(() => { inviteSuccess.value = '' }, 3000)
+  } catch (e) {
+    inviteError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    inviteBusy.value = false
+  }
+}
+
 const timezones = [
   'Europe/Moscow',
   'Europe/Paris',
@@ -376,6 +428,7 @@ async function unlinkMax() {
 
 onMounted(loadSettings)
 onMounted(loadRole)
+onMounted(loadInviteAccess)
 onMounted(loadTelegramStatus)
 onMounted(loadMaxStatus)
 </script>
@@ -634,6 +687,33 @@ onMounted(loadMaxStatus)
       <fieldset class="settings-fieldset">
         <legend>Администрирование</legend>
         <p class="hint">Выпуск и отзыв пригласительных кодов — доступно только администратору.</p>
+
+        <div class="form-group">
+          <label class="checkbox-label" for="inviteAccessOpen">
+            <input
+              id="inviteAccessOpen"
+              v-model="inviteAccessOpen"
+              type="checkbox"
+              :disabled="inviteBusy"
+            />
+            Открыть доступ по инвайтам
+          </label>
+          <p class="hint">
+            Когда галочка снята, на экране входа не показывается ссылка «У меня есть код»,
+            а регистрация по пригласительному коду закрыта.
+          </p>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            :disabled="inviteBusy"
+            @click="saveInviteAccess"
+          >
+            {{ inviteBusy ? 'Сохранение…' : 'Сохранить' }}
+          </button>
+          <div v-if="inviteError" class="alert alert-error">{{ inviteError }}</div>
+          <div v-if="inviteSuccess" class="alert alert-success">{{ inviteSuccess }}</div>
+        </div>
+
         <router-link to="/admin/invites" class="btn btn-ghost">Пользователи / Инвайт-коды</router-link>
       </fieldset>
     </section>
