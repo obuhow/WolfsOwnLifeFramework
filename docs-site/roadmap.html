@@ -159,22 +159,14 @@
     </nav>
 
     <nav class="nav-group">
-      <p class="nav-title">Правда о состоянии</p>
-      <a href="#gaps">Разрывы код ↔ трекер</a>
-      <a href="#r04">Что осталось в 0.4</a>
-    </nav>
-
-    <nav class="nav-group">
-      <p class="nav-title">В работу</p>
-      <a href="#handoff-agent">Можно отдать агенту</a>
-      <a href="#handoff-you">Нужны вы</a>
-      <a href="#blocked">Заблокировано</a>
-      <a href="#order">Рекомендуемый порядок</a>
+      <p class="nav-title">Текущий релиз</p>
+      <a href="#r11">Что в релизе 1.1</a>
+      <a href="#gaps">Разрывы код ↔ трекер ↔ деплой</a>
     </nav>
 
     <nav class="nav-group">
       <p class="nav-title">Дальше</p>
-      <a href="#future">Релизы 0.5 – 0.7</a>
+      <a href="#order">Рекомендуемый порядок</a>
       <a href="#открытые">Не решено</a>
     </nav>
 
@@ -190,7 +182,7 @@
       <h1>Дорожная карта WOLF</h1>
       <p>Где проект находится сейчас и что прямо сегодня можно передать в работу.</p>
       <p class="stamp">
-        develop @ cf76a68 · 192 коммита · последний 2026-08-22 · 148 Java-классов · 32 Vue-экрана · 37 миграций Flyway · 82 тикета в шести релизах
+        develop @ 3312442 · 303 коммита · последний 2026-08-30 · 400 Java-классов · 33 Vue-экрана · 40 миграций Flyway · релизы 0.1–1.0 смёржены, 1.1 в работе
       </p>
     </header>
 
@@ -211,13 +203,13 @@
         </div>
         <div class="fact">
           <div class="fact-k">Отданные ассеты</div>
-          <div class="fact-v">Свежие</div>
-          <div class="fact-n"><code>index-y1FK3RJ4.js</code> совпадает с <code>web/dist</code></div>
+          <div class="fact-v">Отстают</div>
+          <div class="fact-n">стенд отдаёт <code>0.6.0</code> (<code>index-DgbvRH0b.js</code>), а исходники develop уже <code>1.0.0</code> — стенд не передеплоен</div>
         </div>
         <div class="fact">
           <div class="fact-k">Активный релиз</div>
-          <div class="fact-v">0.4</div>
-          <div class="fact-n">Многопользовательский режим · приёмка не пройдена</div>
+          <div class="fact-v">1.1</div>
+          <div class="fact-n">Планирование и UX Ежедневника · 1 из 8 тикетов закрыт</div>
         </div>
       </div>
 
@@ -225,12 +217,21 @@
         Функционально WOLF — это работающая личная Life OS: 15-минутная сетка «Сегодня», Календарь неделя/месяц,
         Диаграмма Ганта с планом и фактом, Проекты и Дела, Цели с метриками, Идеи, Рутины, Синергия,
         Утренний обход, Отчёт «Чек-лист», Статистика волн, импорт CSV/XLSX и полноценная Синхронизация данных
-        через версионированный workbook. Поверх всего этого лежит принятый UI-контракт 0.3 — минималистичный
-        реестр без красных состояний, процентов и прогресс-баров.
+        через версионированный workbook. Поверх — навигация и раздел Документации (0.5), демо-профили и Знакомство (0.6),
+        AI-импорт свободных заметок в сущности через чат/Telegram/Max (0.7), страница «План нагрузки» с вкладками
+        Бюджет/Кривые/Лестница/Очередь (0.8), сквозная миграция <code>wolf-api</code> на слоистую архитектуру (0.9)
+        и «укладка» техдолга релиза 1.0. Всё это <b>смёржено в <code>develop</code></b>. Поверх всего лежит
+        UI-контракт 0.3 — минималистичный реестр без красных состояний, процентов и прогресс-баров.
       </p>
       <p>
-        Незакрытая граница проходит по релизу 0.4: система <b>перестала быть однопользовательской в коде</b>,
-        но ещё не подтверждена как многопользовательская <b>в браузере и тестами</b>.
+        Текущая работа — релиз <b>1.1 «Планирование и UX Ежедневника»</b>: пять доработок и один баг по итогам
+        использования 1.0 на трёх экранах (Утренний обход, План нагрузки, Ежедневник) и в разделе Документации.
+        Закрыт первый тикет; остальные семь ещё в очереди. Прогресс — в разделе
+        <a href="#r11">«Что в релизе 1.1»</a>.
+      </p>
+      <p class="note" style="margin-top:1rem">
+        Отдельная граница — <b>деплой</b>: код релизов до 1.0 в <code>develop</code>, но стенд всё ещё отдаёт
+        сборку <code>0.6.0</code> — контейнеры <code>wolf-web</code>/<code>wolf-api</code> не пересобирались из свежего кода.
       </p>
     </section>
 
@@ -240,39 +241,49 @@
 
       <div class="track">
         <div class="track-cell is-done">
-          <div class="track-num">0.1</div>
-          <div class="track-name">Календарь-OS: сетка, Гант, проекты, дела</div>
+          <div class="track-num">0.1–0.3</div>
+          <div class="track-name">Календарь-OS, смысловой слой, синхронизация, дизайн-система</div>
           <div class="track-state">Готово</div>
         </div>
         <div class="track-cell is-done">
-          <div class="track-num">0.2</div>
-          <div class="track-name">Методологический слой: цели, идеи, заметки, прогноз</div>
+          <div class="track-num">0.4</div>
+          <div class="track-name">Многопользовательский режим и доступ по инвайту</div>
+          <div class="track-state">Смёржено</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">0.5</div>
+          <div class="track-name">Навигация и раздел Документации</div>
           <div class="track-state">Готово</div>
         </div>
         <div class="track-cell is-done">
-          <div class="track-num">0.21</div>
-          <div class="track-name">Синхронизация данных: workbook, preview, apply</div>
-          <div class="track-state">Код готов</div>
+          <div class="track-num">0.6</div>
+          <div class="track-name">Демо-профили, Знакомство, AGPL, шапка версии</div>
+          <div class="track-state">Готово</div>
         </div>
         <div class="track-cell is-done">
-          <div class="track-num">0.3</div>
-          <div class="track-name">Дизайн-система и UI-контракт «реестр 1a»</div>
+          <div class="track-num">0.7</div>
+          <div class="track-name">AI-импорт заметок: чат-панель, Telegram, Max</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">0.8</div>
+          <div class="track-name">План нагрузки: Бюджет / Кривые / Лестница / Очередь</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">0.9</div>
+          <div class="track-name">Слоистая архитектура <code>wolf-api</code> (тонкий MVCS + порты)</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">1.0</div>
+          <div class="track-name">«Укладка» техдолга: дедлайны, распределение, экспорт, глоссарий</div>
           <div class="track-state">Готово</div>
         </div>
         <div class="track-cell is-now">
-          <div class="track-num">0.4</div>
-          <div class="track-name">Многопользовательский режим и доступ по инвайту</div>
+          <div class="track-num">1.1</div>
+          <div class="track-name">Планирование и UX Ежедневника</div>
           <div class="track-state">Сейчас здесь</div>
-        </div>
-        <div class="track-cell">
-          <div class="track-num">0.5</div>
-          <div class="track-name">Навигация и Документация</div>
-          <div class="track-state">Проектируется</div>
-        </div>
-        <div class="track-cell">
-          <div class="track-num">0.6 / 0.7</div>
-          <div class="track-name">Демо-профили и Знакомство · AI-импорт записей</div>
-          <div class="track-state">Проектируется</div>
         </div>
       </div>
 
@@ -330,15 +341,57 @@
             <td class="num">0.4</td>
             <td>Роли и статусы пользователя, регистрация по инвайту, изоляция арендатора, админ-API, экран инвайтов, мастер первого входа, остаток дневной нормы, аккаунт <code>obuhov</code></td>
             <td class="num">13</td>
-            <td><span class="chip">11 смёржено</span></td>
-            <td><span class="chip ink">1 resolved, 12 open</span></td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip done">11 resolved · 1 wontfix · 09 open</span></td>
           </tr>
           <tr>
-            <td class="num">0.5–0.7</td>
-            <td>Карта wayfinder: переименования меню и раздел Документация; три демо-профиля и Знакомство; AI-импорт свободных заметок в сущности</td>
-            <td class="num">13</td>
-            <td><span class="chip faint">кода нет</span></td>
-            <td><span class="chip">2 claimed · 10 open</span></td>
+            <td class="num">0.5</td>
+            <td>Реструктуризация навигационного меню и раздел Документации <code>/docs</code></td>
+            <td class="num">2</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip">01 done · 02 open</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.6</td>
+            <td>Демо-профили, тур Знакомства, финальный выбор и очистка, перезагрузка профиля в Настройках, AGPL-3.0, фикс тайтла README, версия в шапке</td>
+            <td class="num">10</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip done">10 resolved</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.7</td>
+            <td>AI-импорт свободных заметок в сущности: сервис-парсер, чат-панель, каналы Telegram и Max</td>
+            <td class="num">4</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip done">4 resolved</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.8</td>
+            <td>Страница «План нагрузки»: API, оболочка вкладок, вкладки Кривые / Бюджет / Лестница / Очередь, редактор кривой проекта</td>
+            <td class="num">6</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip">1 resolved · 3 claimed · 1 ready · 06 в ветке</span></td>
+          </tr>
+          <tr>
+            <td class="num">0.9</td>
+            <td>Миграция <code>wolf-api</code> на слоистую архитектуру: тонкий MVCS, DTO-records, точечные порты и адаптеры, сквозной аудит</td>
+            <td class="num">11</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip done">11 (карта wayfinder)</span></td>
+          </tr>
+          <tr>
+            <td class="num">1.0</td>
+            <td>«Укладка» техдолга: версия 1.0.0, дедлайн проекта, тумблер распределения, ссылка-пост бота, вложенность в Утреннем обходе, шапка/тур/админ, демо-режим, HTTPS-инструкция, экспорт CSV, глоссарий</td>
+            <td class="num">10 + 5 багов</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip done">10 resolved · Б-1..Б-4 resolved · Б-5 needs-info</span></td>
+          </tr>
+          <tr>
+            <td class="num">1.1</td>
+            <td>Планирование и UX Ежедневника: раскрытие названия в Утреннем обходе, «План нагрузки» отдельной страницей, порядок вкладок, редактор кривой «Распределить время», переименование h1, полоса заполнения проекта, режим «Карандаш+»</td>
+            <td class="num">7 + 1 баг</td>
+            <td><span class="chip">01 в ветке (не смёржен)</span></td>
+            <td><span class="chip">1 resolved · 6 ready · баг open</span></td>
           </tr>
         </tbody>
       </table>
@@ -349,9 +402,82 @@
       </div>
     </section>
 
+    <!-- ================= РЕЛИЗ 1.1 ================= -->
+    <section id="r11">
+      <h2>Что в релизе 1.1<span class="h2-sub">Прожарка проведена, решения владельца зафиксированы. Обновляется после закрытия каждого тикета</span></h2>
+
+      <p>
+        Пять доработок и один баг по итогам использования 1.0 на трёх экранах — Утренний обход,
+        План нагрузки (бывшая Дорожная карта), Ежедневник — и в разделе Документации. Часть требований
+        сознательно противоречит доменным решениям (глоссарий <code>CONTEXT.md</code>, визуальный контракт 0.3);
+        все противоречия разобраны grill-with-docs и разрешены явными решениями владельца.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th class="narrow">№</th><th>Тикет</th><th class="narrow">Статус</th><th>Что сделано / что осталось</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">01</td>
+            <td>Утренний обход: клик по названию проекта раскрывает блок, справа — «Редактировать проект»</td>
+            <td><span class="chip">частично</span></td>
+            <td><b>Фронт готов и собран</b> (коммит <code>df2c42f</code>, <code>MorningView.vue</code> + <code>ProjectsView.vue</code>, <code>npm run build</code> зелёный). <b>Осталось:</b> браузерная приёмка и мерж в <code>develop</code> + передеплой — по правилу «зелёная сборка ≠ приёмка»</td>
+          </tr>
+          <tr>
+            <td class="num">02</td>
+            <td>«План нагрузки» отдельной страницей <code>/load-plan</code>; старый якорь <code>/roadmap#load-plan</code> → 302</td>
+            <td><span class="chip faint">ready-for-agent</span></td>
+            <td>Не начат. Блокирует 03 и 04</td>
+          </tr>
+          <tr>
+            <td class="num">03</td>
+            <td>Порядок вкладок «Плана нагрузки»: Бюджет, Кривые, Лестница, Очередь</td>
+            <td><span class="chip faint">ready-for-agent</span></td>
+            <td>Не начат. <span class="chip">Blocked by 02</span></td>
+          </tr>
+          <tr>
+            <td class="num">04</td>
+            <td>Кнопка «Распределить время» + ручной редактор кривой (дополняет стратегии, сумма плановых часов неизменна)</td>
+            <td><span class="chip faint">ready-for-agent</span></td>
+            <td>Не начат. <span class="chip">Blocked by 02</span></td>
+          </tr>
+          <tr>
+            <td class="num">05</td>
+            <td>Ежедневник: h1 «Календарь» → «Ежедневник»</td>
+            <td><span class="chip faint">ready-for-agent</span></td>
+            <td>Не начат</td>
+          </tr>
+          <tr>
+            <td class="num">06</td>
+            <td>Ежедневник: полоса заполнения проекта (зелёный факт + светло-зелёный план)</td>
+            <td><span class="chip faint">ready-for-agent</span></td>
+            <td>Не начат. Точечное исключение из контракта 0.3, требует принятия <code>ADR-0006</code> (черновик набросан)</td>
+          </tr>
+          <tr>
+            <td class="num">07</td>
+            <td>Ежедневник: режим «Карандаш+» ±15 мин сверху/снизу записи + фикс бага «вычитание с начала вместо конца»</td>
+            <td><span class="chip faint">ready-for-agent</span></td>
+            <td>Не начат (переформулирован 2026-08-31 из прежней постановки «со скольки до скольки»)</td>
+          </tr>
+          <tr>
+            <td class="num">Б-01</td>
+            <td>Документация: вторая шапка и отсутствие flyout у пункта «Документация»</td>
+            <td><span class="chip faint">open</span></td>
+            <td>Не начат</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        Итог: <b>1 из 8 закрыт</b> (и то частично — код есть, приёмки/мержа нет), 6 доработок и 1 баг ждут исполнителя.
+        Зависимости: 02 блокирует 03 и 04; 06 требует ADR-0006. Остальные независимы.
+      </div>
+    </section>
+
     <!-- ================= РАЗРЫВЫ ================= -->
     <section id="gaps">
-      <h2>Разрывы между кодом и трекером<span class="h2-sub">Главный риск карты: по трекеру релиз 0.4 выглядит неначатым, хотя код почти весь смёржен — и наоборот, «зелёные» релизы имеют незакрытые чек-листы</span></h2>
+      <h2>Разрывы код ↔ трекер ↔ деплой<span class="h2-sub">Код релизов 0.1–1.0 в <code>develop</code>, но на стенде и в трекере остались хвосты</span></h2>
 
       <table>
         <thead>
@@ -359,278 +485,74 @@
         </thead>
         <tbody>
           <tr>
-            <td><b>Экрана <code>/onboarding</code> не существует</b></td>
-            <td>Бэкенд <code>OnboardingController</code> со всеми пятью эндпоинтами смёржен (<code>da5da47</code>), но во фронте нет ни маршрута, ни компонента. <code>RegisterView.vue</code> прямо содержит комментарий, что редиректит на <code>/today</code>, потому что мастера нет.</td>
-            <td><span class="chip ink">завести тикет</span></td>
+            <td><b>Стенд отдаёт старую сборку <code>0.6.0</code></b></td>
+            <td>Контейнер <code>wolf-web</code> раздаёт <code>index-DgbvRH0b.js</code> с версией <code>0.6.0</code>, тогда как <code>web/package.json</code> в <code>develop</code> уже <code>1.0.0</code>. Образы <code>wolf-web</code>/<code>wolf-api</code> не пересобирались из свежего кода.</td>
+            <td><span class="chip ink">передеплой</span></td>
           </tr>
           <tr>
-            <td><b>Экрана «Пользователи» не существует</b></td>
-            <td>В <code>AdminController</code> есть <code>/admin/users</code>, block, unblock, reset-password, delete. Во фронте есть только <code>/admin/invites</code>. Путь C приёмки (блокировка, сброс пароля, удаление через UI) непроходим.</td>
-            <td><span class="chip ink">завести тикет</span></td>
+            <td><b>Тикет 1.1/01 закрыт как <code>resolved</code>, но не смёржен</b></td>
+            <td>Ветка <code>release-1.1/feature/01-...</code> на 1 коммит впереди <code>develop</code>; в <code>## Answer</code> тикета прямо указано, что мерж и передеплой оставлены отдельным шагом, а браузерная приёмка не проводилась.</td>
+            <td><span class="chip ink">приёмка + мерж</span></td>
           </tr>
           <tr>
-            <td><b>Ни одного гейт-теста релиза 0.4</b></td>
-            <td>В <code>api/src/test</code> нет <code>TenantIsolationApiIT</code>, <code>UserPurgeServiceIT</code>, <code>AdminApiIT</code>, <code>OnboardingApiIT</code>, <code>TodayNormIT</code>. Есть только <code>RegistrationApiIT</code> и <code>UserModelApiIT</code>. Изоляция арендатора <i>предполагается</i>, но не доказана.</td>
-            <td><span class="chip ink">блокер релиза</span></td>
+            <td><b>Релиз 0.4: тикет 09 (приёмка) — <code>open</code></b></td>
+            <td>Код 0.4 смёржен, 11 тикетов <code>resolved</code>, 06 — <code>wontfix</code>. Не закрыт только <code>09</code> — сквозная приёмка трёх путей в живом браузере на задеплоенной системе.</td>
+            <td><span class="chip">браузерная приёмка</span></td>
           </tr>
           <tr>
-            <td><b><code>admin/admin</code> всё ещё открыт</b></td>
-            <td>В БД стенда <code>admin</code> (id 1) имеет <code>status = ACTIVE</code>. Именной администратор <code>obuhov</code> (id 12, ADMIN) создан и подтверждён рабочим — то есть блокер тикета 13 снят, а сам тикет не выполнен.</td>
-            <td><span class="chip ink">делать сейчас</span></td>
-          </tr>
-          <tr>
-            <td><b>Демо-код есть, демо-режим отменён</b></td>
-            <td><code>DemoController</code>, <code>DemoFixtureGenerator</code>, <code>DemoGcService</code> смёржены, в БД лежат три аккаунта <code>demo-*</code>. Кнопки «Попробовать демо» в UI нет. Карта 0.5–0.7 отменяет анонимное демо целиком в пользу закрытого инвайт-стенда.</td>
-            <td><span class="chip ink">решить судьбу</span></td>
-          </tr>
-          <tr>
-            <td><b>Согласование 0.4 описано, но не применено</b></td>
-            <td>Тикет карты <code>WF-03</code> содержит готовый пошаговый список: закрыть 05 и 06 как <code>wontfix</code>, вычистить Demo Sandbox из <code>spec.md</code>, переформулировать 08, снять рёбра <code>Blocked by</code>. В файлах 0.4 ничего из этого пока нет.</td>
-            <td><span class="chip ink">15 минут работы</span></td>
-          </tr>
-          <tr>
-            <td><b>«Заметки / LLM Wiki» — заглушка</b></td>
-            <td>Маршрут <code>/notes</code> отдаёт <code>PlaceholderView</code>, хотя бэкенд заметок и ассистента из 0.2 реализован. Экран остаётся контрактом-заготовкой.</td>
-            <td><span class="chip">знать</span></td>
-          </tr>
-          <tr>
-            <td><b>Статусы 0.1 и 0.21 отстали от кода</b></td>
-            <td>Тикеты 0.1 <code>04</code>, <code>11-week-backlog</code>, <code>15</code> висят <code>ready-for-agent</code> с пустыми чек-боксами, хотя функциональность год как в проде. У 0.21 все семь тикетов имеют <code>## Answer: Not resolved</code> при смёрженном и работающем экране Синхронизации.</td>
+            <td><b>Хвосты трекера: 0.5/02, 0.8, 1.0/Б-5</b></td>
+            <td>0.5 тикет <code>02</code> (Документация) — <code>open</code> при смёрженном коде; часть тикетов 0.8 в статусе <code>claimed</code>; баг <code>Б-5</code> релиза 1.0 — <code>needs-info</code>.</td>
             <td><span class="chip">гигиена трекера</span></td>
           </tr>
         </tbody>
       </table>
     </section>
 
-    <!-- ================= 0.4 ================= -->
-    <section id="r04">
-      <h2>Что осталось в релизе 0.4<span class="h2-sub">Единственный релиз, который сейчас мешает двигаться дальше: 0.5–0.7 опираются на инвайт-стенд</span></h2>
-
-      <table>
-        <thead>
-          <tr><th class="narrow">№</th><th>Тикет</th><th class="narrow">Код</th><th>Что осталось</th></tr>
-        </thead>
-        <tbody>
-          <tr><td class="num">01</td><td>Модель пользователя: роль, статус, тип, e-mail</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист; по решению карты — убрать <code>account_type</code> и <code>expires_at</code></td></tr>
-          <tr><td class="num">02</td><td>Регистрация по инвайт-коду</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист, есть <code>RegistrationApiIT</code></td></tr>
-          <tr><td class="num">03</td><td>Изоляция арендатора: аудит и тест-гейт</td><td><span class="chip">частично</span></td><td><b>Нет <code>TenantIsolationApiIT</code> и <code>UserPurgeServiceIT</code></b> — гейт релиза не выполнен</td></tr>
-          <tr><td class="num">04</td><td>Администрирование: пользователи и инвайты</td><td><span class="chip">только API</span></td><td>Нет экрана «Пользователи»</td></tr>
-          <tr><td class="num">05</td><td>Генератор демо-фикстур</td><td><span class="chip done">смёржен</span></td><td><b>Отменён картой</b> → перевести в <code>wontfix</code>, содержание передать в 0.6</td></tr>
-          <tr><td class="num">06</td><td>Demo Sandbox: эфемерная сессия, GC</td><td><span class="chip done">смёржен</span></td><td><b>Отменён картой</b> → <code>wontfix</code>, решить судьбу мёртвого кода и трёх demo-аккаунтов</td></tr>
-          <tr><td class="num">07</td><td>Остаток дневной нормы на «Сегодня»</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист, браузерная проверка</td></tr>
-          <tr><td class="num">08</td><td>Мастер первого входа: Проект → Цель → Норма</td><td><span class="chip">только API</span></td><td><b>Нет фронтенда <code>/onboarding</code></b> и guard-а в роутере</td></tr>
-          <tr><td class="num">09</td><td>Сквозная приёмка релиза</td><td><span class="chip faint">—</span></td><td>Три пути в браузере на задеплоенной системе. Ждёт всех остальных</td></tr>
-          <tr><td class="num">10</td><td>Фронтенд: ввод инвайт-кода</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист</td></tr>
-          <tr><td class="num">11</td><td>Фронтенд: выпуск инвайт-кодов (админ)</td><td><span class="chip done">смёржен</span></td><td>Закрыть чек-лист (был фикс <code>LazyInitializationException</code>)</td></tr>
-          <tr><td class="num">12</td><td>Именной админский аккаунт <code>obuhov</code></td><td><span class="chip done">resolved</span></td><td>—</td></tr>
-          <tr><td class="num">13</td><td>Закрыть доступ к seed-аккаунту <code>admin</code></td><td><span class="chip faint">—</span></td><td>Блокер снят тикетом 12. <b>Готов к работе прямо сейчас</b></td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- ================= ПЕРЕДАЧА ================= -->
-    <section id="handoff-agent">
-      <h2>Что можно передавать в работу<span class="h2-sub">Разложено по тому, кто может это взять: агент, вы лично, или никто пока</span></h2>
-
-      <div class="lane">
-        <div class="lane-head">
-          <span class="lane-title">Можно отдать агенту сегодня</span>
-          <span class="lane-meta">формулировка полная, блокеров нет, приёмка формальная</span>
-        </div>
-        <div class="lane-body">
-          <table>
-            <thead><tr><th class="narrow">Метка</th><th>Работа</th><th>Почему готово</th><th class="narrow">Объём</th></tr></thead>
-            <tbody>
-              <tr>
-                <td class="num">WF-03</td>
-                <td>Согласование релиза 0.4 с решениями карты</td>
-                <td>В теле тикета лежит готовый пошаговый список правок с указанием файлов. Ничем не блокируется. Снимает противоречие, из-за которого исполнитель может построить отменённую функциональность.</td>
-                <td><span class="chip">S</span></td>
-              </tr>
-              <tr>
-                <td class="num">0.4 / 13</td>
-                <td>Закрыть доступ к <code>admin/admin</code></td>
-                <td>Единственный блокер — рабочий <code>obuhov</code> — подтверждён и проверен в браузере. Процедура прописана до уровня API-вызовов, включая запрет физического удаления.</td>
-                <td><span class="chip">S</span></td>
-              </tr>
-              <tr>
-                <td class="num">0.4 / 03</td>
-                <td>Тест-гейт изоляции: <code>TenantIsolationApiIT</code> + <code>UserPurgeServiceIT</code></td>
-                <td>Аудит контроллеров уже описан, список маршрутов задан как артефакт. Без этого релиз не имеет права закрыться, а стенд — принимать чужие данные.</td>
-                <td><span class="chip">L</span></td>
-              </tr>
-              <tr>
-                <td class="num">0.4 / 08-fe</td>
-                <td>Фронтенд мастера первого входа <code>/onboarding</code></td>
-                <td>Бэкенд готов и покрыт эндпоинтами по шагам, UI-контракт 0.3 задаёт вид формы, поведение guard-а описано в spec. Нужен тикет-обёртка — содержание уже есть.</td>
-                <td><span class="chip">M</span></td>
-              </tr>
-              <tr>
-                <td class="num">0.4 / 04-fe</td>
-                <td>Экран «Пользователи» для администратора</td>
-                <td>Все шесть эндпоинтов реализованы; <code>AdminInvitesView.vue</code> — готовый образец разметки, guard-а по роли и <code>ConfirmInline</code> вместо модалок.</td>
-                <td><span class="chip">M</span></td>
-              </tr>
-              <tr>
-                <td class="num">гигиена</td>
-                <td>Синхронизация статусов 0.1 и 0.21 с реальностью</td>
-                <td>Механическая работа: проставить <code>resolved</code> и <code>## Answer</code> там, где функциональность в проде. Убирает ложные «свободные» тикеты из фронтира.</td>
-                <td><span class="chip">S</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section id="handoff-you">
-      <div class="lane">
-        <div class="lane-head">
-          <span class="lane-title">Требует вас лично</span>
-          <span class="lane-meta">решения и приёмка — агент не может ответить за продукт</span>
-        </div>
-        <div class="lane-body">
-          <table>
-            <thead><tr><th class="narrow">Метка</th><th>Работа</th><th>Что именно от вас</th></tr></thead>
-            <tbody>
-              <tr>
-                <td class="num">WF-04</td>
-                <td>Полная структура меню и судьба переименований</td>
-                <td><b>Корень всей карты 0.5–0.7.</b> Grilling: четыре переименования (Гант → Дорожная карта, Кривая нагрузки → План нагрузки, Сферы жизни → Диаграмма компетенций, Заметки → Личная база знаний), переезд Бэклога, Банка идей и Чек-листа в «Управление делами», судьба Синергии.</td>
-              </tr>
-              <tr>
-                <td class="num">WF-01</td>
-                <td>Правовая модель хранения чужих персданных</td>
-                <td>Research уже <code>claimed</code>. Решение о самохостинге и приёме чужих данных на своём VPS — ваше, не агентское.</td>
-              </tr>
-              <tr>
-                <td class="num">0.4 / 06</td>
-                <td>Судьба демо-кода после отмены Demo Sandbox</td>
-                <td>Удалять <code>DemoController</code>/<code>DemoGcService</code> и чистить три demo-аккаунта — или оставить как основу генератора трёх профилей 0.6.</td>
-              </tr>
-              <tr>
-                <td class="num">0.4 / 09</td>
-                <td>Сквозная приёмка релиза 0.4</td>
-                <td>Три пути в живом браузере. По вашему же правилу зелёные тесты и успешная сборка приёмкой не считаются.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section id="blocked">
-      <div class="lane">
-        <div class="lane-head">
-          <span class="lane-title">Заблокировано — не трогать</span>
-          <span class="lane-meta">возьмёшь раньше — построишь не то</span>
-        </div>
-        <div class="lane-body">
-          <table>
-            <thead><tr><th class="narrow">Метка</th><th>Работа</th><th>Ждёт</th></tr></thead>
-            <tbody>
-              <tr><td class="num">WF-05</td><td>Содержание трёх демо-профилей</td><td>WF-04: профиль обязан наполнять каждый пункт утверждённого меню</td></tr>
-              <tr><td class="num">WF-06</td><td>Механика Знакомства: тур и финальный выбор</td><td>WF-04: тур водит по пунктам меню</td></tr>
-              <tr><td class="num">WF-07</td><td>Манифест Siberian Wolf: правда о реализации</td><td>WF-04: манифест ссылается на переименованные экраны</td></tr>
-              <tr><td class="num">WF-08</td><td>Раздел Документация и Сценарии использования</td><td>WF-04, WF-07: иначе оглавление придётся переписывать</td></tr>
-              <tr><td class="num">WF-10</td><td>Архитектура бота импорта и каналы</td><td>WF-09: нельзя проектировать транспорт, не зная, что передаётся</td></tr>
-              <tr><td class="num">WF-11/12/13</td><td>Публикация spec релизов 0.5, 0.6, 0.7</td><td>Все grilling-тикеты своей ветки</td></tr>
-              <tr><td class="num">0.4 / 09</td><td>Приёмка релиза</td><td>03, 04-fe, 08-fe, 13</td></tr>
-            </tbody>
-          </table>
-          <p style="font-size:.85rem;color:var(--ink-soft);margin:.6rem 0 0">
-            Исключение: <b>WF-09 «Контракт разбора заметки в сущности WOLF»</b> формально не блокируется ничем
-            и может идти параллельно ветке меню — это grilling про AI-импорт, не зависящий от навигации.
-          </p>
-        </div>
-      </div>
-    </section>
-
     <!-- ================= ПОРЯДОК ================= -->
     <section id="order">
-      <h2>Рекомендуемый порядок<span class="h2-sub">Сначала снять противоречия в трекере, потом закрыть 0.4, и только затем проектировать 0.5</span></h2>
+      <h2>Рекомендуемый порядок по 1.1<span class="h2-sub">Сначала передеплой и приёмка уже готового, затем разблокирующий тикет 02, потом остальное</span></h2>
 
       <ol class="seq">
         <li>
-          <b>WF-03 — согласовать 0.4 с картой</b>
-          <span class="why">Пока 05 и 06 висят открытыми, любой исполнитель может достроить отменённое демо. Дешевле всего и разблокирует честный подсчёт остатка.</span>
+          <b>Передеплой стенда до <code>develop</code> (1.0.0)</b>
+          <span class="why">Стенд отдаёт сборку 0.6.0, а код 0.1–1.0 давно в <code>develop</code>. Пока не передеплоено, ни одна доработка 1.1 не видна вживую и приёмка невозможна.</span>
         </li>
         <li>
-          <b>0.4 / 13 — закрыть <code>admin/admin</code></b>
-          <span class="why">Публично известная пара логин-пароль на домене, который уже отвечает из интернета. Блокер снят, работа на полчаса.</span>
+          <b>1.1 / 01 — приёмка и мерж</b>
+          <span class="why">Фронт готов и собран, осталась браузерная проверка (клик по названию → раскрытие, «Редактировать проект» → форма) и мерж в <code>develop</code>. Самое дешёвое доведение до конца.</span>
         </li>
         <li>
-          <b>0.4 / 03 — тест-гейт изоляции</b>
-          <span class="why">Стенд принимает чужих людей по инвайту. Изоляция сейчас держится на договорённости, а не на тесте. Это последний технический блокер релиза.</span>
+          <b>1.1 / 02 — «План нагрузки» отдельной страницей</b>
+          <span class="why">Разблокирует сразу 03 и 04. После него порядок вкладок и редактор кривой можно вести параллельно.</span>
         </li>
         <li>
-          <b>0.4 / 08-fe и 04-fe — два недостающих экрана</b>
-          <span class="why">Мастер первого входа и «Пользователи». Оба бэкенда готовы; без экранов пути A и C приёмки непроходимы в браузере.</span>
+          <b>1.1 / 05 и Б-01 — независимые мелочи</b>
+          <span class="why">Переименование h1 «Календарь» → «Ежедневник» и фикс второй шапки в Документации ничем не блокируются — можно закрывать в любой момент.</span>
         </li>
         <li>
-          <b>0.4 / 09 — сквозная приёмка</b>
-          <span class="why">Три пути живьём. Только этот тикет имеет право объявить релиз готовым.</span>
+          <b>1.1 / 06 — принять ADR-0006, затем полоса заполнения</b>
+          <span class="why">Точечное исключение из тихого контракта 0.3 (зелёный факт + план). Черновик ADR набросан; без принятия исключения тикет строить нельзя.</span>
         </li>
         <li>
-          <b>WF-04 — grilling структуры меню</b>
-          <span class="why">Корень 0.5–0.7. После него разблокируются сразу четыре тикета карты, и работу можно распараллелить.</span>
-        </li>
-        <li>
-          <b>WF-09 — контракт разбора заметки</b>
-          <span class="why">Можно вести параллельно с меню: ветка AI-импорта от навигации не зависит.</span>
+          <b>1.1 / 03, 04, 07 — оставшиеся доработки</b>
+          <span class="why">Порядок вкладок и редактор кривой после 02; режим «Карандаш+» с фиксом бага «вычитание с начала» — на экране Ежедневника.</span>
         </li>
       </ol>
-    </section>
-
-    <!-- ================= БУДУЩЕЕ ================= -->
-    <section id="future">
-      <h2>Релизы 0.5 – 0.7<span class="h2-sub">Пока это карта wayfinder, а не спецификации: 13 тикетов, из них 11 ещё без ответа</span></h2>
-
-      <table>
-        <thead><tr><th class="narrow">Релиз</th><th>Что войдёт</th><th>Зафиксировано при черчении карты</th></tr></thead>
-        <tbody>
-          <tr>
-            <td class="num">0.5</td>
-            <td><b>Навигация и Документация.</b> Четыре переименования экранов, новая группировка меню, раздел <code>/docs</code> внутри приложения: Манифест Siberian Wolf, Сценарии использования, Технические инструкции.</td>
-            <td>Переименования — это <b>переименования, а не новые экраны</b>. Манифест описывает только работающее: пункт без реализации не публикуется.</td>
-          </tr>
-          <tr>
-            <td class="num">0.6</td>
-            <td><b>Демо-профили и Знакомство.</b> При первом входе по инвайту — выбор одного из трёх профилей (наёмный работник / фрилансер / художник), тур подсказками, финальный выбор «Оставить или Очистить профиль», повторная загрузка в Настройках.</td>
-            <td>Анонимное демо отменено: каждый гость получает настоящий постоянный аккаунт. Профили — декларативные файлы в репозитории со сдвигом дат, правка не требует пересборки Java.</td>
-          </tr>
-          <tr>
-            <td class="num">0.7</td>
-            <td><b>AI-импорт записей.</b> Бот, превращающий свободный текст заметок в Дела, Проекты, Рутины и слоты расписания. Каналы по порядку: чат-панель в интерфейсе → Telegram → Max.</td>
-            <td>Подтверждение спрашивается только там, где разбор неуверен или слот занят. Повторяющиеся Дела хранятся правилом, а не материализацией 52 записей.</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="note">
-        Тихий контракт 0.3 переносится во все три релиза без изменений:
-        никаких красных состояний, процентов, прогресс-баров, стриков и упрёков.
-        Сравнение факта и плана — это контекст, а не оценка.
-      </div>
     </section>
 
     <section id="открытые">
       <h2>Ещё не решено<span class="h2-sub">Явно зафиксированные пробелы — чтобы они не всплыли посреди реализации</span></h2>
       <ul>
-        <li><b>Поведение тура на мобильном</b> — подсказки поверх выдвижного drawer-меню: механики нет в контракте 0.3.</li>
-        <li><b>Судьба гостевого аккаунта во времени</b> — истекает ли доступ по инвайту через месяц, кто чистит заброшенные профили.</li>
-        <li><b>Голосовой ввод в бота импорта</b> — <code>POST /api/v1/notes/audio</code> уже существует для заметок; распространяется ли он на импорт.</li>
-        <li><b>Существующие пользователи после переименования меню</b> — нужен ли короткий тур «что переехало».</li>
-        <li><b>Судьба экрана Синергия</b> — поглощается Диаграммой компетенций или остаётся отдельно.</li>
-        <li><b>Правовая модель хостинга</b> — оферта, политика обработки, уведомление РКН, локализация БД (зависит от WF-01).</li>
-        <li><b>Дистрибутив самохостинга</b> — одна команда <code>docker compose up</code>, готовые образы, миграция данных со стенда.</li>
-        <li><b>Лицензия</b> — <code>LICENSE.md</code> нужно привести в соответствие с намерением до публичного демо.</li>
+        <li><b>Хвост релиза 0.4</b> — тикет <code>09</code> (сквозная приёмка трёх путей в живом браузере) остаётся <code>open</code>; остальной код 0.4 смёржен.</li>
+        <li><b>Гигиена трекера</b> — 0.5/02 (Документация) <code>open</code>, часть тикетов 0.8 <code>claimed</code>, баг 1.0/Б-5 <code>needs-info</code> при смёрженном коде.</li>
+        <li><b>ADR-0006</b> — исключение полосы заполнения из контракта 0.3 нужно принять до реализации тикета 1.1/06.</li>
+        <li><b>Судьба демо-кода</b> — <code>DemoController</code>/<code>DemoGcService</code> и три <code>demo-*</code> аккаунта остаются в БД после отмены анонимного демо-режима.</li>
       </ul>
     </section>
 
     <footer class="page-foot">
-      WOLF · дорожная карта · источники: <code>.scratch/release-0.1 … 0.4</code>,
-      <code>.scratch/wayfinder-releases-05-07/map.md</code>, git-история develop, схема БД стенда, живые health-checks.
+      WOLF · дорожная карта · источники: <code>.scratch/release-0.1 … release-1.1</code>,
+      карты <code>.scratch/wayfinder-*</code>, git-история <code>origin/develop</code>, схема БД стенда, живые health-checks.
       Файл отдаётся контейнером <code>wolf-docs</code> без пересборки: <code>/docs/roadmap.html</code>.
     </footer>
   </main>
