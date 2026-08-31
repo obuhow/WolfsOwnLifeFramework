@@ -27,7 +27,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import lombok.RequiredArgsConstructor;
 import ru.wolf.api.telegram.dto.TelegramMessage;
 
 /**
@@ -38,12 +37,16 @@ import ru.wolf.api.telegram.dto.TelegramMessage;
  */
 @Component
 @Profile("!test")
-@RequiredArgsConstructor
 public class HttpTelegramAdapter implements TelegramPort {
 
     private final TelegramProperties properties;
-    @Qualifier("telegramRestClient")
     private final RestClient restClient;
+
+    public HttpTelegramAdapter(TelegramProperties properties,
+                               @Qualifier("telegramRestClient") RestClient restClient) {
+        this.properties = properties;
+        this.restClient = restClient;
+    }
 
     private String url(String method) {
         return properties.getApiBase().replaceAll("/+$", "")

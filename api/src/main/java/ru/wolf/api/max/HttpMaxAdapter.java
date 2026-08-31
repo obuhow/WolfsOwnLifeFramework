@@ -27,8 +27,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import lombok.RequiredArgsConstructor;
-
 /**
  * Production Max transport: calls the Bot API over HTTPS (base
  * {@code platform-api2.max.ru}). Active on every profile except {@code test}
@@ -47,12 +45,16 @@ import lombok.RequiredArgsConstructor;
  */
 @Component
 @Profile("!test")
-@RequiredArgsConstructor
 public class HttpMaxAdapter implements MaxPort {
 
     private final MaxProperties properties;
-    @Qualifier("maxRestClient")
     private final RestClient restClient;
+
+    public HttpMaxAdapter(MaxProperties properties,
+                          @Qualifier("maxRestClient") RestClient restClient) {
+        this.properties = properties;
+        this.restClient = restClient;
+    }
 
     private String messagesUrl() {
         return properties.getApiBase().replaceAll("/+$", "") + "/messages";
