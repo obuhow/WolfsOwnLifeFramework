@@ -86,7 +86,7 @@ async function purge() {
     <section class="onboarding-inner" aria-labelledby="final-choice-title">
       <header class="onboarding-head">
         <p class="eyebrow">WOLF</p>
-        <h1 id="final-choice-title">Знакомство завершено</h1>
+        <h1 id="final-choice-title">Приветственный тур завершён</h1>
         <p class="subtitle">
           Сейчас в системе демо-данные выбранного профиля. Их можно оставить и разбираться
           на живом примере — или очистить и начать со своих Проектов и Целей.
