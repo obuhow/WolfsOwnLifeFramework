@@ -20,6 +20,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase } from '../api'
 import { fillBarSegments } from '../backlogGroups'
 import { buildDayBlocks } from '../weekViewBlocks'
+import { durationToSlots } from '../durationParse'
 
 const loading = ref(false)
 const error = ref('')
@@ -63,6 +64,13 @@ const pickerDeloId = ref('')
 const pickerAdHoc = ref('')
 const pickerFilter = ref('')
 const quickTitle = ref('')
+// Релиз 1.2, тикет 07: длительность записи из picker свободного слота. Строка
+// человеческого формата («1 ч 30 м», «90 минут», «1.5 ч», «1:30»); по умолчанию
+// «15м» — тот же результат, что и прежний клик (одна 15-минутная запись).
+const pickerDuration = ref('15м')
+// Релиз 1.2, тикет 07: нейтральное уведомление (без красного — контракт 0.3),
+// напр. «создано N слотов, дальше занято». Отдельно от `error`.
+const pickerNotice = ref('')
 const quickCreating = ref(false)
 const saving = ref(false)
 
@@ -137,6 +145,15 @@ function addMinutes(ldtStr, mins) {
   const d = parseLdt(ldtStr)
   d.setMinutes(d.getMinutes() + mins)
   return formatLdt(d)
+}
+
+/**
+ * Разбор человеческого формата длительности (релиз 1.2, тикет 07) вынесен в
+ * `durationParse.js` — там же юнит-тест `durationParse.test.mjs`. Здесь только
+ * событие тура при успешном создании записей.
+ */
+function dispatchTimeEntrySaved(slots) {
+  document.dispatchEvent(new CustomEvent('wolf:time-entry-saved', { detail: { slots } }))
 }
 
 function entryCovering(slotStart) {
@@ -666,6 +683,14 @@ async function onCellClick(slot, span = 1) {
     }
     const body = await res.json()
     if (body.action === 'NEED_PICKER') {
+      // Релиз 1.2, тикет 07: в режиме «Карандаш+» клик по слоту означает ±15 мин
+      // (обрабатывается бэкендом grid-click). Picker с формой длительности —
+      // инструмент СОЗДАНИЯ и в этом режиме не открывается: два способа
+      // сосуществуют, но не пересекаются на одном клике.
+      if (quickEditMode.value) {
+        await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value, ensureSleep: false })
+        return
+      }
       openPicker(slot.startAt)
       return
     }
@@ -684,6 +709,8 @@ function openPicker(startAt) {
   pickerAdHoc.value = ''
   pickerFilter.value = ''
   quickTitle.value = ''
+  pickerDuration.value = '15м'
+  pickerNotice.value = ''
   pickerOpen.value = true
 }
 
@@ -788,20 +815,48 @@ async function submitPicker() {
   saving.value = true
   error.value = ''
   try {
-    const payload = { slotStart: normalizeStart(pickerSlot.value) }
-    if (body.deloId != null) payload.deloId = body.deloId
-    if (body.adHocText) payload.adHocText = body.adHocText
-    const res = await fetch(`${apiBase()}/time-entries/grid-click`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.message || `Сохранение: HTTP ${res.status}`)
+    // Длительность → число 15-минутных слотов (тикет 07). Вариант A: N
+    // последовательных вызовов grid-click с фронта, без изменения контракта API.
+    const wantSlots = durationToSlots(pickerDuration.value)
+
+    let created = 0
+    let blocked = false
+    let cursor = normalizeStart(pickerSlot.value)
+
+    for (let i = 0; i < wantSlots; i++) {
+      // Занятые слоты не перетирать: в одной ячейке не больше одной Записи.
+      // Первый слот заведомо свободен (picker открылся по пустому слоту);
+      // проверяем последующие перед созданием.
+      if (i > 0 && entryCovering(cursor)) {
+        blocked = true
+        break
+      }
+      const payload = { slotStart: cursor }
+      if (body.deloId != null) payload.deloId = body.deloId
+      if (body.adHocText) payload.adHocText = body.adHocText
+      const res = await fetch(`${apiBase()}/time-entries/grid-click`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || `Сохранение: HTTP ${res.status}`)
+      }
+      created += 1
+      cursor = addMinutes(cursor, 15)
     }
+
     closePicker()
     await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value, ensureSleep: false })
+
+    // Упор в занятую ячейку — нейтральное уведомление (без красного, контракт 0.3).
+    if (blocked) {
+      pickerNotice.value = `Создано слотов: ${created}. Дальше время уже занято — остановился, чтобы не перезаписать.`
+      window.setTimeout(() => { pickerNotice.value = '' }, 5000)
+    }
+    // Событие для тура — только по факту успешного создания.
+    if (created > 0) dispatchTimeEntrySaved(created)
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -1175,6 +1230,21 @@ onMounted(loadAll)
           >
             {{ quickCreating ? 'Создаю…' : 'Создать и выбрать' }}
           </button>
+        </div>
+
+        <!-- Релиз 1.2, тикет 07: длительность записи (свободный слот). Разложится
+             по 15-минутным слотам. Не показываем в режиме быстрого создания Дела. -->
+        <div v-if="pickerMode !== 'create'" class="form-group">
+          <label for="week-picker-duration">Длительность</label>
+          <input
+            id="week-picker-duration"
+            class="input"
+            v-model="pickerDuration"
+            placeholder="напр. 1 ч 30 м, 90 минут, 1:30"
+            @keyup.enter="submitPicker"
+          />
+          <p class="hint">Шаг 15 минут — округляется вверх (20 м → 30 м). По умолчанию 15 минут.</p>
+          <p v-if="pickerNotice" class="hint" role="status">{{ pickerNotice }}</p>
         </div>
 
         <div v-if="pickerMode !== 'create'" class="form-actions">

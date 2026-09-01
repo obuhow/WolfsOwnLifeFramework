@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node loadChartsForecast.test.mjs && node distributeTime.test.mjs && node backlogGroups.test.mjs && node weekViewBlocks.test.mjs && node onboardingSteps.test.mjs"
+    "test": "node loadChartsForecast.test.mjs && node distributeTime.test.mjs && node backlogGroups.test.mjs && node weekViewBlocks.test.mjs && node onboardingSteps.test.mjs && node durationParse.test.mjs"
   },
   "dependencies": {
     "vue": "^3.5.39",
