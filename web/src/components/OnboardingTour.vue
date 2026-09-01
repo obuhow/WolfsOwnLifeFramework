@@ -83,6 +83,16 @@ const hint = computed(() => (viaMenu.value ? MENU_HINT : step.value))
 // цель ушла в drawer (там подсказка ведёт к кнопке меню).
 const isCentered = computed(() => hint.value.placement === 'center' && !viaMenu.value)
 
+// Повторный запуск из шапки (не первый вход): тур ведёт по НАСТОЯЩЕМУ аккаунту.
+// Заставлять работающего пользователя создавать проект/дело/рутину = мусорить
+// его данными. Поэтому шаги-действия (await:'event') при повторном запуске
+// ВЫРОЖДАЮТСЯ в информационные (тикет 09 §4, вариант A): подсказка показывается,
+// шаг засчитывается кнопкой «Далее» без требования создать сущность.
+const isRepeatRun = !isFirstRunTour()
+const isInfoStep = computed(
+  () => isRepeatRun && step.value.await === 'event' && !viaMenu.value,
+)
+
 // «Завершить тур» — только на финальном шаге (await:'finish'); иначе «Пропустить».
 const exitLabel = computed(() =>
   step.value.await === 'finish' && !viaMenu.value ? 'Завершить тур' : 'Пропустить',
@@ -417,6 +427,16 @@ onBeforeUnmount(stopMeasuring)
       <p v-if="hint.n" class="tour-hint-counter">шаг {{ hint.n }} из {{ TOTAL_STEPS }}</p>
       <p class="tour-hint-title">{{ hint.title }}</p>
       <p class="tour-hint-text">{{ hint.text }}</p>
+      <!-- Повторный запуск (тикет 09 §4, вариант A): шаг-действие вырождается в
+           информационный — «Далее» вместо ожидания создания сущности. -->
+      <button
+        v-if="isInfoStep"
+        type="button"
+        class="tour-finish"
+        @click="goNext"
+      >
+        Далее
+      </button>
       <button
         v-if="step.await === 'finish' && !viaMenu"
         type="button"
