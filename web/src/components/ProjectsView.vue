@@ -281,6 +281,15 @@ async function saveProject() {
     success.value = isEdit ? 'Проект обновлён' : 'Проект создан'
     cancelForm()
     await loadProjects()
+    // Событие для Приветственного тура (релиз 1.2, тикет 04, шаг 5): движок ждёт
+    // ФАКТА создания проекта, чтобы отличить «нажал Сохранить» от «сохранилось».
+    // Только для создания — редактирование тур вперёд не двигает. Вне тура ни на
+    // что не влияет (никто не слушает).
+    if (!isEdit) {
+      document.dispatchEvent(
+        new CustomEvent('wolf:project-saved', { detail: { id: savedProject.id } })
+      )
+    }
     setTimeout(() => { success.value = '' }, 3000)
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
