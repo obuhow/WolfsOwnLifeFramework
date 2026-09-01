@@ -1050,6 +1050,7 @@ onMounted(loadAll)
                   type="button"
                   :class="blockClass(blockAt(dayIdx, rowIdx))"
                   :title="blockTitle(blockAt(dayIdx, rowIdx))"
+                  :data-tour-action="blockAt(dayIdx, rowIdx).slot.entry ? undefined : 'week-slot'"
                   :disabled="saving"
                   :style="{
                     gridColumn: dayIdx + 2,
