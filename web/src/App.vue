@@ -51,16 +51,16 @@ const NAV = [
         title: 'Планирование',
         children: [
           { label: 'Дорожная карта', to: '/roadmap' },
-          { label: 'План нагрузки', to: '/load-plan' },
+          { label: 'План нагрузки', to: '/load-plan', tourAction: 'nav-load-plan' },
           { label: 'Бэклог', to: '/backlog' },
         ],
       },
       {
         title: 'Сущности',
         children: [
-          { label: 'Проекты', to: '/projects' },
-          { label: 'Рутины', to: '/routines' },
-          { label: 'Дела', to: '/delos' },
+          { label: 'Проекты', to: '/projects', tourAction: 'nav-projects' },
+          { label: 'Рутины', to: '/routines', tourAction: 'nav-routines' },
+          { label: 'Дела', to: '/delos', tourAction: 'nav-delos' },
           { label: 'Банк идей', to: '/ideas' },
         ],
       },
@@ -359,6 +359,7 @@ onBeforeUnmount(() => {
                         v-for="child in subgroup.children"
                         :key="child.to"
                         :to="child.to"
+                        :data-tour-action="child.tourAction"
                         class="nav-submenu-link"
                         :class="{ active: isChildActive(child.to) }"
                         role="menuitem"
@@ -464,6 +465,7 @@ onBeforeUnmount(() => {
                           v-for="child in subgroup.children"
                           :key="child.to"
                           :to="child.to"
+                          :data-tour-action="child.tourAction"
                           class="drawer-submenu-link"
                           :class="{ active: isChildActive(child.to) }"
                           @click="onDrawerNavigate"
