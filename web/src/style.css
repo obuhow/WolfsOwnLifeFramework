@@ -153,7 +153,11 @@ textarea:focus-visible,
   min-width: 0;
 }
 
-.nav-desktop { flex-wrap: wrap; }
+/* Релиз 1.2, тикет 10: строка навигации не переносится, а измеряется на
+   переполнение (см. App.vue). flex-wrap:wrap маскировал бы overflow высотой
+   второй строки, поэтому nowrap + overflow:hidden. Перенос больше не нужен —
+   при нехватке места вся навигация уходит в бургер по классу .nav-collapsed. */
+.nav-desktop { flex-wrap: nowrap; overflow: hidden; }
 
 .nav-link {
   display: inline-flex;
@@ -754,6 +758,23 @@ input[type="radio"] {
   .menu-trigger { display: inline-flex; }
   .header-inner { align-items: center; }
 }
+
+/* Релиз 1.2, тикет 10: сворачивание в бургер по ФАКТУ переполнения (класс
+   навешивает App.vue через ResizeObserver), выше нижнего флора 768px.
+   ВАЖНО: в свёрнутом состоянии .nav-desktop НЕ display:none, а убрана из потока
+   через visibility:hidden + position:absolute — иначе её нельзя измерить
+   (display:none даёт scrollWidth=0, и разворот назад никогда бы не сработал).
+   Так строка остаётся измеримой, но не видна и не кликается. */
+.header-inner.nav-collapsed .nav-desktop {
+  visibility: hidden;
+  position: absolute;
+  left: -99999px;
+  top: 0;
+  pointer-events: none;
+}
+.header-inner.nav-collapsed .user-menu { display: none; }
+.header-inner.nav-collapsed .menu-trigger { display: inline-flex; }
+.header-inner.nav-collapsed { align-items: center; }
 
 @media (max-width: 640px) {
   .header-inner { min-height: 48px; }
