@@ -95,9 +95,15 @@ function openEdit(item) {
 async function save() {
   if (!form.value.title.trim()) { error.value = 'Название обязательно'; return }
   try {
+    const isEdit = editingId.value != null
     const body = { ...form.value, title: form.value.title.trim(), weeklyHours: Number(form.value.weeklyHours) }
     const saved = await request(editingId.value ? `/routines/${editingId.value}` : '/routines', { method: editingId.value ? 'PUT' : 'POST', body: JSON.stringify(body) })
     showForm.value = false; selectedId.value = saved.id; success.value = 'Рутина сохранена'; await load()
+    // Событие для Приветственного тура (релиз 1.2, тикет 08, шаг 13): движок ждёт
+    // ФАКТА создания рутины. Только при создании — редактирование тур не двигает.
+    if (!isEdit) {
+      document.dispatchEvent(new CustomEvent('wolf:routine-saved', { detail: { id: saved.id } }))
+    }
   } catch (e) { error.value = e.message }
 }
 async function archive(item) {
@@ -131,7 +137,7 @@ onMounted(load)
   <section class="page routines-page">
     <header class="page-header">
       <div><p class="eyebrow">Управление потоком</p><h1>Рутины</h1><p class="page-intro">Постоянные процессы с недельной квотой и повторяющимся расписанием.</p></div>
-      <button class="btn btn-primary" @click="openCreate">Добавить рутину</button>
+      <button class="btn btn-primary" data-tour-action="routine-create" @click="openCreate">Добавить рутину</button>
     </header>
     <p v-if="error" class="notice notice-error">{{ error }}</p>
     <p v-if="success" class="notice notice-success">{{ success }}</p>
