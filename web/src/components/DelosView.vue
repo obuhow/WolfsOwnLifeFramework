@@ -177,9 +177,17 @@ async function saveDelo() {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.message || `HTTP ${res.status}`)
     }
+    const savedDelo = await res.json().catch(() => ({}))
     success.value = isEdit ? 'Дело обновлено' : 'Дело создано'
     cancelForm()
     await loadDelos()
+    // Событие для Приветственного тура (релиз 1.2, тикет 05, шаг 8): движок ждёт
+    // ФАКТА создания Дела. Только при создании — редактирование тур не двигает.
+    if (!isEdit) {
+      document.dispatchEvent(
+        new CustomEvent('wolf:delo-saved', { detail: { id: savedDelo.id } })
+      )
+    }
     setTimeout(() => { success.value = '' }, 3000)
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -347,7 +355,7 @@ onMounted(loadAll)
             aria-controls="delo-csv-import"
             @click="importOpen = !importOpen"
           >{{ importOpen ? 'Скрыть импорт CSV' : 'Импорт CSV' }}</button>
-          <button v-if="!showForm" class="btn btn-primary" :disabled="loading" @click="openCreate">
+          <button v-if="!showForm" class="btn btn-primary" :disabled="loading" data-tour-action="delo-create" @click="openCreate">
             + Добавить
           </button>
         </div>
@@ -385,7 +393,7 @@ onMounted(loadAll)
       <div v-else-if="delos.length === 0" class="empty-state">
         <h3>Пока пусто</h3>
         <p>Создайте первое Дело — шаблон активности без привязки к моменту времени. Проект не обязателен.</p>
-        <button class="btn btn-primary" :disabled="loading" @click="openCreate">Создать Дело</button>
+        <button class="btn btn-primary" :disabled="loading" data-tour-action="delo-create" @click="openCreate">Создать Дело</button>
       </div>
 
       <div v-else class="project-tree">
