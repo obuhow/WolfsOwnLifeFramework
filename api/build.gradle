@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'ru.wolf'
-version = '1.1.0'
+version = '1.2.0'
 
 // SPDX-License-Identifier: AGPL-3.0-only (см. LICENSE в корне репозитория)
 
