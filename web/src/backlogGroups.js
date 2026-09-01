@@ -56,6 +56,7 @@ export function groupByProject(items, projects, hoursByProject = {}) {
           label: pid == null ? 'Без проекта' : titleOf(pid),
           fact: pid == null ? null : (hours ? hours.fact : 0),
           plan: pid == null ? null : (hours ? hours.plan : null),
+          pending: pid == null ? null : (hours ? hours.pending : 0),
           items: []
         })
       }
@@ -77,6 +78,39 @@ export function groupHoursLabel(group) {
   return `${hoursOrDash(group.fact ?? 0)} / ${hoursOrDash(group.plan)} ч`
 }
 
+/**
+ * Полоса заполнения проекта (ticket 06, release 1.1; ADR-0006).
+ *
+ * Три сегмента относительно недельного плана Проекта (`plan`, ч):
+ *   - fact    — тёмный зелёный, доля выполненного факта (status=DONE);
+ *   - pending — светло-зелёный, доля запланированного (status=PLANNED, ещё не
+ *     подтверждено) — берётся из отдельного агрегата `pendingHours`
+ *     (GET /gantt cells[].pendingHours), НЕ из `plan − fact` (расходится с
+ *     примером тикета: план 8ч, факт 1ч, запланирован ещё 1ч → полоса
+ *     заполнена на 2/8, а не на 8/8);
+ *   - остаток — нейтральный (пусто).
+ * Перегруз (fact+pending > plan) — доли клампятся до 100%, признак overLimit
+ * выставляется отдельно (рендерится нейтральной подписью/штриховкой, без
+ * красного — п.3 тикета).
+ *
+ * @param {{ fact: number|null, plan: number|null, pending: number|null }} group
+ * @returns {{ factPct: number, pendingPct: number, overLimit: boolean } | null}
+ *   null когда план не задан (полосу показывать нечего — только подпись «—»).
+ */
+export function fillBarSegments(group) {
+  const plan = Number(group?.plan)
+  if (!Number.isFinite(plan) || plan <= 0) return null
+  const fact = Math.max(0, Number(group?.fact) || 0)
+  const pending = Math.max(0, Number(group?.pending) || 0)
+  const factPct = Math.min(100, (fact / plan) * 100)
+  const pendingPct = Math.min(100 - factPct, (pending / plan) * 100)
+  return {
+    factPct,
+    pendingPct,
+    overLimit: (fact + pending) > plan
+  }
+}
+
 /** Real per-project plan/fact hours for one ISO week from the Gantt aggregate. */
 export async function fetchProjectWeekHours(apiBase, headers, mondayIso) {
   if (!mondayIso) return {}
@@ -89,7 +123,8 @@ export async function fetchProjectWeekHours(apiBase, headers, mondayIso) {
       const cell = (row.cells || [])[0] || {}
       map[String(row.id)] = {
         plan: cell.planHours == null ? null : Number(cell.planHours),
-        fact: Number(cell.factHours || 0)
+        fact: Number(cell.factHours || 0),
+        pending: Number(cell.pendingHours || 0)
       }
     }
     return map

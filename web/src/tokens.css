@@ -1,0 +1,113 @@
+/*
+  WOLF — Wolf's Own Life Framework
+  Copyright (C) 2025 Pavel Obukhov
+  Licensed under the GNU Affero General Public License v3 or later.
+
+  ТОКЕНЫ ДИЗАЙН-СИСТЕМЫ. Направление «Кабинет»: белый лист, тёплый ink вместо
+  чёрного, подложки вместо рамок. Цвета в интерфейсе нет — единственное цветное
+  пятно на экране это метка области жизни.
+
+  ПРАВИЛО: компонент не пишет hex, размер отступа или кегль напрямую.
+  Нужного оттенка нет — он добавляется сюда, а не в scoped-стили.
+
+  СОВМЕСТИМОСТЬ: имена --wolf-ink, --wolf-muted, --wolf-rule, --wolf-subrule,
+  --wolf-surface, --wolf-faint, --wolf-hover, --wolf-done-* уже используются
+  в компонентах (520 обращений). Они сохранены. Меняются только значения,
+  поэтому смена палитры не требует правок в компонентах.
+*/
+
+:root {
+  color-scheme: light;
+
+  /* ---------- Поверхности ---------- */
+  --wolf-surface:        #FFFFFF;  /* лист: фон страницы и карточек */
+  --wolf-card:           #FFFFFF;  /* использовался в AdminUsersView и не был объявлен */
+  --wolf-fill:           #F7F7F5;  /* подложка: поля ввода, сообщения, пустые состояния */
+  --wolf-fill-strong:    #EFEEEB;  /* подложка активнее: наведение на кнопку */
+  --wolf-hover:          #F7F7F5;  /* наведение на строку списка */
+
+  /* ---------- Текст ---------- */
+  --wolf-ink:            #37352F;  /* основной. Тёплый тёмно-серый, не чёрный */
+  --wolf-muted:          #787066;  /* вторичный: метаданные, подписи полей */
+  --wolf-faint:          #A5A093;  /* третичный: подсказки, плейсхолдеры */
+  --wolf-ink-hover:      #4A473F;  /* тёмная плашка под курсором */
+  --wolf-on-ink:         #FFFFFF;  /* текст на тёмной плашке */
+
+  /* ---------- Линии ---------- */
+  --wolf-rule:           #EAE9E5;  /* основная разделительная */
+  --wolf-subrule:        #F1F0ED;  /* внутренняя: между строками списка */
+
+  /* ---------- Состояния ---------- */
+  --wolf-done-ink:       #4D6A56;
+  --wolf-done-surface:   #F0F3F0;
+  --wolf-danger-ink:     #9B453A;
+  --wolf-danger-surface: #F6EDEB;
+  --wolf-focus:          #37352F;
+
+  /* Полоса заполнения проекта (ADR-0006, тикет 1.1/06) — зелёный факт + план.
+     Добавлены сюда при переносе токенов из style.css (тикет 1.1/09):
+     значения не менялись, единый источник истины — этот файл. */
+  --wolf-fill-fact:     #2E7D32;   /* тёмный зелёный — выполненный факт */
+  --wolf-fill-plan:     #A5D6A7;   /* светло-зелёный — план */
+  --wolf-fill-neutral:  var(--wolf-subrule); /* нейтральный остаток/перегруз */
+
+  /* ---------- Шкала отступов ----------
+     Одна геометрическая шкала. Произвольные значения запрещены. */
+  --wolf-space-1:  4px;
+  --wolf-space-2:  8px;
+  --wolf-space-3: 12px;
+  --wolf-space-4: 16px;
+  --wolf-space-5: 24px;
+  --wolf-space-6: 32px;
+  --wolf-space-7: 48px;
+
+  /* ---------- Четыре шага ритма ----------
+     Вместо 44 разных значений gap — четыре осмысленных.
+     Компонент выбирает по смыслу связи, а не на глаз. */
+  --wolf-gap-inline:  var(--wolf-space-2);  /*  8px — внутри группы: кнопки подряд, чип и текст */
+  --wolf-gap-group:   var(--wolf-space-4);  /* 16px — между группами: селект и кнопка в тулбаре */
+  --wolf-gap-block:   var(--wolf-space-5);  /* 24px — между блоками: форма и список */
+  --wolf-gap-section: var(--wolf-space-7);  /* 48px — между секциями страницы */
+
+  /* ---------- Форма ---------- */
+  --wolf-radius:    4px;
+  --wolf-radius-lg: 6px;
+
+  /* ---------- Элементы управления ----------
+     --wolf-tap поднимается до 44px на узких экранах (ниже).
+     Поэтому зона клика чинится один раз и сразу во всех компонентах. */
+  --wolf-control-h: 30px;
+  --wolf-tap:       30px;
+
+  /* ---------- Типографика ---------- */
+  --wolf-font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Helvetica, Arial, sans-serif;
+  --wolf-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --wolf-text-xs:   11px;    /* подписи полей, метаданные */
+  --wolf-text-sm:   12.5px;  /* кнопки, служебный текст */
+  --wolf-text-base: 13.5px;  /* основной текст интерфейса */
+  --wolf-text-lg:   15px;    /* заголовок пустого состояния */
+  --wolf-text-h1:   28px;    /* заголовок страницы */
+
+  --wolf-leading-tight: 1.2;
+  --wolf-leading-base:  1.5;
+  --wolf-leading-loose: 1.6;
+
+  --wolf-track-label: .08em;   /* трекинг капители в подписях */
+  --wolf-track-h1:    -.015em;
+
+  /* ---------- Движение ---------- */
+  --wolf-transition: .12s ease;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --wolf-tap: 44px;      /* зона клика на телефоне */
+    --wolf-text-h1: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --wolf-transition: 0s; }
+}

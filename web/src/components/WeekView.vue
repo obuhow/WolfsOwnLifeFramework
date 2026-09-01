@@ -18,6 +18,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase } from '../api'
+import { fillBarSegments } from '../backlogGroups'
+import { buildDayBlocks } from '../weekViewBlocks'
 
 const loading = ref(false)
 const error = ref('')
@@ -36,6 +38,9 @@ const nightStart = ref('23:00')
 const nightEnd = ref('07:00')
 const dayEndSetting = ref('02:00')
 const showNightHours = ref(false)
+// Ticket 07: «Карандаш+» — quick ±15-minute edit mode, targets the exact clicked
+// 15-minute sub-row of a merged multi-slot block instead of always the block's top slot.
+const quickEditMode = ref(false)
 
 // Weekly project backlog (ticket 04 — same grouped register as Today)
 const weekBacklog = ref([])
@@ -334,6 +339,7 @@ const backlogGroups = computed(() => {
           label: pid == null ? 'Без проекта' : projectTitle(pid),
           fact: pid == null ? null : (hours ? hours.fact : 0),
           plan: pid == null ? null : (hours ? hours.plan : null),
+          pending: pid == null ? null : (hours ? hours.pending : 0),
           items: []
         })
       }
@@ -351,6 +357,11 @@ const backlogGroups = computed(() => {
 function groupHoursLabel(group) {
   if (group.projectId == null) return ''
   return `${hoursOrDash(group.fact ?? 0)} / ${hoursOrDash(group.plan)} ч`
+}
+/** Полоса заполнения проекта (ticket 06, ADR-0006) — сегменты факт/план для одной группы. */
+function groupFillBar(group) {
+  if (group.projectId == null) return null
+  return fillBarSegments(group)
 }
 function executionModeLabel(mode) {
   const found = EXECUTION_MODES.find(m => m.value === mode)
@@ -381,7 +392,7 @@ async function loadWeekBacklog() {
   }
 }
 
-/** Real current-week plan/fact hours per Project from the Gantt aggregate. */
+/** Real current-week plan/fact/pending hours per Project from the Gantt aggregate. */
 async function loadProjectWeekHours() {
   const headers = authHeaders()
   if (!headers || !weekStart.value) return
@@ -394,7 +405,8 @@ async function loadProjectWeekHours() {
       const cell = (row.cells || [])[0] || {}
       map[String(row.id)] = {
         plan: cell.planHours == null ? null : Number(cell.planHours),
-        fact: Number(cell.factHours || 0)
+        fact: Number(cell.factHours || 0),
+        pending: Number(cell.pendingHours || 0)
       }
     }
     projectWeekHours.value = map
@@ -433,111 +445,15 @@ function entryMergeKey(entry) {
 
 /**
  * Per day column: for each visible row either a block-start cell (with rowspan)
- * or a continuation (skipped in template) or an empty single cell.
+ * or a continuation (own real slot kept for quick-edit sub-slot clicks — ticket 07)
+ * or an empty single cell.
  * Contiguous same-name entries render as one block: "Сон 00:00–07:00".
  */
 const dayBlocks = computed(() => {
   const rows = visibleTimeRows.value
   if (!days.value.length) return []
-  return days.value.map(day => {
-    const cells = []
-    let i = 0
-    while (i < rows.length) {
-      const row = rows[i]
-      // Map row clock onto this day's absolute timeline
-      let slotStart
-      if (row.absStart && days.value[0]) {
-        // same offset from day start as row.absStart from first day start
-        const d0 = days.value[0]
-        const base0 = d0.dayStart ? normalizeStart(d0.dayStart) : normalizeStart(row.absStart)
-        const offsetMs = parseLdt(row.absStart) - parseLdt(base0)
-        const dayBase = day.dayStart ? normalizeStart(day.dayStart) : `${day.date}T${row.label}:00`
-        const dt = parseLdt(dayBase)
-        dt.setTime(dt.getTime() + offsetMs)
-        slotStart = formatLdt(dt)
-      } else if (day.dayStart) {
-        slotStart = addMinutes(normalizeStart(day.dayStart), row.index * 15)
-      } else {
-        slotStart = `${day.date}T${row.label}:00`
-      }
-      slotStart = normalizeStart(slotStart)
-      const entry = entryCovering(slotStart)
-      if (!entry) {
-        cells.push({
-          kind: 'empty',
-          rowIndex: i,
-          span: 1,
-          slot: {
-            startAt: slotStart,
-            label: row.label,
-            entry: null,
-            date: day.date,
-            isNight: row.isNight,
-            minute: row.minute,
-            hour: row.hour
-          },
-          displayLabel: '',
-          rangeLabel: row.label
-        })
-        i += 1
-        continue
-      }
-      let j = i + 1
-      while (j < rows.length) {
-        const r2 = rows[j]
-        let s2
-        if (r2.absStart && days.value[0]) {
-          const d0 = days.value[0]
-          const base0 = d0.dayStart ? normalizeStart(d0.dayStart) : normalizeStart(r2.absStart)
-          const offsetMs = parseLdt(r2.absStart) - parseLdt(base0)
-          const dayBase = day.dayStart ? normalizeStart(day.dayStart) : `${day.date}T${r2.label}:00`
-          const dt = parseLdt(dayBase)
-          dt.setTime(dt.getTime() + offsetMs)
-          s2 = formatLdt(dt)
-        } else if (day.dayStart) {
-          s2 = addMinutes(normalizeStart(day.dayStart), r2.index * 15)
-        } else {
-          s2 = `${day.date}T${r2.label}:00`
-        }
-        const e2 = entryCovering(normalizeStart(s2))
-        if (!e2 || e2.id !== entry.id) break
-        j += 1
-      }
-      const span = j - i
-      const startLabel = parseSlotLabel(entry.startAt)
-      const endLabel = parseSlotLabel(entry.endAt)
-      const name = entry.deloTitle || entry.adHocText || ''
-      const displayLabel = span > 1 ? `${name} ${startLabel}–${endLabel}` : name
-      cells.push({
-        kind: 'block',
-        rowIndex: i,
-        span,
-        slot: {
-          startAt: slotStart,
-          label: row.label,
-          entry,
-          date: day.date,
-          isNight: row.isNight,
-          minute: row.minute,
-          hour: row.hour
-        },
-        displayLabel,
-        rangeLabel: `${startLabel}–${endLabel}`
-      })
-      for (let k = i + 1; k < j; k++) {
-        cells.push({
-          kind: 'cont',
-          rowIndex: k,
-          span: 0,
-          slot: { startAt: slotStart, label: rows[k].label, entry, date: day.date, isNight: rows[k].isNight, minute: rows[k].minute, hour: rows[k].hour },
-          displayLabel: '',
-          rangeLabel: ''
-        })
-      }
-      i = j
-    }
-    return cells
-  })
+  const firstDay = days.value[0] || null
+  return days.value.map(day => buildDayBlocks(day, rows, entryCovering, firstDay))
 })
 
 function blockAt(dayIdx, rowIdx) {
@@ -960,6 +876,23 @@ function cellLabel(slot) {
   return slot.entry.deloTitle || slot.entry.adHocText || ''
 }
 
+/** Title/aria-label for a quick-edit ("Карандаш+") sub-row overlay button. */
+function quickEditOverlayLabel(block) {
+  if (!block || !block.slot.entry) return ''
+  const entry = block.slot.entry
+  const name = entry.deloTitle || entry.adHocText || ''
+  const slotStart = normalizeStart(block.slot.startAt)
+  const firstSlot = normalizeStart(entry.startAt)
+  const lastSlot = normalizeStart(addMinutes(entry.endAt, -15))
+  if (slotStart === lastSlot) {
+    return `${name}: −15 минут с конца (${block.slot.label})`
+  }
+  if (slotStart === firstSlot) {
+    return `${name}: −15 минут с начала (${block.slot.label})`
+  }
+  return `${name}: разбить по слоту ${block.slot.label}`
+}
+
 function isTodayCol(dateStr) {
   const d = new Date()
   const today = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
@@ -1004,6 +937,18 @@ onMounted(loadAll)
         </button>
         <button
           type="button"
+          :class="quickEditMode ? 'btn btn-primary' : 'btn btn-ghost'"
+          :aria-pressed="quickEditMode"
+          :title="quickEditMode
+            ? 'Карандаш+: клик по под-слоту записи — −15 минут с этого края; пустой соседний слот — +15 минут'
+            : 'Карандаш+: режим быстрого ±15 минут к записи (клик по краю укорачивает с этого края)'"
+          :disabled="loading || saving"
+          @click="quickEditMode = !quickEditMode"
+        >
+          Карандаш+
+        </button>
+        <button
+          type="button"
           class="btn btn-primary"
           :disabled="loading || saving || pendingConfirmCount === 0"
           :title="pendingConfirmCount ? `Подтвердить ${pendingConfirmCount} прошедших плановых` : 'Нет прошедших плановых записей'"
@@ -1021,7 +966,7 @@ onMounted(loadAll)
     <div v-else class="week-layout">
       <section class="card grid-card" aria-label="Сетка недели">
         <div class="week-scroll" role="region" aria-label="Сетка недели, прокрутка по горизонтали" tabindex="0">
-          <div class="week-grid" :style="{ '--day-cols': days.length || 7 }">
+          <div class="week-grid" :class="{ 'quick-edit-active': quickEditMode }" :style="{ '--day-cols': days.length || 7 }">
             <!-- header row -->
             <div class="week-corner" aria-hidden="true" :style="{ gridColumn: 1, gridRow: 1 }"></div>
             <div
@@ -1063,6 +1008,21 @@ onMounted(loadAll)
                     {{ blockAt(dayIdx, rowIdx).displayLabel }}
                   </span>
                 </button>
+                <!-- Ticket 07: quick-edit overlay — one clickable sub-row per 15-min slot.
+                     Without "Карандаш+" the grid keeps its old single top-slot button. -->
+                <button
+                  v-if="quickEditMode && blockAt(dayIdx, rowIdx) && blockAt(dayIdx, rowIdx).slot.entry"
+                  type="button"
+                  class="quick-edit-overlay"
+                  :aria-label="quickEditOverlayLabel(blockAt(dayIdx, rowIdx))"
+                  :title="quickEditOverlayLabel(blockAt(dayIdx, rowIdx))"
+                  :disabled="saving"
+                  :style="{
+                    gridColumn: dayIdx + 2,
+                    gridRow: rowIdx + 2
+                  }"
+                  @click="onCellClick(blockAt(dayIdx, rowIdx).slot, blockAt(dayIdx, rowIdx).span)"
+                ></button>
               </template>
             </template>
           </div>
@@ -1095,6 +1055,16 @@ onMounted(loadAll)
               <span class="backlog-group-title">{{ group.label }}</span>
               <span v-if="group.projectId != null" class="backlog-group-hours">{{ groupHoursLabel(group) }}</span>
             </header>
+            <div
+              v-if="group.projectId != null && groupFillBar(group)"
+              class="fill-bar"
+              role="img"
+              :aria-label="`Загрузка недели: ${groupHoursLabel(group)}${groupFillBar(group).overLimit ? ' · перегруз' : ''}`"
+            >
+              <span class="fill-bar-fact" :style="{ width: groupFillBar(group).factPct + '%' }"></span>
+              <span class="fill-bar-pending" :style="{ width: groupFillBar(group).pendingPct + '%', left: groupFillBar(group).factPct + '%' }"></span>
+              <span v-if="groupFillBar(group).overLimit" class="fill-bar-over" title="Перегруз: факт + план больше недельного плана"></span>
+            </div>
             <ul class="backlog-group-list">
               <li v-for="delo in group.items" :key="delo.id + '-' + group.key" class="backlog-delo">
                 <div class="backlog-delo-body">
@@ -1409,6 +1379,32 @@ onMounted(loadAll)
   z-index: 0;
 }
 
+/* Ticket 07: «Карандаш+» — per-15-min-slot click overlays above a merged block.
+   Transparent so the block's own visuals stay; hover shows a quiet ink outline. */
+.quick-edit-overlay {
+  position: relative;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  min-height: 1.35rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.quick-edit-overlay:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(44, 42, 38, 0.45);
+}
+
+.quick-edit-overlay:focus-visible {
+  outline: 1px dashed rgba(44, 42, 38, 0.7);
+  outline-offset: -1px;
+}
+
+.quick-edit-overlay:disabled {
+  cursor: wait;
+}
+
 .week-cell.cell-span .week-cell-label {
   white-space: normal;
   display: -webkit-box;
@@ -1647,6 +1643,37 @@ onMounted(loadAll)
 .backlog-group-title { color: var(--wolf-ink); font-size: 13px; font-weight: 600; }
 .backlog-group-hours { color: var(--wolf-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .backlog-group-list { list-style: none; margin: 0; padding: 0; }
+/* Полоса заполнения проекта (ticket 06, ADR-0006 — точечное исключение из 0.3:
+   зелёный факт + зелёный план допущены только на этом экране). */
+.fill-bar {
+  position: relative;
+  height: 6px;
+  margin: 6px 0 2px;
+  background: var(--wolf-fill-neutral);
+  overflow: hidden;
+}
+.fill-bar-fact,
+.fill-bar-pending {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+.fill-bar-fact { background: var(--wolf-fill-fact); }
+.fill-bar-pending { background: var(--wolf-fill-plan); }
+/* Перегруз — нейтральная штриховка по всей ширине, БЕЗ красного (п.3 тикета). */
+.fill-bar-over {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 3px,
+    var(--wolf-ink) 3px,
+    var(--wolf-ink) 4px
+  );
+  opacity: 0.12;
+}
 .backlog-delo { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--wolf-subrule); }
 .backlog-delo-body { display: grid; gap: 2px; min-width: 0; }
 .backlog-delo-title { color: var(--wolf-ink); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

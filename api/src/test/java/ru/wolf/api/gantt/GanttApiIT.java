@@ -278,7 +278,7 @@ class GanttApiIT extends ApiIntegrationTest {
     }
 
     @Test
-    void planned_entries_not_counted_as_fact() {
+    void planned_entries_not_counted_as_fact_but_counted_as_pending() {
         WebTestClient authed = authedAdminClient();
         Long areaId = createLifeArea(authed, "Работа");
         Long p1 = createProject(authed, areaId, null, "План").id();
@@ -291,8 +291,31 @@ class GanttApiIT extends ApiIntegrationTest {
         putEntry(authed, monday.atTime(10, 0), monday.atTime(12, 0), deloId, TimeEntry.Status.PLANNED);
 
         GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
-        assertThat(findCell(findProject(gantt, p1), isoYear, isoWeek).factHours())
-                .isEqualByComparingTo("0.00");
+        CellHours cell = findCell(findProject(gantt, p1), isoYear, isoWeek);
+        assertThat(cell.factHours()).isEqualByComparingTo("0.00");
+        assertThat(cell.pendingHours()).isEqualByComparingTo("2.00");
+    }
+
+    @Test
+    void pending_primary_only_counts_primary_project() {
+        WebTestClient authed = authedAdminClient();
+        Long areaId = createLifeArea(authed, "Работа");
+        Long p1 = createProject(authed, areaId, null, "Primary").id();
+        Long p2 = createProject(authed, areaId, null, "Secondary").id();
+
+        Long deloId = createDelo(authed, "Код", List.of(p1, p2), p1);
+
+        LocalDate monday = LocalDate.of(2026, 3, 9);
+        int isoYear = monday.get(WeekFields.ISO.weekBasedYear());
+        int isoWeek = monday.get(WeekFields.ISO.weekOfWeekBasedYear());
+        putEntry(authed, monday.atTime(10, 0), monday.atTime(12, 0), deloId, TimeEntry.Status.PLANNED);
+
+        GanttResponse gantt = getGantt(authed, "from=" + monday + "&weeks=2");
+
+        CellHours c1 = findCell(findProject(gantt, p1), isoYear, isoWeek);
+        CellHours c2 = findCell(findProject(gantt, p2), isoYear, isoWeek);
+        assertThat(c1.pendingHours()).isEqualByComparingTo("2.00");
+        assertThat(c2.pendingHours()).isEqualByComparingTo("0.00");
     }
 
     @Test
