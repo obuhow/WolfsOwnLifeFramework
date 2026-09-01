@@ -37,7 +37,7 @@ onMounted(() => {
 
 <template>
   <main class="onboarding-page">
-    <p class="onboarding-note">Открываю Знакомство…</p>
+    <p class="onboarding-note">Открываю Приветственный тур…</p>
   </main>
 </template>
 
