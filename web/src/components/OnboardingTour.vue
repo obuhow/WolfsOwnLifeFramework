@@ -69,8 +69,8 @@ const PAD = 6
 const TOOLTIP_W = 320
 
 // Индекс шага восстанавливается из sessionStorage — перезагрузка посреди тура
-// не сбрасывает прогресс (тикет 01 §4). Кламп на случай устаревшего значения.
-const stepIndex = ref(Math.min(loadStepIndex(), STEPS.length - 1))
+// не сбрасывает прогресс (тикет 01 §4). loadStepIndex клампит и снизу, и сверху.
+const stepIndex = ref(loadStepIndex(STEPS.length))
 const hole = ref(null) // { top, left, width, height } в координатах вьюпорта
 const viaMenu = ref(false) // цель шага недоступна — подсвечена кнопка меню
 const settling = ref(false) // короткая пауза после клика, пока DOM перестраивается
@@ -326,7 +326,7 @@ function onEntitySaved(e) {
   const s = step.value
   if (s.await !== 'event') return
   if (e.type !== s.event) return
-  goNext(false)
+  goNext()
 }
 
 function advance(el) {
@@ -342,11 +342,11 @@ function advance(el) {
     if (isDesktopGroup) {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     }
-    goNext(true)
+    goNext()
   }, isGroup ? 1100 : 500)
 }
 
-/** Переход к следующему шагу или завершение. `fromClick` — для симметрии логов. */
+/** Переход к следующему шагу или завершение. */
 function goNext() {
   if (isLast.value) {
     finish()

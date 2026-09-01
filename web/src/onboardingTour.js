@@ -102,12 +102,18 @@ export function isTourActive() {
 
 /**
  * Сохранённый индекс шага (0-based) для восстановления после перезагрузки.
- * Возвращает 0, если ничего не сохранено или значение невалидно.
+ * Возвращает 0, если ничего не сохранено или значение невалидно. Если передан
+ * `stepCount`, индекс дополнительно ограничивается сверху (`stepCount - 1`) —
+ * оба клампа (нижний и верхний) живут здесь, чтобы вызывающие не дублировали их.
  */
-export function loadStepIndex() {
+export function loadStepIndex(stepCount) {
   const raw = readStorage(STORAGE_STEP)
   const n = Number.parseInt(raw ?? '', 10)
-  return Number.isFinite(n) && n >= 0 ? n : 0
+  let index = Number.isFinite(n) && n >= 0 ? n : 0
+  if (Number.isFinite(stepCount) && stepCount > 0) {
+    index = Math.min(index, stepCount - 1)
+  }
+  return index
 }
 
 /** Сохраняет текущий индекс шага, чтобы F5 посреди тура не сбрасывал прогресс. */

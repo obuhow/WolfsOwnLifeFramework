@@ -37,6 +37,10 @@ assert.equal(parseDuration('45 м'), 45, '«45 м» → 45')
 assert.equal(parseDuration('1:05'), 75, '«1:05» = 65 мин → 75 (вверх)')
 assert.equal(durationToSlots('1:05'), 5)
 
+// Нормализация поля минут ≥ 60: «1:75» = 1ч + 75мин = 135 (кратно 15, 9 слотов).
+assert.equal(parseDuration('1:75'), 135, '«1:75» нормализуется в 135 мин')
+assert.equal(durationToSlots('1:75'), 9)
+
 // Точное кратное 15 не «раздувается».
 assert.equal(parseDuration('30 м'), 30)
 assert.equal(parseDuration('1 ч'), 60)

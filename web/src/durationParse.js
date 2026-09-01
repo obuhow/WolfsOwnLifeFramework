@@ -42,10 +42,14 @@ export function parseDuration(raw) {
 
   let minutes = null
 
-  // «1:30» — часы:минуты
+  // «1:30» — часы:минуты. Поле минут нормализуем: значение ≥ 60 переносим в
+  // часы (1:75 → 2:15 = 135 мин остаётся, но трактовка предсказуема), чтобы
+  // «1:75» не выглядело сюрпризом. Минуты берём по модулю 60, избыток — в часы.
   const colon = s.match(/^(\d+)\s*:\s*(\d{1,2})$/)
   if (colon) {
-    minutes = Number(colon[1]) * 60 + Number(colon[2])
+    const h = Number(colon[1]) + Math.floor(Number(colon[2]) / 60)
+    const m = Number(colon[2]) % 60
+    minutes = h * 60 + m
   }
 
   if (minutes === null) {
