@@ -20,7 +20,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase } from '../api'
 import { fillBarSegments } from '../backlogGroups'
 import { buildDayBlocks } from '../weekViewBlocks'
-import { durationToSlots } from '../durationParse'
 
 const loading = ref(false)
 const error = ref('')
@@ -64,15 +63,32 @@ const pickerDeloId = ref('')
 const pickerAdHoc = ref('')
 const pickerFilter = ref('')
 const quickTitle = ref('')
-// Релиз 1.2, тикет 07: длительность записи из picker свободного слота. Строка
-// человеческого формата («1 ч 30 м», «90 минут», «1.5 ч», «1:30»); по умолчанию
-// «15м» — тот же результат, что и прежний клик (одна 15-минутная запись).
-const pickerDuration = ref('15м')
+// Хотфикс 1.2.1 (правка C): длительность записи задаётся раздельно в ЧАСАХ и
+// МИНУТАХ вместо прежней текстовой строки «1 ч 30 м». Минуты — шаг 15 (0/15/30/45).
+// По умолчанию 0 ч 15 м — тот же результат, что прежний клик (одна 15-минутная запись).
+const pickerHours = ref(0)
+const pickerMinutes = ref(15)
+const MINUTE_OPTIONS = [0, 15, 30, 45]
+// Общая длительность picker в 15-минутных слотах: часы*4 + минуты/15, но не
+// меньше одного слота (пустой ввод/0:0 → одна 15-минутная запись, как прежде).
+const pickerTotalSlots = computed(() => {
+  const h = Math.max(0, Math.floor(Number(pickerHours.value) || 0))
+  const m = Math.max(0, Math.floor(Number(pickerMinutes.value) || 0))
+  return Math.max(1, h * 4 + Math.round(m / 15))
+})
 // Релиз 1.2, тикет 07: нейтральное уведомление (без красного — контракт 0.3),
 // напр. «создано N слотов, дальше занято». Отдельно от `error`.
 const pickerNotice = ref('')
 const quickCreating = ref(false)
 const saving = ref(false)
+
+// Хотфикс 1.2.1 (правка B): окно редактирования записи времени. Открывается при
+// клике по ЗАНЯТОЙ ячейке (внутри Дела) вне режима «Карандаш+». Прежнее поведение
+// grid-click по занятой ячейке (SHRINK/SPLIT по краю/середине) по клику больше не
+// вызывается — вместо него это окно. Пока даёт переключение статуса
+// запланирована ↔ выполнена (PLANNED ↔ DONE) через PUT /time-entries.
+const entryEditorOpen = ref(false)
+const entryEditorEntry = ref(null)
 
 const SLOTS_PER_DAY = 96
 const SHOW_NIGHT_KEY = 'wolf_show_night_hours'
@@ -667,6 +683,14 @@ async function onWeekDatePick(ev) {
 }
 
 async function onCellClick(slot, span = 1) {
+  // Хотфикс 1.2.1 (правка B): клик по ЗАНЯТОЙ ячейке (внутри Дела) вне режима
+  // «Карандаш+» открывает окно редактирования записи, а НЕ шлёт grid-click.
+  // Прежние SHRINK/SPLIT по клику по занятой ячейке отключены — правка записи
+  // теперь только через это окно. «Карандаш+» (±15 мин) не затрагивается.
+  if (slot.entry && !quickEditMode.value) {
+    openEntryEditor(slot.entry)
+    return
+  }
   const headers = authHeaders(true)
   if (!headers) return
   saving.value = true
@@ -709,7 +733,8 @@ function openPicker(startAt) {
   pickerAdHoc.value = ''
   pickerFilter.value = ''
   quickTitle.value = ''
-  pickerDuration.value = '15м'
+  pickerHours.value = 0
+  pickerMinutes.value = 15
   pickerNotice.value = ''
   pickerOpen.value = true
 }
@@ -717,6 +742,57 @@ function openPicker(startAt) {
 function closePicker() {
   pickerOpen.value = false
   pickerSlot.value = null
+}
+
+// --- Хотфикс 1.2.1 (правка B): окно редактирования записи времени -----------
+function openEntryEditor(entry) {
+  entryEditorEntry.value = entry
+  entryEditorOpen.value = true
+}
+
+function closeEntryEditor() {
+  entryEditorOpen.value = false
+  entryEditorEntry.value = null
+}
+
+/**
+ * Переключить статус записи запланирована ↔ выполнена (PLANNED ↔ DONE).
+ * Через PUT /time-entries со ЯВНЫМ status — бэкенд не переопределяет явный статус
+ * (resolveStatus авто-логику применяет только при status == null). Длительность
+ * (startAt/endAt) и содержимое (deloId/adHocText) сохраняются как есть.
+ */
+async function toggleEntryStatus() {
+  const entry = entryEditorEntry.value
+  if (!entry) return
+  const headers = authHeaders(true)
+  if (!headers) return
+  const nextStatus = entry.status === 'DONE' ? 'PLANNED' : 'DONE'
+  saving.value = true
+  error.value = ''
+  try {
+    const payload = {
+      startAt: normalizeStart(entry.startAt),
+      endAt: normalizeStart(entry.endAt || addMinutes(entry.startAt, 15)),
+      status: nextStatus
+    }
+    if (entry.deloId != null) payload.deloId = entry.deloId
+    else if (entry.adHocText) payload.adHocText = entry.adHocText
+    const res = await fetch(`${apiBase()}/time-entries`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.message || `Статус: HTTP ${res.status}`)
+    }
+    closeEntryEditor()
+    await loadWeek({ isoYear: isoYear.value, isoWeek: isoWeek.value, ensureSleep: false })
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    saving.value = false
+  }
 }
 
 async function clearSlot(startAt) {
@@ -815,9 +891,10 @@ async function submitPicker() {
   saving.value = true
   error.value = ''
   try {
-    // Длительность → число 15-минутных слотов (тикет 07). Вариант A: N
-    // последовательных вызовов grid-click с фронта, без изменения контракта API.
-    const wantSlots = durationToSlots(pickerDuration.value)
+    // Хотфикс 1.2.1 (правка C): длительность из полей Часы+Минуты → число
+    // 15-минутных слотов. Вариант A (тикет 07): N последовательных вызовов
+    // grid-click с фронта, без изменения контракта API.
+    const wantSlots = pickerTotalSlots.value
 
     let created = 0
     let blocked = false
@@ -1086,7 +1163,7 @@ onMounted(loadAll)
         <p class="hint grid-legend">
           <span class="legend-swatch planned"></span> запланирована
           <span class="legend-swatch done"></span> выполнена
-          · клик: поставить / снять / подтвердить прошлое плановое
+          · клик по пустой ячейке — поставить; по занятой — редактировать запись (статус)
           · конец дня {{ dayEndSetting }} · ночь {{ nightHoursLabel }} скрыта по умолчанию; авто «Сон» интервалом
         </p>
       </section>
@@ -1233,18 +1310,34 @@ onMounted(loadAll)
           </button>
         </div>
 
-        <!-- Релиз 1.2, тикет 07: длительность записи (свободный слот). Разложится
-             по 15-минутным слотам. Не показываем в режиме быстрого создания Дела. -->
+        <!-- Хотфикс 1.2.1 (правка C): длительность записи задаётся в ЧАСАХ и
+             МИНУТАХ. Разложится по 15-минутным слотам. Не показываем в режиме
+             быстрого создания Дела. -->
         <div v-if="pickerMode !== 'create'" class="form-group">
-          <label for="week-picker-duration">Длительность</label>
-          <input
-            id="week-picker-duration"
-            class="input"
-            v-model="pickerDuration"
-            placeholder="напр. 1 ч 30 м, 90 минут, 1:30"
-            @keyup.enter="submitPicker"
-          />
-          <p class="hint">Шаг 15 минут — округляется вверх (20 м → 30 м). По умолчанию 15 минут.</p>
+          <label>Длительность</label>
+          <div class="duration-hm">
+            <label class="duration-field">
+              <span class="duration-cap">Часы</span>
+              <input
+                class="input"
+                type="number"
+                min="0"
+                max="24"
+                step="1"
+                inputmode="numeric"
+                v-model.number="pickerHours"
+                aria-label="Часы"
+                @keyup.enter="submitPicker"
+              />
+            </label>
+            <label class="duration-field">
+              <span class="duration-cap">Минуты</span>
+              <select class="input" v-model.number="pickerMinutes" aria-label="Минуты">
+                <option v-for="m in MINUTE_OPTIONS" :key="m" :value="m">{{ m }}</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint">Минуты — шаг 15. По умолчанию 0 ч 15 м (одна ячейка).</p>
           <p v-if="pickerNotice" class="hint" role="status">{{ pickerNotice }}</p>
         </div>
 
@@ -1259,10 +1352,60 @@ onMounted(loadAll)
         </div>
       </div>
     </div>
+
+    <!-- Хотфикс 1.2.1 (правка B): окно редактирования записи времени. Клик по
+         занятой ячейке (внутри Дела) вне «Карандаш+» открывает это окно. -->
+    <div v-if="entryEditorOpen" class="modal-backdrop" @click.self="closeEntryEditor">
+      <div class="modal card" role="dialog" aria-modal="true" aria-label="Редактирование записи времени">
+        <header class="modal-header">
+          <h2>Запись времени</h2>
+          <p class="hint" v-if="entryEditorEntry">
+            {{ entryEditorEntry.deloTitle || entryEditorEntry.adHocText || 'Запись' }}
+            · {{ parseSlotDate(entryEditorEntry.startAt) }}
+            · {{ parseSlotLabel(entryEditorEntry.startAt) }}–{{ parseSlotLabel(entryEditorEntry.endAt) }}
+          </p>
+        </header>
+
+        <div class="form-group" v-if="entryEditorEntry">
+          <p class="hint">
+            Текущий статус:
+            <strong>{{ entryEditorEntry.status === 'DONE' ? 'выполнена' : 'запланирована' }}</strong>
+          </p>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" :disabled="saving" @click="toggleEntryStatus">
+            {{ saving
+              ? 'Сохраняю…'
+              : (entryEditorEntry && entryEditorEntry.status === 'DONE'
+                  ? 'Отметить запланированной'
+                  : 'Отметить выполненной') }}
+          </button>
+          <button type="button" class="btn btn-ghost" :disabled="saving" @click="closeEntryEditor">Закрыть</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* Хотфикс 1.2.1 (правка C): поля длительности Часы + Минуты рядом. */
+.duration-hm {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+.duration-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 0;
+}
+.duration-cap {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
 .week-page {
   display: flex;
   flex-direction: column;

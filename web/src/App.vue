@@ -280,93 +280,30 @@ async function logout() {
   router.push('/login')
 }
 
-// --- Адаптивная навигация по переполнению (релиз 1.2, тикет 10) -------------
-// Переключение desktop-строка ↔ бургер по ФАКТУ переполнения, а не по
-// фиксированному брейкпоинту 768px: на промежуточных ширинах (напр. 820px, или
-// /docs с сайдбаром) пункты не помещаются, но media-query бургер ещё не включал.
-// Media-query max-width:768px остаётся нижним флором (телефон всегда бургер);
-// измерение — дополнительный триггер выше него.
-const navCollapsed = ref(false)
+// --- Навигация: всегда бургер (хотфикс 1.2.1) -------------------------------
+// Решением владельца навигация ВСЕГДА показывается как бургер-меню (drawer),
+// независимо от ширины экрана. Прежняя адаптация по переполнению (релиз 1.2,
+// тикет 10: ResizeObserver + измерение .nav-desktop) снята — desktop-строка
+// пунктов больше не показывается ни при какой ширине. Флаг navCollapsed
+// зафиксирован в true: .nav-desktop скрыта, .menu-trigger (☰) виден всегда.
+const navCollapsed = ref(true)
+// Реф остаётся для совместимости с шаблоном (<nav ref="navMeasureEl">), но
+// содержимое больше не измеряется.
 const navMeasureEl = ref(null)
 const headerInnerEl = ref(null)
 const brandEl = ref(null)
-let navResizeObserver = null
-let navMeasureRaf = 0
-// Кэш интринсной ширины строки навигации, снятый пока она в потоке (не свёрнута).
-// В свёрнутом состоянии .nav-desktop убрана из потока, и её нельзя мерить
-// напрямую — сравниваем кэш с доступной шириной шапки.
-let navContentWidth = 0
-
-// Гистерезис: сворачиваем при переполнении, разворачиваем только когда есть
-// запас ≥ этого зазора — чтобы не осциллировать на пограничной ширине.
-const NAV_SLACK = 24
-
-// Доступная для навигации ширина = ширина шапки минус бренд минус место под
-// кнопку-бургер и небольшой внутренний отступ.
-function availableNavWidth() {
-  const header = headerInnerEl.value
-  if (!header) return 0
-  // brandEl — это <router-link> (компонент), у ref берём корневой DOM через $el.
-  const brandDom = brandEl.value?.$el ?? brandEl.value
-  const brandW = brandDom && brandDom.offsetWidth ? brandDom.offsetWidth : 0
-  const BURGER_RESERVE = 56 // ширина .menu-trigger (40) + зазор
-  return header.clientWidth - brandW - BURGER_RESERVE
-}
-
-function measureNavOverflow() {
-  const el = navMeasureEl.value
-  if (!el) return
-  if (!navCollapsed.value) {
-    // В потоке: запоминаем интринсную ширину строки и решаем, не пора ли свернуть.
-    navContentWidth = el.scrollWidth
-    if (navContentWidth > availableNavWidth()) navCollapsed.value = true
-  } else {
-    // Свёрнуто: разворачиваем, только если кэшированная строка помещается с
-    // запасом NAV_SLACK (гистерезис против дёрганья на пограничной ширине).
-    if (navContentWidth > 0 && navContentWidth + NAV_SLACK <= availableNavWidth()) {
-      navCollapsed.value = false
-    }
-  }
-}
-
-function scheduleNavMeasure() {
-  if (navMeasureRaf) return
-  navMeasureRaf = window.requestAnimationFrame(() => {
-    navMeasureRaf = 0
-    measureNavOverflow()
-  })
-}
 
 onMounted(async () => {
   token.value = localStorage.getItem('wolf_token') || ''
   if (token.value) await loadUser()
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onDocKeydown)
-  // Наблюдаем за шириной контейнера навигации (реагирует и на сайдбар /docs,
-  // и на смену роли admin, добавляющую 9-й пункт). Первое измерение — после
-  // отрисовки, чтобы не мигать обоими меню на первом кадре.
-  await nextTick()
-  // Наблюдаем за шириной ШАПКИ (её меняет и сайдбар /docs, и роль admin с 9-м
-  // пунктом). Меряем содержимое навигации против доступной ширины шапки.
-  const observed = headerInnerEl.value
-  if (observed && 'ResizeObserver' in window) {
-    navResizeObserver = new ResizeObserver(scheduleNavMeasure)
-    navResizeObserver.observe(observed)
-  }
-  window.addEventListener('resize', scheduleNavMeasure)
-  scheduleNavMeasure()
 })
-
-// Роль admin добавляет пункт «Администрирование» — пересчитать порог сворачивания.
-watch(isAdmin, () => nextTick(scheduleNavMeasure))
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onDocKeydown)
   document.body.style.overflow = ''
-  if (navResizeObserver) navResizeObserver.disconnect()
-  window.removeEventListener('resize', scheduleNavMeasure)
-  if (navMeasureRaf) window.cancelAnimationFrame(navMeasureRaf)
 })
 </script>
 

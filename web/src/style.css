@@ -759,19 +759,13 @@ input[type="radio"] {
   .header-inner { align-items: center; }
 }
 
-/* Релиз 1.2, тикет 10: сворачивание в бургер по ФАКТУ переполнения (класс
-   навешивает App.vue через ResizeObserver), выше нижнего флора 768px.
-   ВАЖНО: в свёрнутом состоянии .nav-desktop НЕ display:none, а убрана из потока
-   через visibility:hidden + position:absolute — иначе её нельзя измерить
-   (display:none даёт scrollWidth=0, и разворот назад никогда бы не сработал).
-   Так строка остаётся измеримой, но не видна и не кликается. */
-.header-inner.nav-collapsed .nav-desktop {
-  visibility: hidden;
-  position: absolute;
-  left: -99999px;
-  top: 0;
-  pointer-events: none;
-}
+/* Хотфикс 1.2.1: навигация ВСЕГДА бургер. Класс .nav-collapsed навешивается
+   App.vue безусловно (navCollapsed=true), поэтому desktop-строка пунктов
+   скрыта при любой ширине, а .menu-trigger (☰) виден всегда. Измерение
+   переполнения (релиз 1.2, тикет 10) снято, поэтому .nav-desktop прячем
+   честным display:none (offscreen-хак под ResizeObserver больше не нужен —
+   скрытый элемент не ловит фокус табом и не участвует в раскладке). */
+.header-inner.nav-collapsed .nav-desktop { display: none; }
 .header-inner.nav-collapsed .user-menu { display: none; }
 .header-inner.nav-collapsed .menu-trigger { display: inline-flex; }
 .header-inner.nav-collapsed { align-items: center; }
