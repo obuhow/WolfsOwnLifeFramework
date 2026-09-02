@@ -18,6 +18,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { apiBase } from '../api'
+import { startTour } from '../onboardingTour'
 
 // Поля входа пустые: предзаполнять форму учётными данными нельзя.
 // Исторически здесь стояло admin/admin от однопользовательского режима до релиза 0.4;
@@ -92,7 +93,16 @@ async function startDemo(slug) {
 }
 
 function enterDemo() {
-  window.location.hash = '#/today'
+  // Баг Б-1 (релиз 1.2), вариант B: демо-вход показывает Приветственный тур как
+  // ПОВТОРНЫЙ запуск (firstRun не выставляем). Модель не трогаем — демо-аккаунт
+  // остаётся onboarding-completed, поэтому финального выбора «Оставить/Очистить»
+  // на выходе нет (он удалял бы данные), а шаги-действия вырождаются в
+  // информационные «Далее» (тикет 09 §4) — гостю не нужно создавать сущности
+  // поверх уже загруженного демо-профиля. Флаг тура переживает reload через
+  // sessionStorage (см. onboardingTour.js), а `/morning` — тот же вход, что у
+  // повторного запуска из шапки (App.vue runNavAction).
+  startTour()
+  window.location.hash = '#/morning'
   window.location.reload()
 }
 
