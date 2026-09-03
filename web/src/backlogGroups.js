@@ -72,6 +72,69 @@ export function groupByProject(items, projects, hoursByProject = {}) {
   })
 }
 
+/**
+ * Backlog grouped for the Ежедневник fill-bar (ticket 02, release 1.3).
+ *
+ * Unlike {@link groupByProject} (which enumerates delos), this builds the list
+ * from **projects that have a weekly norm** — every project with `plan > 0` in
+ * the Gantt week aggregate appears, even with zero linked delos (empty bar,
+ * «0 / y ч»). Owner's request: «список Проектов, у которых на этой неделе
+ * запланирована норма часов». Delos merely fill the bar and expand under their
+ * group. Delos linked to a project that has no norm still surface their project
+ * group (so nothing linked silently disappears). Unlinked delos fall under a
+ * single «Без проекта» group, shown only when such delos exist.
+ *
+ * All hour values come from `hoursByProject` (the real Gantt aggregate), never
+ * from the visible page.
+ *
+ * @param {Array} projects  project list for titles ({id, title})
+ * @param {Array} delos      backlog entries carrying `projectIds`
+ * @param {Object} hoursByProject { [projectId]: { plan, fact, pending } }
+ * @returns {Array} groups sorted by label, «Без проекта» last
+ */
+export function groupBacklogWithNorm(projects, delos, hoursByProject = {}) {
+  const titleOf = id => projects.find(p => p.id === id)?.title || `Проект #${id}`
+  const groups = new Map()
+
+  const ensure = pid => {
+    const key = pid == null ? '__none__' : String(pid)
+    if (!groups.has(key)) {
+      const hours = pid == null ? null : hoursByProject[String(pid)]
+      groups.set(key, {
+        key,
+        projectId: pid,
+        label: pid == null ? 'Без проекта' : titleOf(pid),
+        fact: pid == null ? null : (hours ? hours.fact : 0),
+        plan: pid == null ? null : (hours ? hours.plan : null),
+        pending: pid == null ? null : (hours ? hours.pending : 0),
+        items: []
+      })
+    }
+    return groups.get(key)
+  }
+
+  // Seed every project that has a weekly norm (plan > 0) — even with no delos.
+  for (const [pid, hours] of Object.entries(hoursByProject)) {
+    const plan = Number(hours?.plan)
+    if (Number.isFinite(plan) && plan > 0) ensure(Number(pid))
+  }
+
+  // Attach delos; a linked project without a norm still gets its group.
+  for (const delo of delos) {
+    const pids = (delo.projectIds && delo.projectIds.length) ? delo.projectIds : [null]
+    for (const pid of pids) {
+      const group = ensure(pid)
+      if (!group.items.some(x => x.id === delo.id)) group.items.push(delo)
+    }
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.key === '__none__') return 1
+    if (b.key === '__none__') return -1
+    return a.label.localeCompare(b.label, 'ru')
+  })
+}
+
 /** «x / y ч» for a project group; empty for the «Без проекта» group. */
 export function groupHoursLabel(group) {
   if (group.projectId == null) return ''

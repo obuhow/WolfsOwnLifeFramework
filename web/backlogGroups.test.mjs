@@ -1,6 +1,7 @@
 // Smoke-тест полосы заполнения проекта (тикет 06, release 1.1, ADR-0006).
+// + список групп от проектов с недельной нормой (тикет 02, release 1.3).
 // Запуск: node backlogGroups.test.mjs
-import { fillBarSegments } from './src/backlogGroups.js'
+import { fillBarSegments, groupBacklogWithNorm } from './src/backlogGroups.js'
 
 let failures = 0
 function eq(name, got, want) {
@@ -47,6 +48,86 @@ approx('overload: segments sum to 100', t3.factPct + t3.pendingPct, 100)
 const t4 = fillBarSegments({ plan: 8, fact: -1, pending: null })
 approx('negative fact clamped', t4.factPct, 0)
 approx('null pending clamped', t4.pendingPct, 0)
+
+// --- groupBacklogWithNorm: список от проектов с недельной нормой (тикет 02) ---
+
+const projects = [
+  { id: 1, title: 'Курс английского' },
+  { id: 2, title: 'Бег' },
+  { id: 3, title: 'Проект без нормы' }
+]
+
+// Норма у проекта без единого Дела — проект всё равно в списке, полоса пустая.
+{
+  const hours = { '2': { plan: 5, fact: 0, pending: 0 } }
+  const groups = groupBacklogWithNorm(projects, [], hours)
+  eq('norm-no-delos: одна группа', groups.length, 1)
+  eq('norm-no-delos: это проект 2', groups[0].projectId, 2)
+  eq('norm-no-delos: подпись 0 / 5 ч', groupHoursLabelLocal(groups[0]), '0 / 5 ч')
+  eq('norm-no-delos: полосы нет пока? fillBar факт=0/pending=0', fillBarSegments(groups[0]), { factPct: 0, pendingPct: 0, overLimit: false })
+  eq('norm-no-delos: items пусты', groups[0].items.length, 0)
+}
+
+// Пример владельца: проект 1 план 8ч, факт 1ч, pending 1ч, два Дела привязаны.
+{
+  const hours = { '1': { plan: 8, fact: 1, pending: 1 } }
+  const delos = [
+    { id: 10, projectIds: [1], title: 'Урок пн' },
+    { id: 11, projectIds: [1], title: 'Урок ср' }
+  ]
+  const groups = groupBacklogWithNorm(projects, delos, hours)
+  eq('owner-example: одна группа', groups.length, 1)
+  eq('owner-example: 2 Дела под проектом', groups[0].items.length, 2)
+  const seg = fillBarSegments(groups[0])
+  approx('owner-example: factPct', seg.factPct, 12.5)
+  approx('owner-example: pendingPct', seg.pendingPct, 12.5)
+}
+
+// Проекты с нормой БЕЗ Дел + проект с Делами: все попадают, сортировка по названию.
+{
+  const hours = {
+    '1': { plan: 8, fact: 0, pending: 0 }, // Курс английского
+    '2': { plan: 5, fact: 0, pending: 0 }  // Бег
+  }
+  const delos = [{ id: 20, projectIds: [1], title: 'Урок' }]
+  const groups = groupBacklogWithNorm(projects, delos, hours)
+  eq('mix: две группы (оба проекта с нормой)', groups.length, 2)
+  eq('mix: сортировка — Бег первым', groups[0].label, 'Бег')
+  eq('mix: Курс английского вторым', groups[1].label, 'Курс английского')
+}
+
+// Проект БЕЗ нормы (plan отсутствует), но с привязанным Делом — не теряется.
+{
+  const hours = {} // ни у кого нет нормы
+  const delos = [{ id: 30, projectIds: [3], title: 'Задача' }]
+  const groups = groupBacklogWithNorm(projects, delos, hours)
+  eq('linked-no-norm: проект 3 показан', groups.length, 1)
+  eq('linked-no-norm: это проект 3', groups[0].projectId, 3)
+  eq('linked-no-norm: plan == null', groups[0].plan, null)
+}
+
+// Дело без проекта → «Без проекта» в конце, показывается только при наличии таких Дел.
+{
+  const hours = { '2': { plan: 5, fact: 0, pending: 0 } }
+  const delos = [{ id: 40, projectIds: [], title: 'Разрозненное' }]
+  const groups = groupBacklogWithNorm(projects, delos, hours)
+  eq('no-project: две группы', groups.length, 2)
+  eq('no-project: «Без проекта» последней', groups[groups.length - 1].label, 'Без проекта')
+}
+
+// plan = 0 не считается нормой — проект без Дел с plan=0 не появляется.
+{
+  const hours = { '2': { plan: 0, fact: 0, pending: 0 } }
+  const groups = groupBacklogWithNorm(projects, [], hours)
+  eq('zero-plan-no-delos: пусто', groups.length, 0)
+}
+
+// Локальная копия подписи (в компонентах это groupHoursLabel из backlogGroups.js).
+function groupHoursLabelLocal(group) {
+  const f = group.fact == null ? '—' : (Number.isInteger(group.fact) ? String(group.fact) : String(group.fact))
+  const p = group.plan == null ? '—' : (Number.isInteger(group.plan) ? String(group.plan) : String(group.plan))
+  return `${f} / ${p} ч`
+}
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)

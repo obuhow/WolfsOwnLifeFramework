@@ -18,6 +18,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase, authHeaders, handleAuthFailure } from '../api'
+import { groupBacklogWithNorm, fillBarSegments } from '../backlogGroups'
 import FocusPanel from './FocusPanel.vue'
 
 const loading = ref(false)
@@ -296,46 +297,26 @@ function hoursOrDash(value) {
 }
 
 /**
- * Weekly backlog grouped by Project. Each group carries `x / y ч` where
- * x = completed fact hours (current ISO week), y = planned hours — both from the
- * Gantt API (projectWeekHours), never invented from the visible page.
- * Delos without a Project fall into a separate «Без проекта» group.
+ * Backlog grouped for the Ежедневник fill-bar (ticket 02, release 1.3).
+ * Built from projects with a weekly norm (plan > 0) — every such project shows,
+ * even with zero linked delos (empty bar, «0 / y ч»). Delos fill the bar and
+ * expand under their group; unlinked delos go to «Без проекта». All hour values
+ * come from the Gantt aggregate (projectWeekHours), never from the visible page.
  */
-const backlogGroups = computed(() => {
-  const projectTitle = id => projects.value.find(p => p.id === id)?.title || `Проект #${id}`
-  const groups = new Map()
-
-  for (const delo of filteredWeekBacklog.value) {
-    const pids = (delo.projectIds && delo.projectIds.length) ? delo.projectIds : [null]
-    for (const pid of pids) {
-      const key = pid == null ? '__none__' : String(pid)
-      if (!groups.has(key)) {
-        const hours = pid == null ? null : projectWeekHours.value[String(pid)]
-        groups.set(key, {
-          key,
-          projectId: pid,
-          label: pid == null ? 'Без проекта' : projectTitle(pid),
-          fact: pid == null ? null : (hours ? hours.fact : 0),
-          plan: pid == null ? null : (hours ? hours.plan : null),
-          items: []
-        })
-      }
-      const g = groups.get(key)
-      if (!g.items.some(x => x.id === delo.id)) g.items.push(delo)
-    }
-  }
-
-  return Array.from(groups.values()).sort((a, b) => {
-    if (a.key === '__none__') return 1
-    if (b.key === '__none__') return -1
-    return a.label.localeCompare(b.label, 'ru')
-  })
-})
+const backlogGroups = computed(() =>
+  groupBacklogWithNorm(projects.value, filteredWeekBacklog.value, projectWeekHours.value)
+)
 
 /** `x / y ч` for a group, or empty for «Без проекта». Missing plan → `x / — ч`. */
 function groupHoursLabel(group) {
   if (group.projectId == null) return ''
   return `${hoursOrDash(group.fact ?? 0)} / ${hoursOrDash(group.plan)} ч`
+}
+
+/** Полоса заполнения проекта (ticket 06/02, ADR-0006) — сегменты факт/план для одной группы. */
+function groupFillBar(group) {
+  if (group.projectId == null) return null
+  return fillBarSegments(group)
 }
 
 function executionModeLabel(mode) {
@@ -582,7 +563,8 @@ async function loadProjectWeekHours() {
       const cell = (row.cells || [])[0] || {}
       map[String(row.id)] = {
         plan: cell.planHours == null ? null : Number(cell.planHours),
-        fact: Number(cell.factHours || 0)
+        fact: Number(cell.factHours || 0),
+        pending: Number(cell.pendingHours || 0)
       }
     }
     projectWeekHours.value = map
@@ -1035,6 +1017,16 @@ onMounted(loadAll)
               <span class="backlog-group-title">{{ group.label }}</span>
               <span v-if="group.projectId != null" class="backlog-group-hours">{{ groupHoursLabel(group) }}</span>
             </header>
+            <div
+              v-if="group.projectId != null && groupFillBar(group)"
+              class="fill-bar"
+              role="img"
+              :aria-label="`Загрузка недели: ${groupHoursLabel(group)}${groupFillBar(group).overLimit ? ' · перегруз' : ''}`"
+            >
+              <span class="fill-bar-fact" :style="{ width: groupFillBar(group).factPct + '%' }"></span>
+              <span class="fill-bar-pending" :style="{ width: groupFillBar(group).pendingPct + '%', left: groupFillBar(group).factPct + '%' }"></span>
+              <span v-if="groupFillBar(group).overLimit" class="fill-bar-over" title="Перегруз: факт + план больше недельного плана"></span>
+            </div>
             <ul class="backlog-group-list">
               <li v-for="delo in group.items" :key="delo.id + '-' + group.key" class="backlog-delo">
                 <div class="backlog-delo-body">
@@ -1482,6 +1474,39 @@ onMounted(loadAll)
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+/* Полоса заполнения проекта (ticket 06 → ticket 02, ADR-0006 — точечное
+   исключение из 0.3: зелёный факт + зелёный план допущены только в пределах
+   Ежедневника). Совпадает с правилами WeekView.vue. */
+.fill-bar {
+  position: relative;
+  height: 6px;
+  margin: 6px 0 2px;
+  background: var(--wolf-fill-neutral);
+  overflow: hidden;
+}
+.fill-bar-fact,
+.fill-bar-pending {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+.fill-bar-fact { background: var(--wolf-fill-fact); }
+.fill-bar-pending { background: var(--wolf-fill-plan); }
+/* Перегруз — нейтральная штриховка по всей ширине, БЕЗ красного (п.3 тикета). */
+.fill-bar-over {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 3px,
+    var(--wolf-ink) 3px,
+    var(--wolf-ink) 4px
+  );
+  opacity: 0.12;
 }
 
 .backlog-delo {

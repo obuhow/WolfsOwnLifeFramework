@@ -18,7 +18,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase } from '../api'
-import { fillBarSegments } from '../backlogGroups'
+import { fillBarSegments, groupBacklogWithNorm } from '../backlogGroups'
 import { buildDayBlocks } from '../weekViewBlocks'
 
 const loading = ref(false)
@@ -356,36 +356,12 @@ const filteredWeekBacklog = computed(() => {
   return weekBacklog.value.filter(d => d.executionMode === executionModeFilter.value)
 })
 
-/** Weekly backlog grouped by Project with real x / y ч (see ticket 03). */
-const backlogGroups = computed(() => {
-  const projectTitle = id => projects.value.find(p => p.id === id)?.title || `Проект #${id}`
-  const groups = new Map()
-  for (const delo of filteredWeekBacklog.value) {
-    const pids = (delo.projectIds && delo.projectIds.length) ? delo.projectIds : [null]
-    for (const pid of pids) {
-      const key = pid == null ? '__none__' : String(pid)
-      if (!groups.has(key)) {
-        const hours = pid == null ? null : projectWeekHours.value[String(pid)]
-        groups.set(key, {
-          key,
-          projectId: pid,
-          label: pid == null ? 'Без проекта' : projectTitle(pid),
-          fact: pid == null ? null : (hours ? hours.fact : 0),
-          plan: pid == null ? null : (hours ? hours.plan : null),
-          pending: pid == null ? null : (hours ? hours.pending : 0),
-          items: []
-        })
-      }
-      const g = groups.get(key)
-      if (!g.items.some(x => x.id === delo.id)) g.items.push(delo)
-    }
-  }
-  return Array.from(groups.values()).sort((a, b) => {
-    if (a.key === '__none__') return 1
-    if (b.key === '__none__') return -1
-    return a.label.localeCompare(b.label, 'ru')
-  })
-})
+/** Weekly backlog grouped from projects with a weekly norm (ticket 02) —
+ *  every project with plan > 0 appears even without linked delos; delos fill
+ *  the bar. Hours from the Gantt aggregate (projectWeekHours), not the page. */
+const backlogGroups = computed(() =>
+  groupBacklogWithNorm(projects.value, filteredWeekBacklog.value, projectWeekHours.value)
+)
 
 function groupHoursLabel(group) {
   if (group.projectId == null) return ''
