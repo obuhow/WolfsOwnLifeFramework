@@ -128,11 +128,13 @@ export function groupBacklogWithNorm(projects, delos, hoursByProject = {}) {
     }
   }
 
-  return Array.from(groups.values()).sort((a, b) => {
-    if (a.key === '__none__') return 1
-    if (b.key === '__none__') return -1
-    return a.label.localeCompare(b.label, 'ru')
-  })
+  return Array.from(groups.values())
+    .map(g => ({ ...g, fillBar: g.projectId == null ? null : fillBarSegments(g) }))
+    .sort((a, b) => {
+      if (a.key === '__none__') return 1
+      if (b.key === '__none__') return -1
+      return a.label.localeCompare(b.label, 'ru')
+    })
 }
 
 /** «x / y ч» for a project group; empty for the «Без проекта» group. */

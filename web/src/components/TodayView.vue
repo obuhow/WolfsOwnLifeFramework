@@ -18,7 +18,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiBase, authHeaders, handleAuthFailure } from '../api'
-import { groupBacklogWithNorm, fillBarSegments } from '../backlogGroups'
+import { groupBacklogWithNorm } from '../backlogGroups'
 import FocusPanel from './FocusPanel.vue'
 
 const loading = ref(false)
@@ -311,12 +311,6 @@ const backlogGroups = computed(() =>
 function groupHoursLabel(group) {
   if (group.projectId == null) return ''
   return `${hoursOrDash(group.fact ?? 0)} / ${hoursOrDash(group.plan)} ч`
-}
-
-/** Полоса заполнения проекта (ticket 06/02, ADR-0006) — сегменты факт/план для одной группы. */
-function groupFillBar(group) {
-  if (group.projectId == null) return null
-  return fillBarSegments(group)
 }
 
 function executionModeLabel(mode) {
@@ -1018,14 +1012,14 @@ onMounted(loadAll)
               <span v-if="group.projectId != null" class="backlog-group-hours">{{ groupHoursLabel(group) }}</span>
             </header>
             <div
-              v-if="group.projectId != null && groupFillBar(group)"
+              v-if="group.fillBar"
               class="fill-bar"
               role="img"
-              :aria-label="`Загрузка недели: ${groupHoursLabel(group)}${groupFillBar(group).overLimit ? ' · перегруз' : ''}`"
+              :aria-label="`Загрузка недели: ${groupHoursLabel(group)}${group.fillBar.overLimit ? ' · перегруз' : ''}`"
             >
-              <span class="fill-bar-fact" :style="{ width: groupFillBar(group).factPct + '%' }"></span>
-              <span class="fill-bar-pending" :style="{ width: groupFillBar(group).pendingPct + '%', left: groupFillBar(group).factPct + '%' }"></span>
-              <span v-if="groupFillBar(group).overLimit" class="fill-bar-over" title="Перегруз: факт + план больше недельного плана"></span>
+              <span class="fill-bar-fact" :style="{ width: group.fillBar.factPct + '%' }"></span>
+              <span class="fill-bar-pending" :style="{ width: group.fillBar.pendingPct + '%', left: group.fillBar.factPct + '%' }"></span>
+              <span v-if="group.fillBar.overLimit" class="fill-bar-over" title="Перегруз: факт + план больше недельного плана"></span>
             </div>
             <ul class="backlog-group-list">
               <li v-for="delo in group.items" :key="delo.id + '-' + group.key" class="backlog-delo">

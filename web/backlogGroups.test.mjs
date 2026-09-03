@@ -129,5 +129,20 @@ function groupHoursLabelLocal(group) {
   return `${f} / ${p} ч`
 }
 
+// Каждая группа проекта несёт готовый fillBar (мемоизация для шаблона, тикет 02).
+{
+  const hours = { '1': { plan: 8, fact: 1, pending: 1 } }
+  const groups = groupBacklogWithNorm(projects, [], hours)
+  approx('fillBar on group: factPct', groups[0].fillBar.factPct, 12.5)
+  approx('fillBar on group: pendingPct', groups[0].fillBar.pendingPct, 12.5)
+  eq('fillBar on group: overLimit', groups[0].fillBar.overLimit, false)
+}
+
+// «Без проекта» несёт fillBar=null (полосу не рисуем).
+{
+  const groups = groupBacklogWithNorm(projects, [{ id: 50, projectIds: [], title: 'x' }], {})
+  eq('no-project group: fillBar null', groups[groups.length - 1].fillBar, null)
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)
