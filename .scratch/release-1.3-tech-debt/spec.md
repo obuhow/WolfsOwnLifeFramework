@@ -38,6 +38,10 @@ Depends on: `release-0.7-ai-import` (канал чат-панели импорт
   Проект с недельной нормой без привязанных Дел не показывается. Недоделанный вертикальный
   срез resolved-тикета 06 релиза 1.1. См.
   `bugs/02-daily-project-fill-bar-not-on-today-and-no-norm-only-projects.md`.
+- **Б-3** — эндпойнт `/api/v1/admin/agent/run` без ролевого гейта: путь admin, доступ у
+  любого аутентифицированного (найдено прожаркой 1.5–1.9, `AgentController` без
+  `@PreAuthorize`, в `SecurityConfig` нет matcher'а `/api/v1/admin/**`). См.
+  `bugs/03-admin-agent-endpoint-missing-role-gate.md`.
 
 ## Тикеты (реализация)
 
@@ -49,6 +53,9 @@ Depends on: `release-0.7-ai-import` (канал чат-панели импорт
 02 ── полоса заполнения проекта на дневной странице Ежедневника + список от проектов с
       недельной нормой (проекты с planHours>0, даже без Дел); фронт, бэкенд не трогаем
       (закрывает Б-2)   Status: resolved
+03 ── ролевой гейт на `/api/v1/admin/**` (закрывает Б-3): `@PreAuthorize("hasRole('ADMIN')")`
+      на `AgentController` либо matcher в `SecurityConfig`; проверить, что ни один легальный
+      вызов агента не сломан   Status: needs-triage
 ```
 
 Дальнейшие пункты релиза добавляются по мере формулировки владельцем (объём открыт).
