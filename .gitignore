@@ -35,3 +35,6 @@ hermes-verify-*.py
 testing/.venv/
 testing/__pycache__/
 web/dist/
+
+# Приёмочные скриншоты меню-дока (не в репозиторий)
+web/menu-shots/

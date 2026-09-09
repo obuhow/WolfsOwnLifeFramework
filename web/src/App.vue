@@ -20,6 +20,13 @@ import { onMounted, onBeforeUnmount, ref, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { apiBase } from './api'
 import { tourActive, startTour } from './onboardingTour'
+import {
+  menuModeFor,
+  isMenuOpen,
+  loadDockPref,
+  persistDockPref,
+  expandedGroupsFor,
+} from './navMenu'
 import OnboardingTour from './components/OnboardingTour.vue'
 import ImportChatPanel from './components/ImportChatPanel.vue'
 
@@ -167,26 +174,40 @@ function onGroupKeydown(e, key) {
   }
 }
 
-// --- Mobile drawer state ---------------------------------------------------
-const drawerOpen = ref(false)
+// --- Меню: колонка слева (док) на широких, оверлей на узких -----------------
+// Решение владельца: бургер-меню живёт СЛЕВА и по умолчанию ОТКРЫТО. На широких
+// экранах это постоянная колонка в потоке — она раздвигает контент, не затемняет
+// его и не блокирует скролл. На узких (≤768px) места для колонки нет, поэтому
+// там прежнее поведение: оверлей поверх контента, по умолчанию закрыт.
+// Разметка меню одна на оба режима (см. .drawer в шаблоне) — отличаются только
+// обёртка и класс, чтобы не держать две копии списка пунктов.
+// Чистая логика режимов и хранения вынесена в ./navMenu.js (покрыта тестом).
+const drawerOpen = ref(false) // оверлей на узких экранах
+const dockOpen = ref(true) // колонка на широких; выбор пользователя переживает перезагрузку
+const isWideScreen = ref(true)
 const expandedGroups = ref({})
 const drawerEl = ref(null)
 const menuTriggerEl = ref(null)
+
+// 'dock' — колонка в потоке, 'overlay' — модальная панель поверх контента.
+const menuMode = computed(() => (isWideScreen.value ? 'dock' : 'overlay'))
+const menuOpen = computed(() =>
+  isMenuOpen(menuMode.value, { dockOpen: dockOpen.value, drawerOpen: drawerOpen.value })
+)
 
 // --- Chat-panel import (release 0.7, ticket 02) ----------------------------
 const importOpen = ref(false)
 function toggleImport() { importOpen.value = !importOpen.value }
 function closeImport() { importOpen.value = false }
 
+function expandActiveGroup() {
+  // Текущая группа раскрыта, остальные свёрнуты.
+  expandedGroups.value = expandedGroupsFor(NAV, groupKeyForPath())
+}
+
 function openDrawer() {
   drawerOpen.value = true
-  // Current group starts expanded
-  const active = groupKeyForPath()
-  const state = {}
-  for (const item of NAV) {
-    if (item.kind === 'group') state[item.key] = item.key === active
-  }
-  expandedGroups.value = state
+  expandActiveGroup()
   nextTick(() => {
     document.body.style.overflow = 'hidden'
     const first = drawerEl.value?.querySelector('a, button')
@@ -200,22 +221,56 @@ function closeDrawer() {
   nextTick(() => menuTriggerEl.value?.focus())
 }
 
-function toggleDrawerGroup(key) {
-  expandedGroups.value = { ...expandedGroups.value, [key]: !expandedGroups.value[key] }
+// Клик по бургеру: в режиме дока просто сворачивает/разворачивает колонку —
+// без блокировки скролла и без перехвата фокуса (это не модальное окно).
+function toggleMenu() {
+  if (menuMode.value === 'dock') {
+    dockOpen.value = !dockOpen.value
+    persistDockPref(localStorage, dockOpen.value)
+    if (dockOpen.value) expandActiveGroup()
+    return
+  }
+  if (drawerOpen.value) closeDrawer()
+  else openDrawer()
 }
 
-function onDrawerNavigate() {
-  closeDrawer()
+// Переход по ссылке закрывает только оверлей; открытая колонка остаётся на месте.
+function onMenuNavigate() {
+  if (menuMode.value === 'overlay') closeDrawer()
+}
+
+function onNavAction(action) {
+  runNavAction(action)
+  if (menuMode.value === 'overlay') closeDrawer()
+}
+
+// Смена ширины экрана: оверлей не должен «залипнуть» при переходе к доку и
+// наоборот — сбрасываем состояние, несовместимое с новым режимом.
+function syncScreenMode() {
+  const wide = menuModeFor(window.innerWidth) === 'dock'
+  if (wide === isWideScreen.value) return
+  isWideScreen.value = wide
+  if (wide && drawerOpen.value) closeDrawer()
+}
+
+function toggleDrawerGroup(key) {
+  expandedGroups.value = { ...expandedGroups.value, [key]: !expandedGroups.value[key] }
 }
 
 // Focus trap + Escape inside drawer
 function onDrawerKeydown(e) {
   if (e.key === 'Escape') {
+    // Escape закрывает только модальный оверлей. Колонка-док — часть страницы,
+    // а не диалог: закрывать её по Escape было бы неожиданно.
+    if (menuMode.value !== 'overlay') return
     e.preventDefault()
     closeDrawer()
     return
   }
   if (e.key !== 'Tab') return
+  // Ловушка фокуса нужна только модальному оверлею; из колонки Tab обязан
+  // уводить дальше в контент страницы.
+  if (menuMode.value !== 'overlay') return
   const focusables = drawerEl.value?.querySelectorAll(
     'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
   )
@@ -243,6 +298,7 @@ function onDocKeydown(e) {
 watch(() => route.path, () => {
   token.value = localStorage.getItem('wolf_token') || ''
   closeGroups()
+  // Закрываем только оверлей: колонка-док остаётся открытой между страницами.
   if (drawerOpen.value) closeDrawer()
 })
 
@@ -281,11 +337,12 @@ async function logout() {
 }
 
 // --- Навигация: всегда бургер (хотфикс 1.2.1) -------------------------------
-// Решением владельца навигация ВСЕГДА показывается как бургер-меню (drawer),
+// Решением владельца навигация ВСЕГДА показывается как бургер-меню,
 // независимо от ширины экрана. Прежняя адаптация по переполнению (релиз 1.2,
 // тикет 10: ResizeObserver + измерение .nav-desktop) снята — desktop-строка
 // пунктов больше не показывается ни при какой ширине. Флаг navCollapsed
 // зафиксирован в true: .nav-desktop скрыта, .menu-trigger (☰) виден всегда.
+// Само меню по кнопке ☰ открывается СЛЕВА — см. блок «Меню» ниже.
 const navCollapsed = ref(true)
 // Реф остаётся для совместимости с шаблоном (<nav ref="navMeasureEl">), но
 // содержимое больше не измеряется.
@@ -296,11 +353,16 @@ const brandEl = ref(null)
 onMounted(async () => {
   token.value = localStorage.getItem('wolf_token') || ''
   if (token.value) await loadUser()
+  dockOpen.value = loadDockPref(localStorage)
+  isWideScreen.value = menuModeFor(window.innerWidth) === 'dock'
+  expandActiveGroup()
+  window.addEventListener('resize', syncScreenMode)
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onDocKeydown)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncScreenMode)
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onDocKeydown)
   document.body.style.overflow = ''
@@ -312,6 +374,18 @@ onBeforeUnmount(() => {
     <div v-if="token && !isOnboarding" class="app-shell">
       <header class="app-header">
         <div ref="headerInnerEl" class="header-inner" :class="{ 'nav-collapsed': navCollapsed }">
+          <button
+            ref="menuTriggerEl"
+            type="button"
+            class="menu-trigger"
+            data-tour-target="menu"
+            aria-label="Меню"
+            aria-controls="wolf-nav-menu"
+            :aria-expanded="menuOpen ? 'true' : 'false'"
+            @click="toggleMenu"
+          >
+            <span aria-hidden="true">☰</span>
+          </button>
           <router-link ref="brandEl" to="/morning" class="brand" aria-label="WOLF — Главная">
             <div class="brand-container">
               <div class="brand-logo">WOLF</div>
@@ -402,32 +476,31 @@ onBeforeUnmount(() => {
               <span class="user-name">{{ username }}</span>
               <button @click="logout" class="btn btn-ghost logout-btn" aria-label="Выйти" title="Выйти">Выйти</button>
             </div>
-            <button
-              ref="menuTriggerEl"
-              type="button"
-              class="menu-trigger"
-              data-tour-target="menu"
-              aria-label="Меню"
-              :aria-expanded="drawerOpen ? 'true' : 'false'"
-              @click="openDrawer"
-            >
-              <span aria-hidden="true">☰</span>
-            </button>
           </div>
         </div>
       </header>
 
-      <!-- Mobile drawer -->
-      <transition name="drawer">
-        <div v-if="drawerOpen" class="drawer-overlay" @click="closeDrawer">
+      <!-- Меню навигации. Одна разметка на два режима (решение владельца):
+           на широких экранах — колонка слева в потоке страницы (.nav-dock),
+           на узких — модальный оверлей (.drawer-overlay). Список пунктов ниже
+           общий, поэтому копий разметки не появляется. -->
+      <div class="app-body" :class="{ 'with-dock': menuMode === 'dock' && dockOpen }">
+        <transition :name="menuMode === 'overlay' ? 'drawer' : 'dock'">
+          <div
+            v-if="menuOpen"
+            :class="menuMode === 'overlay' ? 'drawer-overlay' : 'nav-dock-shell'"
+            @click="menuMode === 'overlay' ? closeDrawer() : null"
+          >
           <nav
+            id="wolf-nav-menu"
             ref="drawerEl"
             class="drawer"
-            aria-label="Мобильная навигация"
+            :class="{ 'nav-dock': menuMode === 'dock' }"
+            :aria-label="menuMode === 'dock' ? 'Основная навигация' : 'Мобильная навигация'"
             @click.stop
             @keydown="onDrawerKeydown"
           >
-            <div class="drawer-head">
+            <div v-if="menuMode === 'overlay'" class="drawer-head">
               <div class="brand-container-sm">
                 <div class="brand-logo-sm">WOLF</div>
                 <div class="brand-tagline-sm">Система управления потоком</div>
@@ -447,7 +520,7 @@ onBeforeUnmount(() => {
                   class="drawer-link"
                   :data-tour-target="item.tour"
                   :class="{ active: isChildActive(item.to) }"
-                  @click="onDrawerNavigate"
+                  @click="onMenuNavigate"
                 >{{ item.label }}</router-link>
 
                 <button
@@ -455,7 +528,7 @@ onBeforeUnmount(() => {
                   type="button"
                   class="drawer-link drawer-action"
                   :data-tour-target="item.tour"
-                  @click="() => { runNavAction(item.action); closeDrawer(); }"
+                  @click="() => onNavAction(item.action)"
                 >{{ item.label }}</button>
 
                 <div v-else class="drawer-group">
@@ -481,7 +554,7 @@ onBeforeUnmount(() => {
                           :data-tour-action="child.tourAction"
                           class="drawer-submenu-link"
                           :class="{ active: isChildActive(child.to) }"
-                          @click="onDrawerNavigate"
+                          @click="onMenuNavigate"
                         >{{ child.label }}</router-link>
                       </div>
                     </template>
@@ -492,7 +565,7 @@ onBeforeUnmount(() => {
                         :to="child.to"
                         class="drawer-submenu-link"
                         :class="{ active: isChildActive(child.to) }"
-                        @click="onDrawerNavigate"
+                        @click="onMenuNavigate"
                       >{{ child.label }}</router-link>
                     </template>
                   </div>
@@ -509,9 +582,10 @@ onBeforeUnmount(() => {
         </div>
       </transition>
 
-      <main class="app-main" role="main">
-        <router-view />
-      </main>
+        <main class="app-main" role="main">
+          <router-view />
+        </main>
+      </div>
 
       <!-- Чат-панель импорта записей (релиз 0.7, тикет 02): плавающая кнопка
            открывает карточку предпросмотра поверх основного контента. -->

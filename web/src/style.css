@@ -264,13 +264,13 @@ textarea:focus-visible,
   cursor: pointer;
 }
 
-/* Mobile drawer */
+/* Меню слева. Оверлей (узкие экраны) выезжает слева, а не справа. */
 .drawer-overlay {
   position: fixed;
   inset: 0;
   z-index: 300;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   background: rgba(26, 26, 26, .18);
 }
 
@@ -280,9 +280,40 @@ textarea:focus-visible,
   display: flex;
   flex-direction: column;
   background: var(--wolf-surface);
-  border-left: 1px solid var(--wolf-ink);
+  border-right: 1px solid var(--wolf-ink);
   overflow-y: auto;
 }
+
+/* Режим колонки (широкие экраны): меню стоит в потоке страницы слева от
+   контента и раздвигает его. Не затемняет фон, не блокирует скролл, не
+   перехватывает фокус — это часть страницы, а не модальное окно. */
+.app-body {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.nav-dock-shell {
+  flex: 0 0 auto;
+  /* Колонка тянется во всю высоту области контента; её собственная шапка не
+     нужна — бренд и версия остаются в общей шапке приложения. */
+  display: flex;
+}
+
+.drawer.nav-dock {
+  width: 260px;
+  height: auto;
+  position: sticky;
+  /* Прилипает под шапкой (её min-height 54px), чтобы длинные страницы
+     скроллились, а меню оставалось на виду. */
+  top: 54px;
+  max-height: calc(100vh - 54px);
+}
+
+/* Контент рядом с колонкой: убираем внешнее центрирование max-width, иначе
+   при открытом меню страница уезжает вправо от оптической оси. */
+.app-body.with-dock .app-main { margin: 0; }
 
 .drawer-head {
   display: flex;
@@ -349,6 +380,17 @@ textarea:focus-visible,
 .drawer-leave-active { transition: opacity .14s ease; }
 .drawer-enter-from,
 .drawer-leave-to { opacity: 0; }
+
+/* Сворачивание колонки — та же тихая анимация прозрачности, что у оверлея. */
+.dock-enter-active,
+.dock-leave-active { transition: opacity .14s ease; }
+.dock-enter-from,
+.dock-leave-to { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-enter-active,
+  .dock-leave-active { transition: none; }
+}
 
 .app-main {
   width: 100%;
@@ -759,12 +801,11 @@ input[type="radio"] {
   .header-inner { align-items: center; }
 }
 
-/* Хотфикс 1.2.1: навигация ВСЕГДА бургер. Класс .nav-collapsed навешивается
+/* Навигация ВСЕГДА бургер (хотфикс 1.2.1). Класс .nav-collapsed навешивается
    App.vue безусловно (navCollapsed=true), поэтому desktop-строка пунктов
-   скрыта при любой ширине, а .menu-trigger (☰) виден всегда. Измерение
-   переполнения (релиз 1.2, тикет 10) снято, поэтому .nav-desktop прячем
-   честным display:none (offscreen-хак под ResizeObserver больше не нужен —
-   скрытый элемент не ловит фокус табом и не участвует в раскладке). */
+   скрыта при любой ширине, а .menu-trigger (☰) виден всегда.
+   Правка: по кнопке ☰ открывается меню СЛЕВА — колонкой в потоке на широких
+   экранах (по умолчанию открыта, см. .drawer.nav-dock) и оверлеем на узких. */
 .header-inner.nav-collapsed .nav-desktop { display: none; }
 .header-inner.nav-collapsed .user-menu { display: none; }
 .header-inner.nav-collapsed .menu-trigger { display: inline-flex; }
