@@ -1,0 +1,5 @@
+# Реальные личные данные — не коммитим
+sample/*.xlsx
+spike/__pycache__/
+spike/*.pyc
+spike/xlsx_spike_result.txt
