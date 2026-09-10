@@ -66,7 +66,7 @@
     code { font-family: var(--mono); font-size: .84em; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: .08em .35em; }
 
     /* ---- Полоса релизов ---- */
-    .track { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin: 1.5rem 0 .5rem; }
+    .track { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; margin: 1.5rem 0 .5rem; }
     .track-cell { border: 1px solid var(--rule); padding: .6rem .7rem .7rem; background: var(--bg); }
     .track-cell.is-done { background: var(--done); border-color: var(--done-rule); }
     .track-cell.is-now { border-color: var(--ink); border-width: 1px; box-shadow: inset 0 -3px 0 var(--ink); }
@@ -204,12 +204,12 @@
         <div class="fact">
           <div class="fact-k">Отданные ассеты</div>
           <div class="fact-v">Актуальны</div>
-          <div class="fact-n">стенд отдаёт <code>index-CZKYztIw.js</code> (версия <code>1.1.0</code>), совпадает с <code>web/package.json</code> в <code>develop</code></div>
+          <div class="fact-n">стенд отдаёт <code>index-B7M2ItiI.js</code> (версия <code>1.3.0</code>) из <code>develop</code> @ <code>7c5aab8</code>; хеш совпадает с локальной сборкой</div>
         </div>
         <div class="fact">
           <div class="fact-k">Активный релиз</div>
-          <div class="fact-v">1.1</div>
-          <div class="fact-n">Планирование и UX Ежедневника · 9 из 9 тикетов закрыты · баги Б-1/Б-2 resolved</div>
+          <div class="fact-v">1.4</div>
+          <div class="fact-n">Импорт «Расписание.xlsx» · тикеты 01–06 · 1.3 закрыт (4 тикета, Б-1/Б-3)</div>
         </div>
       </div>
 
@@ -230,10 +230,25 @@
         передеплоен и проверен в браузере. Подробности — в разделе
         <a href="#r11">«Что в релизе 1.1»</a>.
       </p>
+      <p>
+        Релиз <b>1.2 «Приветственный тур»</b> превратил онбординг из экскурсии по меню в
+        сквозной сценарий: гость выбирает демо-профиль, создаёт корневой проект с трудоёмкостью,
+        распределяет часы, заводит Дело на подпроекте, фиксирует факт и видит полосу заполнения,
+        создаёт Рутину с недельной квотой — и всё это за один проход. Десять тикетов и баг Б-1
+        закрыты, ADR-0008 (тихий регистр) принят владельцем.
+      </p>
+      <p>
+        Релиз <b>1.3 «Укладка техдолга»</b> закрыт: чат-панель «＋» больше не теряет
+        расписание молча (Б-1), полоса заполнения проекта появилась на дневной странице
+        Ежедневника и строится от проектов с недельной нормой (Б-2), путь
+        <code>/api/v1/admin/**</code> получил ролевой гейт (Б-3). Версии 1.3.0. Подробности —
+        в разделе <a href="#r13">«Что в релизе 1.3»</a>.
+      </p>
       <p class="note" style="margin-top:1rem">
-        Деплой-граница закрыта: контейнеры <code>wolf-web</code>/<code>wolf-api</code>
-        пересобраны из <code>develop</code> @ 5870626 — стенд отдаёт сборку <code>1.1.0</code>
-        (<code>index-CZKYztIw.js</code>), а не <code>0.6.0</code>, как до релиза 1.1.
+        Активная работа — релиз <b>1.4</b>: импорт реального файла
+        <code>Расписание.xlsx</code> (полгода факта, недельная сетка) с предпросмотром до
+        записи и явным «Применить». Тикеты 01–06, трекер —
+        <code>.scratch/xlsx-schedule-import/</code>.
       </p>
     </section>
 
@@ -282,9 +297,24 @@
           <div class="track-name">«Укладка» техдолга: дедлайны, распределение, экспорт, глоссарий</div>
           <div class="track-state">Готово</div>
         </div>
-        <div class="track-cell is-now">
+        <div class="track-cell is-done">
           <div class="track-num">1.1</div>
           <div class="track-name">Планирование и UX Ежедневника</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">1.2</div>
+          <div class="track-name">Приветственный тур: сквозной онбординг из 16 шагов</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-done">
+          <div class="track-num">1.3</div>
+          <div class="track-name">Техдолг: чат-панель импорта, полоса заполнения, ролевой гейт</div>
+          <div class="track-state">Готово</div>
+        </div>
+        <div class="track-cell is-now">
+          <div class="track-num">1.4</div>
+          <div class="track-name">Импорт «Расписание.xlsx» полугодом (preview → apply)</div>
           <div class="track-state">Сейчас здесь</div>
         </div>
       </div>
@@ -395,6 +425,20 @@
             <td><span class="chip done">смёржено</span></td>
             <td><span class="chip done">5 resolved · 3 ready · баг open</span></td>
           </tr>
+          <tr>
+            <td class="num">1.2</td>
+            <td>Приветственный тур: сквозной онбординг из 16 шагов — выбор демо-профиля, корневой проект с трудоёмкостью и распределением часов, Дело на подпроекте, фиксация факта с полосой заполнения, Рутина с недельной квотой, ввод длительности записи, бургер навигации</td>
+            <td class="num">10 + 1 баг</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip done">10 resolved · Б-1 resolved</span></td>
+          </tr>
+          <tr>
+            <td class="num">1.3</td>
+            <td>«Укладка» техдолга: надёжная материализация расписания из чат-панели «＋» и видимый отклик, полоса заполнения проекта на дневной странице Ежедневника, ролевой гейт на <code>/api/v1/admin/**</code>, док навигационного меню</td>
+            <td class="num">4 + 3 бага</td>
+            <td><span class="chip done">смёржено</span></td>
+            <td><span class="chip">4 resolved · Б-1/Б-3 resolved · Б-2 open</span></td>
+          </tr>
         </tbody>
       </table>
 
@@ -491,9 +535,68 @@
       </div>
     </section>
 
+    <!-- ================= РЕЛИЗ 1.3 ================= -->
+    <section id="r13">
+      <h2>Что в релизе 1.3<span class="h2-sub">«Укладка» техдолга, накопленного к 1.2: 4 тикета и 3 бага, версии 1.3.0</span></h2>
+
+      <p>
+        Релиз собран из дефектов, найденных при использовании 1.2 на живом стенде, а не из
+        новой функциональности. Породивший его пункт — <b>Б-1</b>: чат-панель «＋» принимала
+        свободный текст, показывала предпросмотр и создавала Дело, но Записи времени в
+        расписании не появлялись — без ошибки и без сообщения. Сборка объёма велась по
+        доказательствам из кода и живого стенда, поэтому три из четырёх пунктов заведены как
+        баги с точной локализацией.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th class="narrow">№</th><th>Тикет / баг</th><th class="narrow">Статус</th><th>Что сделано</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">01</td>
+            <td>Чат-панель «＋»: надёжная материализация расписания и видимый отклик вместо тихого no-op <span class="chip">закрывает Б-1</span></td>
+            <td><span class="chip done">resolved</span></td>
+            <td>Пустое <code>recurrenceTime</code> теперь даёт <code>NEEDS_CONFIRMATION</code> <i>до</i> записи, а не молчаливое «ничего не создано»; парс дня и времени стал устойчивым — один плохой кандидат больше не роняет весь <code>confirm</code> в 500; в ответ добавлены <code>timeEntriesCreated</code> и пояснение, чтобы панель показывала, сколько Записей реально создано. Сверх тикета найден второй источник «совсем ничего»: молчаливый <code>return</code> на 401/403 в обеих функциях панели.</td>
+          </tr>
+          <tr>
+            <td class="num">02</td>
+            <td>Полоса заполнения проекта на дневной странице Ежедневника + список от проектов с недельной нормой <span class="chip">закрывает Б-2</span></td>
+            <td><span class="chip done">resolved</span></td>
+            <td>Общая чистая функция <code>groupBacklogWithNorm</code> в <code>backlogGroups.js</code> подключена и в <code>TodayView.vue</code> (полоса + <code>pendingHours</code> + стили <code>.fill-bar*</code>), и в <code>WeekView.vue</code> — единый источник списка. Список строится от проектов с недельной нормой (<code>plan&gt;0</code>), даже без привязанных Дел. <code>npm test</code>/<code>npm run build</code> зелёные, независимое ревью — passed.</td>
+          </tr>
+          <tr>
+            <td class="num">03</td>
+            <td>Ролевой гейт на <code>/api/v1/admin/**</code> <span class="chip">закрывает Б-3</span></td>
+            <td><span class="chip done">resolved</span></td>
+            <td>Путь admin был доступен любому аутентифицированному. Выбран вариант matcher'а в <code>SecurityConfig</code> (<code>/api/v1/admin/**</code> → <code>hasRole("ADMIN")</code>): он защищает весь префикс, а не один контроллер, и не разъедется при добавлении новых admin-эндпойнтов. Легальных вызывающих во фронте нет, так что регрессии нет.</td>
+          </tr>
+          <tr>
+            <td class="num">04</td>
+            <td>Навигационное меню: док/бургер</td>
+            <td><span class="chip done">resolved</span></td>
+            <td>Смёржено в <code>develop</code>.</td>
+          </tr>
+          <tr>
+            <td class="num">Б-2</td>
+            <td>Полоса заполнения проекта: недоделанный вертикальный срез 1.1/06</td>
+            <td><span class="chip">open</span></td>
+            <td><b>Исправление поставлено</b> (тикет 02), но статус самого бага оставлен <code>open</code> сознательно: открыт вопрос о судьбе <code>resolved</code> у тикета 06 релиза 1.1, который поставил половину среза. Решение — за владельцем.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        Итог: <b>4 из 4 тикетов и баги Б-1/Б-3 закрыты</b>, версии подняты до 1.3.0 синхронно
+        (<code>web/package.json</code> + <code>api/build.gradle</code>), README обновлён. Стенд
+        передеплоен из <code>develop</code>. Единственный незакрытый пункт — статус бага
+        <b>Б-2</b> (см. строку выше), код по нему смёржен.
+      </div>
+    </section>
+
     <!-- ================= РАЗРЫВЫ ================= -->
     <section id="gaps">
-      <h2>Разрывы код ↔ трекер ↔ деплой<span class="h2-sub">Код релизов 0.1–1.0 в <code>develop</code>, но на стенде и в трекере остались хвосты</span></h2>
+      <h2>Разрывы код ↔ трекер ↔ деплой<span class="h2-sub">Код релизов 0.1–1.3 и тикетов 01–02 релиза 1.4 в <code>develop</code>; ниже — что осталось шероховатым</span></h2>
 
       <table>
         <thead>
@@ -501,14 +604,19 @@
         </thead>
         <tbody>
           <tr>
-            <td><b>Стенд обновлён до кода релиза 1.1 (закрытие релиза)</b></td>
-            <td>Контейнеры <code>wolf-web</code>/<code>wolf-api</code> пересобраны из <code>develop</code> @ <code>5870626</code>: served bundle <code>index-CZKYztIw.js</code> (версия <code>1.1.0</code>) содержит тикеты 01–09 и фиксы Б-1/Б-2, проверено браузером (CDP). Прежние разрывы «стенд отдаёт 0.6.0» и «тикет 04» закрыты.</td>
+            <td><b>Стенд обновлён до кода релиза 1.3 + тикеты 01–02 релиза 1.4</b></td>
+            <td>Образы <code>wolf-web</code>/<code>wolf-api</code> пересобраны из <code>develop</code> @ <code>7c5aab8</code>. Стенд отдаёт <code>index-B7M2ItiI.js</code> + <code>index-L_8EGIz6.css</code> (версия <code>1.3.0</code>) — хеши совпадают с локальной сборкой. <code>Started WolfApiApplication</code> в логе, <code>/actuator/health</code> = <code>{"status":"UP"}</code>, <code>/api/v1/health</code> через nginx = 200. Живая проверка preview на реальном API: файл разобран (1 неделя, 3 ячейки, Java ×2 + Спортзал ×1), при этом <code>time_entry</code> остался <code>2673</code>, а <code>xlsx_import_run</code> — <code>0</code>, то есть предпросмотр действительно не пишет. Данные целы: 8 пользователей, миграция V42.</td>
             <td><span class="chip done">передеплой выполнен</span></td>
           </tr>
           <tr>
-            <td><b>Тикет 1.1/01 — браузерная приёмка проведена</b></td>
-            <td>При закрытии релиза приёмка 01 выполнена (клик по названию раскрывает, «Редактировать проект» → <code>/projects?edit={id}</code>). Она же вскрыла регрессию: мерж 02 (<code>714a9c2</code>) откатил правку <code>MorningView.vue</code> — заведён <code>bugs/02</code>, восстановлено (<code>5870626</code>).</td>
-            <td><span class="chip done">закрыт</span></td>
+            <td><b>Тикет 1.3/Б-2 — статус бага не переключён</b></td>
+            <td>Исправление смёржено (тикет 1.3/02), но баг по-прежнему <code>Status: open</code>: открыт вопрос о судьбе <code>resolved</code> у тикета 06 релиза 1.1, поставившего половину вертикального среза.</td>
+            <td><span class="chip">решение владельца</span></td>
+          </tr>
+          <tr>
+            <td><b>Релиз 1.4 — метка версии ещё не поднята</b></td>
+            <td>Тикеты 01–02 смёржены, но версии в <code>web/package.json</code> и <code>api/build.gradle</code> поднимаются только на финальном мердже релиза (как в 1.0–1.3), поэтому стенд сообщает <code>1.3.0</code> при уже работающем коде 1.4.</td>
+            <td><span class="chip">норма до закрытия 1.4</span></td>
           </tr>
           <tr>
             <td><b>Релиз 0.4: тикет 09 (приёмка) — <code>open</code></b></td>
@@ -565,15 +673,17 @@
     <section id="открытые">
       <h2>Ещё не решено<span class="h2-sub">Явно зафиксированные пробелы — чтобы они не всплыли посреди реализации</span></h2>
       <ul>
+        <li><b>Статус бага Б-2 релиза 1.3</b> — исправление смёржено, но баг оставлен <code>open</code>: непонятно, что делать с <code>resolved</code> у тикета 06 релиза 1.1, который поставил лишь половину вертикального среза. Решение — за владельцем.</li>
+        <li><b>Импорт «Расписание.xlsx» (1.4)</b> — тикеты 02–06 впереди; 01 смёржен. Реальные числа файла (2117 ячеек, 78 активностей) не совпали с эталоном спайка (1943/67) — расхождение разобрано в <code>bugs/01-03</code> релиза 1.4.</li>
         <li><b>Хвост релиза 0.4</b> — тикет <code>09</code> (сквозная приёмка трёх путей в живом браузере) остаётся <code>open</code>; остальной код 0.4 смёржен.</li>
         <li><b>Гигиена трекера</b> — 0.5/02 (Документация) <code>open</code>, часть тикетов 0.8 <code>claimed</code>, баг 1.0/Б-5 <code>needs-info</code> при смёрженном коде.</li>
         <li><b>Судьба демо-кода</b> — <code>DemoController</code>/<code>DemoGcService</code> и три <code>demo-*</code> аккаунта остаются в БД после отмены анонимного демо-режима.</li>
-        <li><b>Финальный осмотр владельцем</b> — тикеты 01, 06, 07, 09 и Б-1 закрыты с CDP-проверкой на живом стенде; визуальная приёмка глазами владельца остаётся формальностью после передеплоя 1.1.0.</li>
       </ul>
     </section>
 
     <footer class="page-foot">
-      WOLF · дорожная карта · источники: <code>.scratch/release-0.1 … release-1.1</code>,
+      WOLF · дорожная карта · источники: <code>.scratch/release-0.1 … release-1.3</code>,
+      <code>.scratch/xlsx-schedule-import</code> (1.4),
       карты <code>.scratch/wayfinder-*</code>, git-история <code>origin/develop</code>, схема БД стенда, живые health-checks.
       Файл отдаётся контейнером <code>wolf-docs</code> без пересборки: <code>/docs/roadmap.html</code>.
     </footer>
