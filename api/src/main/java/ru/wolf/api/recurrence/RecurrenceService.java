@@ -49,7 +49,13 @@ public class RecurrenceService {
     static final int DEFAULT_HORIZON_WEEKS = 4;
     static final int MIN_HORIZON_WEEKS = 1;
     public static final int MAX_HORIZON_WEEKS = 12;
-    static final LocalTime DEFAULT_WINDOW_START = LocalTime.of(9, 0);
+    /**
+     * Default recurrence window, used when a Delo carries no explicit window. Public since release
+     * 1.3 ticket 01: the import parser offers this same value as the draft {@code recurrenceTime}
+     * for a recurrence the user stated without a time, so the preview and the write path agree on
+     * one default instead of each inventing its own.
+     */
+    public static final LocalTime DEFAULT_WINDOW_START = LocalTime.of(9, 0);
     static final LocalTime DEFAULT_WINDOW_END = LocalTime.of(9, 15);
 
     private final DeloRepository deloRepository;

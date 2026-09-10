@@ -143,6 +143,60 @@ class AdminApiIT extends ApiIntegrationTest {
                 .expectStatus().isForbidden();
     }
 
+    /**
+     * Release 1.3 ticket 03 (bug Б-3): {@code /api/v1/admin/agent/run} used to be reachable by any
+     * authenticated principal — the {@code AgentController} carries no {@code @PreAuthorize} and
+     * {@link ru.wolf.api.auth.SecurityConfig} had no matcher for the admin prefix, so
+     * {@code anyRequest().authenticated()} was the only gate. The fix guards the whole
+     * {@code /api/v1/admin/**} prefix, which is what this test pins: the protection must come from
+     * the prefix rule, not from an annotation on one controller.
+     */
+    @Test
+    void non_admin_accounts_get_403_on_admin_agent_run() {
+        User regular = User.builder()
+                .username("agent-gate-regular")
+                .passwordHash(passwordEncoder.encode("pass1234"))
+                .role("USER")
+                .status("ACTIVE")
+                .accountType("REGULAR")
+                .build();
+        userRepository.save(regular);
+
+        User demo = User.builder()
+                .username("agent-gate-demo")
+                .passwordHash(passwordEncoder.encode("pass1234"))
+                .role("USER")
+                .status("ACTIVE")
+                .accountType("DEMO")
+                .build();
+        userRepository.save(demo);
+
+        authedClient("agent-gate-regular", "pass1234").post()
+                .uri("/api/v1/admin/agent/run")
+                .exchange()
+                .expectStatus().isForbidden();
+
+        authedClient("agent-gate-demo", "pass1234").post()
+                .uri("/api/v1/admin/agent/run")
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    /**
+     * The gate must not lock out the legitimate caller: an ADMIN still passes authorization on the
+     * same path. The endpoint's own outcome depends on LLM/agent state, so this asserts only that
+     * the request is not rejected with 403.
+     */
+    @Test
+    void admin_is_not_forbidden_on_admin_agent_run() {
+        createAdmin("agent-gate-admin");
+
+        authedClient("agent-gate-admin", "pass1234").post()
+                .uri("/api/v1/admin/agent/run")
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotEqualTo(403));
+    }
+
     @Test
     void reset_password_on_seed_admin_replaces_password_hash() {
         createAdmin("obuhov-test3");

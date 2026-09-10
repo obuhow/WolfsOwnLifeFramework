@@ -66,7 +66,10 @@ async function send() {
       headers: authHeaders(true),
       body: JSON.stringify({ text: text.value }),
     })
-    if (res.status === 401 || res.status === 403) return
+    // Релиз 1.3, тикет 01 п.4: молчаливый выход на 401/403 давал симптом «совсем ничего».
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Нет доступа к разбору: войдите заново.')
+    }
     if (!res.ok) throw new Error(`Разбор: HTTP ${res.status}`)
     const data = await res.json()
     if (data.unparsed) {
@@ -99,7 +102,10 @@ async function confirmAll() {
       headers: authHeaders(true),
       body: JSON.stringify({ candidates }),
     })
-    if (res.status === 401 || res.status === 403) return
+    // Релиз 1.3, тикет 01 п.4: любой неуспех подтверждения виден пользователю текстом.
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Нет доступа к подтверждению: войдите заново.')
+    }
     if (!res.ok) throw new Error(`Подтверждение: HTTP ${res.status}`)
     const data = await res.json()
     confirmed.value = true
@@ -109,6 +115,20 @@ async function confirmAll() {
   } finally {
     busy.value = false
   }
+}
+
+/**
+ * Релиз 1.3, тикет 01 (баг Б-1): панель показывает, сколько Записей времени реально создано,
+ * а не только список сущностей — раньше пустое расписание выглядело как успех.
+ */
+function slotsLabel(count) {
+  const n = Number(count) || 0
+  const mod10 = n % 10
+  const mod100 = n % 100
+  let word = 'записей'
+  if (mod10 === 1 && mod100 !== 11) word = 'запись'
+  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = 'записи'
+  return `${n} ${word} времени`
 }
 
 function reset() {
@@ -182,8 +202,14 @@ function reset() {
     <div v-if="confirmed" class="done">
       <ul class="created-list">
         <li v-for="e in result.created" :key="`${e.type}-${e.id}`">
-          <span class="created-kind">{{ kindLabels[e.kind] || e.kind }}</span>
-          <a :href="`#${e.link}`" class="created-link">{{ e.title }}</a>
+          <div class="created-row">
+            <span class="created-kind">{{ kindLabels[e.kind] || e.kind }}</span>
+            <a :href="`#${e.link}`" class="created-link">{{ e.title }}</a>
+            <span v-if="e.timeEntriesCreated > 0" class="created-slots">
+              {{ slotsLabel(e.timeEntriesCreated) }}
+            </span>
+          </div>
+          <p v-if="e.note" class="created-note">{{ e.note }}</p>
         </li>
       </ul>
       <button class="btn btn-ghost" @click="reset">Ещё запись</button>
@@ -258,7 +284,11 @@ function reset() {
 
 .done { display: grid; gap: 0.7rem; }
 .created-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.created-row { display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap; }
 .created-kind { font-size: 0.74rem; text-transform: uppercase; color: var(--muted-foreground, #756d64); margin-right: 0.4rem; }
 .created-link { color: var(--accent, #9a7b4f); text-decoration: none; }
 .created-link:hover { text-decoration: underline; }
+/* Отклик о расписании — нейтральный регистр контракта 0.3: без красного и без полос. */
+.created-slots { font-size: 0.78rem; color: var(--muted-foreground, #756d64); }
+.created-note { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--muted-foreground, #756d64); }
 </style>

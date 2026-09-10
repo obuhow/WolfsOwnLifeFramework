@@ -26,7 +26,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -178,15 +181,135 @@ class ImportConfirmServiceTest {
     void recurrence_appliesRuleViaRecurrenceService() {
         when(deloService.createDelo(eq("alice"), any(CreateDeloRequest.class)))
                 .thenReturn(new DeloResponse(2L, "английский", null, Delo.ExecutionMode.SELF, List.of(), null));
+        when(recurrenceService.apply(eq(user), eq(2L), any(RecurrenceService.ApplyCommand.class)))
+                .thenReturn(new RecurrenceService.ApplyResult(12, 0, 0, 12,
+                        LocalDate.parse("2020-01-06"), LocalDate.parse("2020-03-30")));
 
         ConfirmCandidate cand = new ConfirmCandidate(EntityKind.RECURRENCE, List.of(
                 f("title", "английский", true),
                 f("recurrenceWeekday", "FRIDAY", true),
                 f("recurrenceTime", "19:00", true),
                 f("horizonWeeks", "12", true)));
-        service.confirm("alice", new ConfirmImportRequest(List.of(cand)));
+        ConfirmImportResponse res = service.confirm("alice", new ConfirmImportRequest(List.of(cand)));
 
         verify(recurrenceService, times(1)).apply(eq(user), eq(2L), any(RecurrenceService.ApplyCommand.class));
+        // Release 1.3 ticket 01: the happy path now also reports how much schedule was filled.
+        assertThat(res.created().get(0).timeEntriesCreated()).isEqualTo(12);
+        assertThat(res.created().get(0).note()).isNull();
+    }
+
+    /**
+     * Release 1.3 ticket 01, defect A of bug Б-1 (the main regression): a RECURRENCE confirmed
+     * without a time used to call nothing on {@link RecurrenceService} and still report a created
+     * recurrence, so the user saw "success" with an empty schedule. The recurrence must no longer be
+     * passed off as scheduled — zero time entries and an explicit note.
+     */
+    @Test
+    void recurrence_withoutTime_isNotReportedAsScheduled() {
+        when(deloService.createDelo(eq("alice"), any(CreateDeloRequest.class)))
+                .thenReturn(new DeloResponse(3L, "бассейн", null, Delo.ExecutionMode.SELF, List.of(), null));
+
+        ConfirmCandidate cand = new ConfirmCandidate(EntityKind.RECURRENCE, List.of(
+                f("title", "бассейн", true),
+                f("recurrenceWeekday", "SATURDAY", true),
+                f("recurrenceTime", "", true),
+                f("horizonWeeks", "12", true)));
+        ConfirmImportResponse res = service.confirm("alice", new ConfirmImportRequest(List.of(cand)));
+
+        verify(recurrenceService, never()).apply(any(), any(), any());
+        assertThat(res.created()).hasSize(1);
+        assertThat(res.created().get(0).kind()).isEqualTo(EntityKind.RECURRENCE);
+        assertThat(res.created().get(0).timeEntriesCreated()).isZero();
+        assertThat(res.created().get(0).note()).contains("расписание не заполнено");
+    }
+
+    /**
+     * Release 1.3 ticket 01, defect B of bug Б-1: {@code DayOfWeek.valueOf} / {@code LocalTime.parse}
+     * on raw LLM strings threw inside the {@code @Transactional} confirm, so one malformed candidate
+     * turned the whole call into HTTP 500 and discarded the valid candidates sent with it.
+     */
+    @Test
+    void recurrence_withUnparseableDayOrTime_doesNotAbortTheWholeConfirm() {
+        when(deloService.createDelo(eq("alice"), any(CreateDeloRequest.class)))
+                .thenReturn(new DeloResponse(4L, "йога", null, Delo.ExecutionMode.SELF, List.of(), null))
+                .thenReturn(new DeloResponse(5L, "звонок", null, Delo.ExecutionMode.SELF, List.of(), null));
+
+        ConfirmCandidate broken = new ConfirmCandidate(EntityKind.RECURRENCE, List.of(
+                f("title", "йога", true),
+                f("recurrenceWeekday", "пятница", true),
+                f("recurrenceTime", "вечером", true),
+                f("horizonWeeks", "12", true)));
+        ConfirmCandidate valid = delo("звонок", null, "30", null);
+
+        ConfirmImportResponse res = service.confirm("alice",
+                new ConfirmImportRequest(List.of(broken, valid)));
+
+        verify(recurrenceService, never()).apply(any(), any(), any());
+        assertThat(res.created()).hasSize(2);
+        assertThat(res.created().get(0).timeEntriesCreated()).isZero();
+        assertThat(res.created().get(0).note()).contains("не удалось разобрать");
+        // The valid candidate of the same request still got created.
+        assertThat(res.created().get(1).kind()).isEqualTo(EntityKind.DELO);
+        assertThat(res.created().get(1).link()).isEqualTo("/delos/5");
+    }
+
+    /**
+     * Release 1.3 ticket 01: the parser contract emits ISO {@code HH:mm}, but real LLM answers drift
+     * to {@code 9:00} / {@code 19.00}. Those are normalised rather than rejected.
+     */
+    @Test
+    void recurrence_toleratesSingleDigitHourAndDotSeparator() {
+        when(deloService.createDelo(eq("alice"), any(CreateDeloRequest.class)))
+                .thenReturn(new DeloResponse(6L, "пробежка", null, Delo.ExecutionMode.SELF, List.of(), null));
+        when(recurrenceService.apply(eq(user), eq(6L), any(RecurrenceService.ApplyCommand.class)))
+                .thenReturn(new RecurrenceService.ApplyResult(4, 0, 0, 4,
+                        LocalDate.parse("2020-01-06"), LocalDate.parse("2020-02-03")));
+
+        ConfirmCandidate cand = new ConfirmCandidate(EntityKind.RECURRENCE, List.of(
+                f("title", "пробежка", true),
+                f("recurrenceWeekday", "monday", true),
+                f("recurrenceTime", "7.30", true),
+                f("horizonWeeks", "4", true)));
+        ConfirmImportResponse res = service.confirm("alice", new ConfirmImportRequest(List.of(cand)));
+
+        ArgumentCaptor<RecurrenceService.ApplyCommand> captor =
+                ArgumentCaptor.forClass(RecurrenceService.ApplyCommand.class);
+        verify(recurrenceService, times(1)).apply(eq(user), eq(6L), captor.capture());
+        assertThat(captor.getValue().windowStart()).isEqualTo(LocalTime.of(7, 30));
+        assertThat(captor.getValue().weekdays()).containsExactly(DayOfWeek.MONDAY);
+        assertThat(res.created().get(0).timeEntriesCreated()).isEqualTo(4);
+    }
+
+    /**
+     * Release 1.3 ticket 01, point 3: the confirm response carries the number of Записи времени the
+     * Дело actually placed, so the panel can say it instead of only listing the entity.
+     */
+    @Test
+    void delo_withStart_reportsOneTimeEntryCreated() {
+        when(deloService.createDelo(eq("alice"), any(CreateDeloRequest.class)))
+                .thenReturn(new DeloResponse(1L, "тренировка", null, Delo.ExecutionMode.SELF, List.of(), null));
+        when(deloRepository.findById(1L))
+                .thenReturn(Optional.of(Delo.builder().id(1L).user(user).title("тренировка").build()));
+
+        ConfirmImportResponse res = service.confirm("alice",
+                new ConfirmImportRequest(List.of(delo("тренировка", "2020-01-01T10:00", "90", null))));
+
+        assertThat(res.created().get(0).timeEntriesCreated()).isEqualTo(1);
+        assertThat(res.created().get(0).note()).isNull();
+    }
+
+    /** Release 1.3 ticket 01: an unreadable startAt is reported, not silently dropped. */
+    @Test
+    void delo_withUnparseableStart_reportsNoTimeEntry() {
+        when(deloService.createDelo(eq("alice"), any(CreateDeloRequest.class)))
+                .thenReturn(new DeloResponse(1L, "тренировка", null, Delo.ExecutionMode.SELF, List.of(), null));
+
+        ConfirmImportResponse res = service.confirm("alice",
+                new ConfirmImportRequest(List.of(delo("тренировка", "завтра вечером", "90", null))));
+
+        verify(timeEntryRepository, never()).save(any());
+        assertThat(res.created().get(0).timeEntriesCreated()).isZero();
+        assertThat(res.created().get(0).note()).contains("время не поставлено");
     }
 
     @Test
