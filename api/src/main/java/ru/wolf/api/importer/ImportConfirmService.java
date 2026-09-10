@@ -129,10 +129,18 @@ public class ImportConfirmService {
 
         // A concrete start time (not "now") → place a parallel time-entry slot.
         String startAt = field(candidate, "startAt");
+        int timeEntries = 0;
+        String note = null;
         if (startAt != null && !startAt.isBlank() && !"now".equals(startAt)) {
-            placeParallelSlot(user, id, startAt, durationMinutes(candidate));
+            // Release 1.3 ticket 01 (bug Б-1): the slot used to be placed with no trace in the
+            // response — an unparseable startAt silently produced a Дело with nothing scheduled.
+            timeEntries = placeParallelSlot(user, id, startAt, durationMinutes(candidate));
+            if (timeEntries == 0) {
+                note = "Дело создано, но время не поставлено: не удалось разобрать «" + startAt.trim() + "».";
+            }
         }
-        return new CreatedEntity(EntityKind.DELO, id, title.trim(), "delo", "/delos/" + id);
+        return CreatedEntity.scheduled(EntityKind.DELO, id, title.trim(), "delo", "/delos/" + id,
+                timeEntries, note);
     }
 
     private CreatedEntity createProject(User user, ConfirmCandidate candidate) {
@@ -143,7 +151,7 @@ public class ImportConfirmService {
         LifeArea area = botLifeArea(user);
         Long id = projectService.createProject(user.getUsername(),
                 new CreateProjectRequest(area.getId(), title.trim())).id();
-        return new CreatedEntity(EntityKind.PROJECT, id, title.trim(), "project", "/projects/" + id);
+        return CreatedEntity.of(EntityKind.PROJECT, id, title.trim(), "project", "/projects/" + id);
     }
 
     private CreatedEntity createRoutine(User user, ConfirmCandidate candidate) {
@@ -154,7 +162,7 @@ public class ImportConfirmService {
         ResponseEntity<RoutineResponse> response = routineService.create(user.getUsername(),
                 new RoutineRequest(title.trim(), null, BigDecimal.ZERO, null, null));
         Long id = response.getBody().id();
-        return new CreatedEntity(EntityKind.ROUTINE, id, title.trim(), "routine", "/routines");
+        return CreatedEntity.of(EntityKind.ROUTINE, id, title.trim(), "routine", "/routines");
     }
 
     private CreatedEntity createRecurrence(User user, ConfirmCandidate candidate) {
@@ -164,26 +172,104 @@ public class ImportConfirmService {
         }
         Long deloId = deloService.createDelo(user.getUsername(),
                 new CreateDeloRequest(title.trim(), null, Delo.ExecutionMode.SELF, null, null)).id();
+        String link = "/delos/" + deloId;
 
         String weekdayRaw = field(candidate, "recurrenceWeekday");
         String timeRaw = field(candidate, "recurrenceTime");
-        if (weekdayRaw != null && !weekdayRaw.isBlank() && timeRaw != null && !timeRaw.isBlank()) {
-            DayOfWeek weekday = DayOfWeek.valueOf(weekdayRaw.trim().toUpperCase());
-            LocalTime start = LocalTime.parse(timeRaw.trim());
-            LocalTime end = start.plusMinutes(15);
-            int horizon = parseHorizon(field(candidate, "horizonWeeks"));
-            recurrenceService.apply(user, deloId, new RecurrenceService.ApplyCommand(
-                    List.of(weekday), start, end, horizon, null));
+
+        // Release 1.3 ticket 01 (bug Б-1), defect A: previously a missing day/time silently skipped
+        // RecurrenceService.apply and still reported a created recurrence. Now the Дело is still
+        // created (the user did ask for it), but the response says plainly that nothing was placed
+        // on the schedule instead of passing an empty result off as success.
+        if (weekdayRaw == null || weekdayRaw.isBlank() || timeRaw == null || timeRaw.isBlank()) {
+            return CreatedEntity.scheduled(EntityKind.RECURRENCE, deloId, title.trim(), "recurrence", link,
+                    0, "Дело создано, но расписание не заполнено: не указан день или время повторения.");
         }
-        return new CreatedEntity(EntityKind.RECURRENCE, deloId, title.trim(), "recurrence", "/delos/" + deloId);
+
+        // Release 1.3 ticket 01 (bug Б-1), defect B: DayOfWeek.valueOf / LocalTime.parse ran on raw
+        // LLM strings inside the @Transactional confirm, so one malformed value aborted the whole
+        // call with HTTP 500 and took every other valid candidate of the same request down with it.
+        DayOfWeek weekday = parseWeekday(weekdayRaw);
+        LocalTime start = parseTime(timeRaw);
+        if (weekday == null || start == null) {
+            return CreatedEntity.scheduled(EntityKind.RECURRENCE, deloId, title.trim(), "recurrence", link,
+                    0, "Дело создано, но расписание не заполнено: не удалось разобрать день или время"
+                            + " повторения («" + weekdayRaw.trim() + "», «" + timeRaw.trim() + "»).");
+        }
+
+        LocalTime end = start.plusMinutes(15);
+        int horizon = parseHorizon(field(candidate, "horizonWeeks"));
+        try {
+            RecurrenceService.ApplyResult applied = recurrenceService.apply(user, deloId,
+                    new RecurrenceService.ApplyCommand(List.of(weekday), start, end, horizon, null));
+            return CreatedEntity.scheduled(EntityKind.RECURRENCE, deloId, title.trim(), "recurrence", link,
+                    applied.created(), scheduleNote(applied));
+        } catch (RuntimeException e) {
+            // The Дело is already persisted; report the failure instead of losing the whole confirm.
+            return CreatedEntity.scheduled(EntityKind.RECURRENCE, deloId, title.trim(), "recurrence", link,
+                    0, "Дело создано, но расписание не заполнено: " + e.getMessage());
+        }
     }
 
-    private void placeParallelSlot(User user, Long deloId, String startAtRaw, int durationMinutes) {
+    /** Accepts the English {@code DayOfWeek} names the parser contract emits; null when unreadable. */
+    private DayOfWeek parseWeekday(String raw) {
+        try {
+            return DayOfWeek.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** Accepts ISO {@code HH:mm}, tolerating {@code H:mm} and a {@code 19.00} separator; null when unreadable. */
+    private LocalTime parseTime(String raw) {
+        String value = raw.trim().replace('.', ':').replace('-', ':');
+        try {
+            return LocalTime.parse(value);
+        } catch (Exception ignored) {
+            // fall through to the padded single-digit-hour form
+        }
+        try {
+            int colon = value.indexOf(':');
+            if (colon == 1) {
+                return LocalTime.parse("0" + value);
+            }
+            if (colon < 0) {
+                return LocalTime.of(Integer.parseInt(value), 0);
+            }
+        } catch (Exception ignored) {
+            // unreadable
+        }
+        return null;
+    }
+
+    /** Human-readable remark for a recurrence whose slots were partly or wholly skipped. */
+    private String scheduleNote(RecurrenceService.ApplyResult applied) {
+        if (applied.created() == 0) {
+            return "Расписание не заполнено: все слоты пропущены"
+                    + (applied.skippedOccupied() > 0 ? " (заняты: " + applied.skippedOccupied() + ")" : "")
+                    + (applied.skippedPast() > 0 ? " (в прошлом: " + applied.skippedPast() + ")" : "") + ".";
+        }
+        if (applied.skippedOccupied() > 0 || applied.skippedPast() > 0) {
+            return "Пропущено слотов: занятых " + applied.skippedOccupied()
+                    + ", в прошлом " + applied.skippedPast() + ".";
+        }
+        return null;
+    }
+
+    /**
+     * Places the parallel time-entry slot for a Дело.
+     *
+     * @return number of Записи времени actually created — {@code 1} on success, {@code 0} when the
+     *         start time could not be read. Release 1.3 ticket 01 (bug Б-1) made this visible to the
+     *         caller: it used to be {@code void}, so an unparseable value was indistinguishable from
+     *         a placed slot in the confirm response.
+     */
+    private int placeParallelSlot(User user, Long deloId, String startAtRaw, int durationMinutes) {
         LocalDateTime start;
         try {
             start = LocalDateTime.parse(startAtRaw.trim());
         } catch (Exception e) {
-            return; // unparseable slot — skip the time entry, the Delo still exists
+            return 0; // unparseable slot — skip the time entry, the Delo still exists
         }
         start = floorTo15(start);
         int minutes = durationMinutes > 0 ? durationMinutes : ImportParserService.DEFAULT_DURATION_MINUTES;
@@ -199,6 +285,7 @@ public class ImportConfirmService {
                 .endAt(end)
                 .status(status)
                 .build());
+        return 1;
     }
 
     private Status statusFor(User user, LocalDateTime start) {

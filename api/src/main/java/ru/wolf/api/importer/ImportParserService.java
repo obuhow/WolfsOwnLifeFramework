@@ -175,7 +175,18 @@ public class ImportParserService {
                     : RecurrenceService.MAX_HORIZON_WEEKS;
             fields.add(ParsedField.confident("horizonWeeks",
                     String.valueOf(Math.min(horizon, RecurrenceService.MAX_HORIZON_WEEKS))));
-            fields.add(ParsedField.confident("recurrenceTime", c.recurrenceTime() == null ? "" : c.recurrenceTime()));
+            // Release 1.3 ticket 01 (bug Б-1), defect A: a RECURRENCE without an explicit time used
+            // to be emitted as CONFIDENT "" — the preview showed nothing to fill in, and confirm
+            // then silently skipped RecurrenceService.apply while still reporting the recurrence as
+            // created. An absent time is an INFERRED value like startAt/year above, so it is marked
+            // NEEDS_CONFIRMATION with the service's own default window start; the user sees a draft
+            // field and either confirms or corrects it before anything is written.
+            if (c.recurrenceTime() != null && !c.recurrenceTime().isBlank()) {
+                fields.add(ParsedField.confident("recurrenceTime", c.recurrenceTime()));
+            } else {
+                fields.add(ParsedField.needsConfirmation("recurrenceTime",
+                        RecurrenceService.DEFAULT_WINDOW_START.toString()));
+            }
         }
 
         if (c.projectRef() != null && !c.projectRef().isBlank()) {
