@@ -1,6 +1,6 @@
 # Тикет 03 — Ролевой гейт на `/api/v1/admin/**` (AgentController без `@PreAuthorize`)
 
-Status: needs-triage
+Status: resolved
 Blocked by:
 Type: task
 Закрывает: `bugs/03-admin-agent-endpoint-missing-role-gate.md` (Б-3)
@@ -51,4 +51,39 @@ Type: task
 
 ## Answer
 
-_(заполняется при выполнении: выбранный вариант п.1, найденные вызывающие, статус проверки.)_
+**Выбран вариант B** (matcher в `SecurityConfig`), как и рекомендовал тикет:
+
+```java
+.requestMatchers("/api/v1/bot/max/webhook").permitAll()
+.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")   // ← добавлено
+.anyRequest().authenticated()
+```
+
+Обоснование выбора B над A: гейт защищает **весь admin-префикс**, а не один
+`AgentController`. Сейчас под `/api/v1/admin/**` живут два контроллера
+(`AdminController` — со своим класс-уровневым `@PreAuthorize`, и `AgentController` — без
+него); при варианте A следующий контроллер под тем же путём снова оказался бы открытым по
+умолчанию. `@PreAuthorize` на `AdminController` намеренно **не снимался** — дублирующая
+защита безвредна и оставляет метод-секьюрити на месте, если matcher когда-нибудь изменят.
+
+**Легальные вызывающие (п.2):** во фронте вызовов нет — `grep -rn "admin/agent"` по
+`web/src` пуст, кнопки «Запустить агента» в UI не существует. Единственный вызывающий —
+ручной прогон из `testing/06-background-agent.md` (curl под админом) и IT-тест
+`AgentApiIT` (ходит под `authedAdminClient()`). Поэтому п.3 (выносить легальный путь вне
+admin-префикса) в объёме 1.3 не потребовался — как и допускал тикет.
+
+**Проверка (Testing Decisions):** в `AdminApiIT` добавлены два теста —
+`non_admin_accounts_get_403_on_admin_agent_run` (роль `USER` и аккаунт `DEMO` →
+`403` на `POST /api/v1/admin/agent/run`) и `admin_is_not_forbidden_on_admin_agent_run`
+(`ADMIN` → статус не `403`). Оба зелёные. Существующий
+`regular_user_gets_403_on_admin_endpoints` не сломан. Фронт не трогали, но
+`npm run build` прогнан — зелёный.
+
+Влито в `develop` мержем `506c31c` (ветка `release-1.3/feature/03-admin-role-gate`,
+коммит `00ce072`).
+
+Примечание к прогону `AdminApiIT`: 7 тестов, 1 падение —
+`named_admin_can_block_seed_admin_and_login_is_rejected` с
+`IllegalStateException: Timeout on blocking read for 5000000000 NANOSECONDS`. Это
+известная 5-секундная флакость `WebTestClient` под нагрузкой хоста, не связана с правкой
+(тест не касается ни admin-префикса, ни агента).

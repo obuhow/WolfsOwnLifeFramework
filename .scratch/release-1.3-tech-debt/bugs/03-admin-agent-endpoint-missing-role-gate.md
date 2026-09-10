@@ -1,7 +1,7 @@
 # Б-3 — Эндпойнт `/api/v1/admin/agent/run` без ролевого гейта (путь admin, доступ у любого)
 
 Type: bug
-Status: open
+Status: resolved
 Найдено при: прожарка releases-1.5-1.9-wow-demo (разбор механики «ночной агент»)
 Регрессия в: не регрессия — дефект с момента появления эндпойнта
 (`release-0.7-ai-import` / `agent`-пакет, `AgentController`).

@@ -1,6 +1,6 @@
 # Тикет 01 — Чат-панель «＋»: надёжная материализация расписания и видимый отклик (без тихого no-op)
 
-Status: needs-triage
+Status: resolved
 Blocked by:
 Type: task
 Закрывает: `bugs/01-import-chat-recurrence-silent-drop.md` (Б-1)
@@ -74,4 +74,63 @@ Type: task
 
 ## Answer
 
-_(заполняется при выполнении: выбранный вариант п.1, как решён парс п.2, форма отклика п.3.)_
+**П.1 — выбран вариант A** (пометить поле на разборе), как и рекомендовал тикет.
+`ImportParserService.applyConfidenceTable` больше не кладёт `recurrenceTime` как
+`CONFIDENT ""`; отсутствующее время становится
+`NEEDS_CONFIRMATION` со значением `RecurrenceService.DEFAULT_WINDOW_START` (09:00) —
+ровно тем же дефолтом, которым пользуется сам write-путь, чтобы предпросмотр и запись не
+расходились. Поле приходит в панель как «черновое» (класс `.draft`, уже существовавший),
+пользователь его подтверждает или правит **до** записи. Это в духе «WOLF не додумывает»:
+проблема ловится до БД, а не объясняется после.
+
+Константа `RecurrenceService.DEFAULT_WINDOW_START` повышена с package-private до `public`
+(рядом с уже публичной `MAX_HORIZON_WEEKS`) — иначе пакет `importer` не мог бы переиспользовать
+дефолт и завёл бы второй, свой.
+
+**Вариант B не выбран, но частично сделан всё равно** — как страховка: даже если кандидат
+с пустым временем придёт из другого канала (Telegram/Max шлют `ConfirmCandidate` напрямую,
+минуя предпросмотр панели), `confirm` теперь не выдаёт его за созданное расписание, а
+возвращает `timeEntriesCreated=0` + текст «Дело создано, но расписание не заполнено: не
+указан день или время повторения». Тихого no-op не остаётся ни на одном входе.
+
+**П.2 — устойчивый парс.** `DayOfWeek.valueOf` / `LocalTime.parse` вынесены в
+`parseWeekday` / `parseTime`, которые возвращают `null` вместо исключения; вызов
+`recurrenceService.apply` дополнительно обёрнут в `try/catch RuntimeException`. Один плохой
+кандидат больше не роняет весь `@Transactional confirm` в HTTP 500 — остальные кандидаты
+того же запроса создаются (закреплено тестом
+`recurrence_withUnparseableDayOrTime_doesNotAbortTheWholeConfirm`). Сверх контракта
+(ISO `HH:mm`, англ. `DayOfWeek`) добавлена нормализация реальных дрейфов LLM: `7.30` → `07:30`,
+`9:00` → `09:00`, регистр дня любой.
+
+**П.3 — форма отклика.** `CreatedEntity` расширен двумя полями: `timeEntriesCreated` (сколько
+Записей времени реально поставлено) и `note` (короткая причина, когда поставлено не всё).
+Наполняются из `RecurrenceService.ApplyResult` (`created` / `skippedOccupied` / `skippedPast`),
+а для DELO — из ставшего `int`-овым `placeParallelSlot`. Панель показывает строку вида
+«3 записи времени» рядом с сущностью и примечание под ней. Оформление нейтральное по
+контракту 0.3: обычный текст в `--muted-foreground`, **без красного, без полос и процентов**.
+Конструкторы `CreatedEntity.of(...)` / `.scheduled(...)` добавлены, чтобы Проект/Рутина, которые
+ничего не планируют по своей природе, не писали нули руками.
+
+**П.4 — ошибка видна.** Помимо серверной части нашёлся второй источник симптома «совсем
+ничего»: в `ImportChatPanel.vue` и `send()`, и `confirmAll()` на `401/403` делали молчаливый
+`return` — панель просто ничего не отвечала. Теперь оба бросают понятный текст («Нет доступа…:
+войдите заново»), который выводится в существующий баннер ошибки.
+
+**Проверка (Testing Decisions):**
+
+- `ImportConfirmServiceTest` — **12/12 зелёных**, из них 5 новых:
+  `recurrence_withoutTime_isNotReportedAsScheduled` (дефект A, главный регресс),
+  `recurrence_withUnparseableDayOrTime_doesNotAbortTheWholeConfirm` (дефект B + уцелевший
+  валидный кандидат), `recurrence_toleratesSingleDigitHourAndDotSeparator`,
+  `delo_withStart_reportsOneTimeEntryCreated`, `delo_withUnparseableStart_reportsNoTimeEntry`.
+- Happy-path не сломан: `recurrence_appliesRuleViaRecurrenceService` и
+  `delo_withStart_placesParallelTimeEntry` зелёные (первому добавлен стаб `apply`, поскольку
+  сервис теперь читает `ApplyResult`).
+- Регресс каналов: `TelegramImportServiceTest` 5/5, `MaxImportServiceTest` 8/8.
+- `npm run build` зелёный.
+
+Влито в `develop` мержем `506c31c` (ветка `release-1.3/feature/03-admin-role-gate`,
+коммит `00ce072` — тикеты 01 и 03 сделаны одной веткой).
+
+**Не сделано осознанно:** ручная приёмка в браузере (создать через «＋» повторяющееся дело
+без времени и увидеть черновое поле + счётчик Записей) — за владельцем после передеплоя.
