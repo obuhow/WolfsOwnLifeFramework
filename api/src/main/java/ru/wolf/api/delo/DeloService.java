@@ -82,6 +82,7 @@ public class DeloService {
                 .title(request.title().trim())
                 .description(normalizeDescription(request.description()))
                 .executionMode(request.executionMode() != null ? request.executionMode() : Delo.ExecutionMode.SELF)
+                .supporting(request.supporting() != null && request.supporting())
                 .build();
 
         Delo saved = deloRepository.save(delo);
@@ -103,6 +104,7 @@ public class DeloService {
         delo.setTitle(request.title().trim());
         delo.setDescription(normalizeDescription(request.description()));
         delo.setExecutionMode(request.executionMode() != null ? request.executionMode() : Delo.ExecutionMode.SELF);
+        delo.setSupporting(request.supporting() != null && request.supporting());
 
         applyProjectLinks(delo, projectIds, primaryProjectId);
         Delo saved = deloRepository.save(delo);
@@ -318,7 +320,8 @@ public class DeloService {
                 delo.getDescription(),
                 delo.getExecutionMode(),
                 projectIds,
-                primaryId
+                primaryId,
+                delo.isSupporting()
         );
     }
 
@@ -340,7 +343,8 @@ public class DeloService {
                 RecurrenceService.decodeWeekdays(delo.getRecurrenceWeekdays()),
                 delo.getRecurrenceWindowStart(),
                 delo.getRecurrenceWindowEnd(),
-                toSlotDtos(recurrenceService.slotsOf(delo))
+                toSlotDtos(recurrenceService.slotsOf(delo)),
+                delo.isSupporting()
         );
     }
 

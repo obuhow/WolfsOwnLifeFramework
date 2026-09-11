@@ -36,6 +36,17 @@ public record DeloDetailResponse(
         List<DayOfWeek> recurrenceWeekdays,
         LocalTime recurrenceWindowStart,
         LocalTime recurrenceWindowEnd,
-        List<RecurrenceSlotDto> recurrenceSlots
+        List<RecurrenceSlotDto> recurrenceSlots,
+        boolean supporting
 ) {
+    /** Pre-1.4 constructor (without the supporting flag). Kept for call-site compatibility. */
+    public DeloDetailResponse(Long id, String title, String description,
+                              ru.wolf.api.delo.Delo.ExecutionMode executionMode,
+                              List<ProjectLink> projects, Instant createdAt, Instant updatedAt,
+                              FactAggregate aggregates, List<DayOfWeek> recurrenceWeekdays,
+                              LocalTime recurrenceWindowStart, LocalTime recurrenceWindowEnd,
+                              List<RecurrenceSlotDto> recurrenceSlots) {
+        this(id, title, description, executionMode, projects, createdAt, updatedAt, aggregates,
+                recurrenceWeekdays, recurrenceWindowStart, recurrenceWindowEnd, recurrenceSlots, false);
+    }
 }

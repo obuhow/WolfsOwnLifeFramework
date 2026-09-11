@@ -33,6 +33,13 @@ public record UpdateDeloRequest(
 
         java.util.List<Long> projectIds,
 
-        Long primaryProjectId
+        Long primaryProjectId,
+
+        Boolean supporting
 ) {
+    /** Pre-1.4 constructor (without the supporting flag). Kept for call-site compatibility. */
+    public UpdateDeloRequest(String title, String description, Delo.ExecutionMode executionMode,
+                             java.util.List<Long> projectIds, Long primaryProjectId) {
+        this(title, description, executionMode, projectIds, primaryProjectId, null);
+    }
 }

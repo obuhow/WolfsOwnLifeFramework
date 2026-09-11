@@ -442,4 +442,136 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
                 .returnResult()
                 .getResponseBody();
     }
+
+    /**
+     * Ticket 04 — resolving the unknown activity «Сон» (any case) reuses the existing Дело of the
+     * «Ночные часы» mechanism instead of creating a duplicate, and marks it supporting.
+     */
+    @Test
+    void resolving_sleep_uses_existing_sleep_delo_without_duplicate() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        // Pre-existing sleep Дело from the «Ночные часы» mechanism (Т-1).
+        Delo preexistingSleep = deloRepository.save(Delo.builder()
+                .user(admin()).title("Сон").build());
+
+        // A schedule whose only unknown activity is «Сон» (mixed case to prove normalization).
+        byte[] bytes = scheduleWith(ActivityMapping.builder().user(admin()).activityText("Java")
+                .delo(deloRepository.save(Delo.builder().user(admin()).title("Программирование").build())).build(),
+                "сон");
+        apply(authed, bytes);
+
+        // Resolve «сон» via the question flow, asking to create a new Дело.
+        long runId = runRepository.findAll().get(0).getId();
+        authed.post()
+                .uri("/api/v1/import/xlsx/{id}/resolve", runId)
+                .bodyValue(new XlsxImportService.ResolveRequest("сон", null,
+                        new XlsxImportService.CreateDelo("сон", null, null)))
+                .exchange()
+                .expectStatus().isOk();
+
+        // Still exactly one «Сон» Дело — the pre-existing one, reused, now flagged supporting.
+        assertThat(deloRepository.findByUserAndTitleInIgnoreCase(admin(),
+                List.of("сон".toLowerCase()))).hasSize(1);
+        Delo sleep = deloRepository.findByUserAndTitleInIgnoreCase(admin(),
+                List.of("сон".toLowerCase())).get(0);
+        assertThat(sleep.getId()).isEqualTo(preexistingSleep.getId());
+        assertThat(sleep.isSupporting()).isTrue();
+
+        // The «Сон» Записи времени are now DONE and linked to that одному Делу (use a repo query with
+        // the known delo id to avoid lazy-loading the Delo proxy outside a session).
+        var sleepEntries = timeEntryRepository.findByUserAndDeloAndStartAtBetween(
+                admin().getId(), preexistingSleep.getId(),
+                LocalDateTime.of(2000, 1, 1, 0, 0), LocalDateTime.of(2100, 1, 1, 0, 0));
+        assertThat(sleepEntries).isNotEmpty();
+        assertThat(sleepEntries).allSatisfy(e -> {
+            assertThat(e.getStatus()).isEqualTo(TimeEntry.Status.DONE);
+            assertThat(e.getDelo().getId()).isEqualTo(preexistingSleep.getId());
+        });
+    }
+
+    /**
+     * Ticket 04 — a class-1 activity (Еда) resolves to a Дело flagged {@code supporting=true},
+     * while a work Дело (Java) stays non-supporting.
+     */
+    @Test
+    void resolving_supporting_activity_marks_delo_supporting() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        byte[] bytes = scheduleWith(
+                deloRepository.save(Delo.builder().user(admin()).title("Программирование").build())
+                        .getId(),
+                "Java", "Еда");
+        apply(authed, bytes);
+
+        long runId = runRepository.findAll().get(0).getId();
+        for (String activity : List.of("Java", "Еда")) {
+            authed.post()
+                    .uri("/api/v1/import/xlsx/{id}/resolve", runId)
+                    .bodyValue(new XlsxImportService.ResolveRequest(activity, null,
+                            new XlsxImportService.CreateDelo(activity, null, null)))
+                    .exchange()
+                    .expectStatus().isOk();
+        }
+
+        Delo eda = deloRepository.findByUserAndTitleInIgnoreCase(admin(), List.of("еда")).get(0);
+        assertThat(eda.isSupporting()).isTrue();
+        Delo java = deloRepository.findByUserAndTitleInIgnoreCase(admin(), List.of("java")).get(0);
+        assertThat(java.isSupporting()).isFalse();
+    }
+
+    /** Builds a one-week schedule (1 June 07:00) with the given known mapping and unknown activities. */
+    private byte[] scheduleWith(ActivityMapping known, String... unknownActivities) throws Exception {
+        Delo knownDelo = known.getDelo();
+        mappingRepository.save(known);
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("1-7 июня");
+            Row dates = sheet.createRow(0);
+            for (int day = 0; day < 7; day++) {
+                dates.createCell(3 + day).setCellValue(SERIAL_2026_06_01 + day);
+            }
+            Row row = sheet.createRow(2);
+            row.createCell(2).setCellValue(timeFraction(7, 0));
+            row.createCell(3).setCellValue(knownDelo.getTitle()); // known
+            int col = 4;
+            for (String activity : unknownActivities) {
+                if (col > 9) break;
+                row.createCell(col++).setCellValue(activity); // unknown → question
+            }
+            wb.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    /** Builds a one-week schedule where the given activityText → existing Дело (pre-seeded mapping). */
+    private byte[] scheduleWith(Long knownDeloId, String knownActivity, String... unknownActivities) throws Exception {
+        Delo knownDelo = deloRepository.findById(knownDeloId).orElseThrow();
+        mappingRepository.save(ActivityMapping.builder()
+                .user(admin()).activityText(knownActivity).delo(knownDelo).build());
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("1-7 июня");
+            Row dates = sheet.createRow(0);
+            for (int day = 0; day < 7; day++) {
+                dates.createCell(3 + day).setCellValue(SERIAL_2026_06_01 + day);
+            }
+            Row row = sheet.createRow(2);
+            row.createCell(2).setCellValue(timeFraction(7, 0));
+            row.createCell(3).setCellValue(knownActivity);
+            int col = 4;
+            for (String activity : unknownActivities) {
+                if (col > 9) break;
+                row.createCell(col++).setCellValue(activity);
+            }
+            wb.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    /** Resolve helper that posts a question-resolution request. */
+    private void resolve(WebTestClient client, long runId, String activity, Long deloId) {
+        client.post()
+                .uri("/api/v1/import/xlsx/{id}/resolve", runId)
+                .bodyValue(new XlsxImportService.ResolveRequest(activity, deloId,
+                        new XlsxImportService.CreateDelo(activity, null, null)))
+                .exchange()
+                .expectStatus().isOk();
+    }
 }

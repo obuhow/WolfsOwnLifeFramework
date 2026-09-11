@@ -23,6 +23,13 @@ public record DeloResponse(
         String description,
         ru.wolf.api.delo.Delo.ExecutionMode executionMode,
         java.util.List<Long> projectIds,
-        Long primaryProjectId
+        Long primaryProjectId,
+        boolean supporting
 ) {
+    /** Pre-1.4 constructor (without the supporting flag). Kept for call-site compatibility. */
+    public DeloResponse(Long id, String title, String description,
+                        ru.wolf.api.delo.Delo.ExecutionMode executionMode,
+                        java.util.List<Long> projectIds, Long primaryProjectId) {
+        this(id, title, description, executionMode, projectIds, primaryProjectId, false);
+    }
 }

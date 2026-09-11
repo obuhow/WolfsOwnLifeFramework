@@ -70,6 +70,11 @@ public class Delo {
     @Column(name = "recurrence_slots", columnDefinition = "TEXT")
     private String recurrenceSlots;
 
+    /** True for supporting activities (Сон, Еда, В дороге, …) — «Рутина» in conversation. */
+    @Column(name = "supporting", nullable = false)
+    @Builder.Default
+    private boolean supporting = false;
+
     @OneToMany(mappedBy = "delo", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private Set<DeloProject> deloProjects = new HashSet<>();
