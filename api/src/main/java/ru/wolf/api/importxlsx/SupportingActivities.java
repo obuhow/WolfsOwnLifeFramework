@@ -56,10 +56,7 @@ public final class SupportingActivities {
 
     /** Trims and collapses internal whitespace so «в  спортзал» and «В СПОРТЗАЛ» compare cleanly. */
     public static String normalize(String activity) {
-        if (activity == null) {
-            return "";
-        }
-        return activity.trim().replaceAll("\\s+", " ");
+        return ActivityTextNormalizer.normalize(activity);
     }
 
     /** True when the (normalized) activity text is the sleep Дело (Т-1). */

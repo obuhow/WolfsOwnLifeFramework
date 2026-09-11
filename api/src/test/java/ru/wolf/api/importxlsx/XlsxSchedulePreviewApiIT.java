@@ -415,6 +415,76 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
     }
 
     @Test
+    void case_and_whitespace_variants_share_one_activity_and_existing_mapping() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+        Delo coding = deloRepository.save(Delo.builder().user(admin).title("Программирование").build());
+        mappingRepository.save(ActivityMapping.builder()
+                .user(admin).activityText("Java").delo(coding).build());
+
+        ImportPreviewResponse preview = preview(authed,
+                scheduleWithActivities(" Java ", "JAVA", "java"));
+
+        assertThat(preview.knownActivities()).isEqualTo(1);
+        assertThat(preview.newActivities()).isZero();
+        assertThat(preview.activities()).singleElement().satisfies(activity -> {
+            assertThat(activity.activityText()).isEqualTo("Java");
+            assertThat(activity.cells()).isEqualTo(3);
+            assertThat(activity.known()).isTrue();
+            assertThat(activity.deloTitle()).isEqualTo("Программирование");
+        });
+
+        ImportApplyResponse applied = apply(authed, scheduleWithActivities(" Java ", "JAVA", "java"));
+        assertThat(applied.pendingQuestions()).isZero();
+        assertThat(questionRepository.count()).isZero();
+        assertThat(timeEntryRepository.findAll()).hasSize(3).allSatisfy(entry -> {
+            assertThat(entry.getStatus()).isEqualTo(TimeEntry.Status.DONE);
+            assertThat(entry.getDelo().getId()).isEqualTo(coding.getId());
+        });
+    }
+
+    @Test
+    void semantic_variant_stays_unknown_until_user_confirms_existing_delo_mapping() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+        Delo gym = deloRepository.save(Delo.builder().user(admin).title("Спортзал").build());
+        mappingRepository.save(ActivityMapping.builder()
+                .user(admin).activityText("Спортзал").delo(gym).build());
+        byte[] bytes = scheduleWithActivities("в спортзал");
+
+        ImportPreviewResponse preview = preview(authed, bytes);
+        assertThat(preview.knownActivities()).isZero();
+        assertThat(preview.newActivities()).isEqualTo(1);
+        assertThat(preview.activities()).singleElement()
+                .satisfies(activity -> assertThat(activity.known()).isFalse());
+
+        ImportApplyResponse applied = apply(authed, bytes);
+        assertThat(applied.pendingQuestions()).isEqualTo(1);
+        TimeEntry unknown = timeEntryRepository.findAll().get(0);
+        assertThat(unknown.getStatus()).isEqualTo(TimeEntry.Status.UNKNOWN);
+        assertThat(unknown.getDelo()).isNull();
+
+        resolve(authed, applied.importRunId(), "в спортзал", gym.getId());
+
+        assertThat(mappingRepository.findByUserAndNormalizedActivityText(admin, "в спортзал"))
+                .get().extracting(ActivityMapping::getDelo).extracting(Delo::getId).isEqualTo(gym.getId());
+        TimeEntry resolved = timeEntryRepository.findAll().get(0);
+        assertThat(resolved.getStatus()).isEqualTo(TimeEntry.Status.DONE);
+        assertThat(resolved.getDelo().getId()).isEqualTo(gym.getId());
+    }
+
+    @Test
+    void different_meanings_are_not_collapsed_by_automatic_normalization() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        ImportPreviewResponse preview = preview(authed,
+                scheduleWithActivities("Проект", "Проект игры"));
+
+        assertThat(preview.activities()).extracting(ImportPreviewResponse.ActivityPreview::activityText)
+                .containsExactlyInAnyOrder("Проект", "Проект игры");
+        assertThat(preview.newActivities()).isEqualTo(2);
+    }
+
+    @Test
     void unauthenticated_preview_is_rejected() throws Exception {
         webTestClient.post()
                 .uri("/api/v1/import/xlsx")
@@ -516,6 +586,24 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
         assertThat(eda.isSupporting()).isTrue();
         Delo java = deloRepository.findByUserAndTitleInIgnoreCase(admin(), List.of("java")).get(0);
         assertThat(java.isSupporting()).isFalse();
+    }
+
+    /** Builds a one-week schedule with one row containing the supplied activity variants. */
+    private byte[] scheduleWithActivities(String... activities) throws Exception {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("1-7 июня");
+            Row dates = sheet.createRow(0);
+            for (int day = 0; day < 7; day++) {
+                dates.createCell(3 + day).setCellValue(SERIAL_2026_06_01 + day);
+            }
+            Row row = sheet.createRow(2);
+            row.createCell(2).setCellValue(timeFraction(7, 0));
+            for (int index = 0; index < activities.length && index < 7; index++) {
+                row.createCell(3 + index).setCellValue(activities[index]);
+            }
+            wb.write(out);
+            return out.toByteArray();
+        }
     }
 
     /** Builds a one-week schedule (1 June 07:00) with the given known mapping and unknown activities. */

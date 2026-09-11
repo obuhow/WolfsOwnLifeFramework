@@ -131,12 +131,14 @@ public class XlsxSchedulePreviewService {
         int overwritten = 0;
         int unknown = 0;
         boolean overwrite = conflictStrategy == ImportConflictStrategy.OVERWRITE_ALL;
+        Map<String, String> activityLabels = activityLabels(parsed.cells());
         for (ScheduleCell cell : parsed.cells()) {
+            String activityText = activityLabels.get(ActivityTextNormalizer.key(cell.activity()));
             Optional<TimeEntry> existingEntry = entries.findByUserIdAndStartAt(user.getId(), cell.startAt());
             if (existingEntry.isPresent()) {
                 if (overwrite) {
                     TimeEntry e = existingEntry.get();
-                    ActivityMapping mapping = mappings.findByUserAndActivityText(user, cell.activity()).orElse(null);
+                    ActivityMapping mapping = findMapping(user, activityText);
                     e.setDelo(mapping == null ? null : mapping.getDelo());
                     e.setStartAt(cell.startAt());
                     e.setEndAt(cell.endAt());
@@ -145,13 +147,7 @@ public class XlsxSchedulePreviewService {
                     overwritten++;
                     if (mapping == null) {
                         unknown++;
-                        questions.save(XlsxImportQuestion.builder()
-                                .importRun(run)
-                                .activityText(cell.activity())
-                                .sheetName(cell.sheetName())
-                                .startAt(cell.startAt())
-                                .resolved(false)
-                                .build());
+                        saveQuestion(run, activityText, cell);
                     }
                     continue;
                 }
@@ -159,7 +155,7 @@ public class XlsxSchedulePreviewService {
                 skippedOccupied++;
                 continue;
             }
-            ActivityMapping mapping = mappings.findByUserAndActivityText(user, cell.activity()).orElse(null);
+            ActivityMapping mapping = findMapping(user, activityText);
             entries.save(TimeEntry.builder()
                     .user(user)
                     .delo(mapping == null ? null : mapping.getDelo())
@@ -170,20 +166,14 @@ public class XlsxSchedulePreviewService {
             created++;
             if (mapping == null) {
                 unknown++;
-                questions.save(XlsxImportQuestion.builder()
-                        .importRun(run)
-                        .activityText(cell.activity())
-                        .sheetName(cell.sheetName())
-                        .startAt(cell.startAt())
-                        .resolved(false)
-                        .build());
+                saveQuestion(run, activityText, cell);
             }
         }
 
         run.setTotalCells(parsed.cellCount());
         run.setMapped(created + overwritten - unknown);
         run.setUnknown(unknown);
-        int pending = questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(run.getId()).size();
+        int pending = unresolvedActivityCount(run.getId());
         run.setPendingQuestions(pending);
         run.setStatus(pending > 0 ? XlsxImportRun.Status.PAUSED : XlsxImportRun.Status.DONE);
         runs.save(run);
@@ -195,9 +185,11 @@ public class XlsxSchedulePreviewService {
     private ImportPreviewResponse summarise(User user, ParsedSchedule parsed,
                                             Optional<XlsxImportRun> existingRun) {
         Map<String, Integer> counts = new LinkedHashMap<>();
+        Map<String, String> activityLabels = activityLabels(parsed.cells());
         int conflictingCells = 0;
         for (ScheduleCell cell : parsed.cells()) {
-            counts.merge(cell.activity(), 1, Integer::sum);
+            String key = ActivityTextNormalizer.key(cell.activity());
+            counts.merge(key, 1, Integer::sum);
             if (entries.findByUserIdAndStartAt(user.getId(), cell.startAt()).isPresent()) {
                 conflictingCells++;
             }
@@ -206,12 +198,13 @@ public class XlsxSchedulePreviewService {
         List<ActivityPreview> activities = new ArrayList<>();
         int known = 0;
         for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-            ActivityMapping mapping = mappings.findByUserAndActivityText(user, entry.getKey()).orElse(null);
+            String activityText = activityLabels.get(entry.getKey());
+            ActivityMapping mapping = findMapping(user, activityText);
             Delo delo = mapping == null ? null : mapping.getDelo();
             if (mapping != null) {
                 known++;
             }
-            activities.add(new ActivityPreview(entry.getKey(), entry.getValue(),
+            activities.add(new ActivityPreview(activityText, entry.getValue(),
                     mapping != null, delo == null ? null : delo.getTitle()));
         }
         activities.sort(Comparator.comparingInt(ActivityPreview::cells).reversed()
@@ -231,6 +224,36 @@ public class XlsxSchedulePreviewService {
                 conflictingCells,
                 existingRun.isPresent(),
                 List.copyOf(activities));
+    }
+
+    private void saveQuestion(XlsxImportRun run, String activityText, ScheduleCell cell) {
+        questions.save(XlsxImportQuestion.builder()
+                .importRun(run)
+                .activityText(activityText)
+                .sheetName(cell.sheetName())
+                .startAt(cell.startAt())
+                .resolved(false)
+                .build());
+    }
+
+    private ActivityMapping findMapping(User user, String activityText) {
+        return mappings.findByUserAndNormalizedActivityText(user, activityText).orElse(null);
+    }
+
+    private int unresolvedActivityCount(Long importRunId) {
+        return (int) questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(importRunId).stream()
+                .map(question -> ActivityTextNormalizer.key(question.getActivityText()))
+                .distinct()
+                .count();
+    }
+
+    private static Map<String, String> activityLabels(List<ScheduleCell> cells) {
+        Map<String, String> labels = new LinkedHashMap<>();
+        for (ScheduleCell cell : cells) {
+            String normalized = ActivityTextNormalizer.normalize(cell.activity());
+            labels.putIfAbsent(ActivityTextNormalizer.key(normalized), normalized);
+        }
+        return labels;
     }
 
     private Optional<XlsxImportRun> alreadyImported(User user, byte[] fileBytes) {

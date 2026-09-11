@@ -97,10 +97,34 @@ public class XlsxImportService {
                 delo = delos.save(Delo.builder().user(user).title(title).supporting(supporting).build());
             }
         }
-        ActivityMapping mapping = mappings.findByUserAndActivityText(user, request.activityText()).orElseGet(() -> mappings.save(ActivityMapping.builder().user(user).activityText(request.activityText()).delo(delo).build()));
-        for (XlsxImportQuestion q : questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id)) if (q.getActivityText().equals(request.activityText())) { entries.findByUserIdAndStartAt(user.getId(), q.getStartAt()).ifPresent(e -> { e.setDelo(mapping.getDelo()); e.setStatus(TimeEntry.Status.DONE); entries.save(e); }); q.setResolved(true); questions.save(q); }
-        run.setPendingQuestions(questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id).size()); run.setStatus(run.getPendingQuestions() == 0 ? XlsxImportRun.Status.DONE : XlsxImportRun.Status.PAUSED); runs.save(run);
+        ActivityMapping mapping = mappings.findByUserAndNormalizedActivityText(user, request.activityText())
+                .orElseGet(() -> mappings.save(ActivityMapping.builder()
+                        .user(user)
+                        .activityText(ActivityTextNormalizer.normalize(request.activityText()))
+                        .delo(delo)
+                        .build()));
+        for (XlsxImportQuestion q : questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id)) {
+            if (ActivityTextNormalizer.key(q.getActivityText()).equals(ActivityTextNormalizer.key(request.activityText()))) {
+                entries.findByUserIdAndStartAt(user.getId(), q.getStartAt()).ifPresent(e -> {
+                    e.setDelo(mapping.getDelo());
+                    e.setStatus(TimeEntry.Status.DONE);
+                    entries.save(e);
+                });
+                q.setResolved(true);
+                questions.save(q);
+            }
+        }
+        run.setPendingQuestions(unresolvedActivityCount(id));
+        run.setStatus(run.getPendingQuestions() == 0 ? XlsxImportRun.Status.DONE : XlsxImportRun.Status.PAUSED);
+        runs.save(run);
         return toResponse(run);
+    }
+
+    private int unresolvedActivityCount(Long importRunId) {
+        return (int) questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(importRunId).stream()
+                .map(question -> ActivityTextNormalizer.key(question.getActivityText()))
+                .distinct()
+                .count();
     }
 
     private User current(String username) { return users.findByUsername(username).orElseThrow(); }

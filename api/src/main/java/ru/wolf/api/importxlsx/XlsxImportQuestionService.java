@@ -20,7 +20,9 @@ package ru.wolf.api.importxlsx;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.wolf.api.user.UserRepository;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -32,9 +34,13 @@ public class XlsxImportQuestionService {
     public List<XlsxImportQuestionResponse> questions(String username, Long id) {
         var user = users.findByUsername(username).orElseThrow();
         runs.findByUserAndId(user, id).orElseThrow();
-        return questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id).stream()
-                .map(q -> new XlsxImportQuestionResponse(q.getId(), q.getActivityText(), q.getSheetName(), q.getStartAt()))
-                .toList();
+        Map<String, XlsxImportQuestionResponse> unique = new LinkedHashMap<>();
+        for (XlsxImportQuestion question : questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id)) {
+            unique.putIfAbsent(ActivityTextNormalizer.key(question.getActivityText()),
+                    new XlsxImportQuestionResponse(question.getId(), question.getActivityText(),
+                            question.getSheetName(), question.getStartAt()));
+        }
+        return List.copyOf(unique.values());
     }
 
     public record XlsxImportQuestionResponse(Long id, String activityText, String sheetName, java.time.LocalDateTime startAt) {}

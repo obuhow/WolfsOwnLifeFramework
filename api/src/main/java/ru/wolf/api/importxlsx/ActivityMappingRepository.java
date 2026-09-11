@@ -26,6 +26,17 @@ import ru.wolf.api.user.User;
 import java.util.Optional;
 
 public interface ActivityMappingRepository extends JpaRepository<ActivityMapping, Long> {
+    /** Finds a mapping across the automatic (trim/case) normalization boundary. */
+    @Query("""
+            select m from ActivityMapping m
+            where m.user = :user
+              and lower(trim(m.activityText)) = lower(trim(:activityText))
+            order by m.id asc
+            """)
+    Optional<ActivityMapping> findByUserAndNormalizedActivityText(@Param("user") User user,
+                                                                   @Param("activityText") String activityText);
+
+    /** Kept for callers that need the exact legacy lookup semantics. */
     Optional<ActivityMapping> findByUserAndActivityText(User user, String activityText);
 
     /**
