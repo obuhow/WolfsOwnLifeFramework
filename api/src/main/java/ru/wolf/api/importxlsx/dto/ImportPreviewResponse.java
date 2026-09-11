@@ -36,6 +36,9 @@ import java.util.List;
  * @param knownActivities     distinct activities already mapped to a Дело (`activity_mapping`)
  * @param newActivities       distinct activities with no mapping yet — these raise import questions
  * @param timeEntriesToCreate how many Записи времени «Применить» would create
+ * @param conflictingCells    slots whose startAt is already covered by a Запись времени of the
+ *                            user; this is the count the conflict resolution (ticket 03) acts on —
+ *                            one conscious choice covers all of them (decision И-G/H)
  * @param alreadyImported     true when a run with this file's hash already exists, so applying again
  *                            would be a repeat (dedup by hash is kept from the original import)
  * @param activities          per-activity breakdown, most frequent first
@@ -48,6 +51,7 @@ public record ImportPreviewResponse(
         int knownActivities,
         int newActivities,
         int timeEntriesToCreate,
+        int conflictingCells,
         boolean alreadyImported,
         List<ActivityPreview> activities
 ) {

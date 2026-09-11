@@ -25,15 +25,19 @@ package ru.wolf.api.importxlsx.dto;
  *
  * @param importRunId      id of the {@code xlsx_import_run} written by this apply
  * @param created          Записи времени actually inserted
- * @param skippedOccupied  slots left untouched because a Запись already occupied them
+ * @param skippedOccupied  slots left untouched because a Запись already occupied them (SKIP_ALL)
+ * @param overwritten      existing Записи времени replaced by the file's data (OVERWRITE_ALL)
  * @param pendingQuestions unresolved import questions after the run (drives the resolve flow)
  * @param alreadyImported  true when the file hash matched an earlier run, so nothing was written
+ * @param cancelled        true when the chosen strategy was CANCEL, so nothing was written
  */
 public record ImportApplyResponse(
         Long importRunId,
         int created,
         int skippedOccupied,
+        int overwritten,
         int pendingQuestions,
-        boolean alreadyImported
+        boolean alreadyImported,
+        boolean cancelled
 ) {
 }

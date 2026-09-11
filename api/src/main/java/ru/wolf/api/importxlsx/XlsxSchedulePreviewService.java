@@ -3,14 +3,14 @@
  * Copyright (C) 2025 Pavel Obukhov
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
+ * it under the terms of the GNU Affero General License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
+ * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
@@ -43,16 +43,19 @@ import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
 /**
- * Release 1.4 ticket 02: the preview → apply path for the weekly-grid schedule import
- * (decision И-I).
+ * Release 1.4 ticket 02 + 03: the preview → apply path for the weekly-grid schedule import
+ * (decision И-I), with conflict resolution on overlapping imports (decision И-G/H).
  *
  * <p>Splits the single "upload writes immediately" step of {@link XlsxImportService} into two:
  *
  * <ol>
  *   <li>{@link #preview(String, byte[])} parses the file with {@link XlsxScheduleGridParser} and
- *       counts what WOULD be created — no database writes at all;</li>
- *   <li>{@link #apply(String, byte[], String)} materialises the cells as individual 15-minute
- *       {@code DONE} Записи времени (И-D: one cell = one Запись, the model does not change).</li>
+ *       counts what WOULD be created — no database writes at all — including how many cells would
+ *       conflict with an existing Запись времени;</li>
+ *   <li>{@link #apply(String, byte[], String, ImportConflictStrategy)} materialises the cells as
+ *       individual 15-minute {@code DONE} Записи времени (И-D: one cell = one Запись, the model
+ *       does not change), honouring the chosen conflict strategy for the slots that already hold
+ *       a Запись.</li>
  * </ol>
  *
  * <p>The existing machinery is reused rather than rewritten: {@code activity_mapping} decides which
@@ -83,12 +86,22 @@ public class XlsxSchedulePreviewService {
      *
      * <p>Cells whose activity is already mapped become {@code DONE} entries linked to that Дело;
      * unknown activities still produce an entry plus an import question, exactly as the original
-     * import did, so the existing "resolve" flow keeps working. A slot already occupied by any entry
-     * is skipped and counted — conflict strategies are ticket 03's job, and until it lands the safe
-     * default is to leave existing facts untouched.
+     * import did, so the existing "resolve" flow keeps working.</p>
+     *
+     * <p>When a cell's slot is already covered by an existing Запись времени, the behaviour depends
+     * on {@code conflictStrategy} (decision И-G/H: one conscious choice for the whole import):
+     *
+     * <ul>
+     *   <li>{@link ImportConflictStrategy#SKIP_ALL} (default until this ticket landed) — the occupied
+     *       slot is left untouched and counted as {@code skippedOccupied};</li>
+     *   <li>{@link ImportConflictStrategy#OVERWRITE_ALL} — the existing Запись's time and Дело are
+     *       replaced by the file's data, counted as {@code overwritten};</li>
+     *   <li>{@link ImportConflictStrategy#CANCEL} — nothing is written, the import is aborted.</li>
+     * </ul>
      */
     @Transactional
-    public ImportApplyResponse apply(String username, byte[] fileBytes, String filename) {
+    public ImportApplyResponse apply(String username, byte[] fileBytes, String filename,
+                                     ImportConflictStrategy conflictStrategy) {
         User user = currentUser(username);
         ParsedSchedule parsed = parser.parse(fileBytes);
 
@@ -97,7 +110,12 @@ public class XlsxSchedulePreviewService {
             // Dedup by hash, kept from the original import: re-applying the same file is a no-op
             // rather than a second copy of the same half-year.
             XlsxImportRun run = existing.get();
-            return new ImportApplyResponse(run.getId(), 0, 0, run.getPendingQuestions(), true);
+            return new ImportApplyResponse(run.getId(), 0, 0, 0, run.getPendingQuestions(), true, false);
+        }
+
+        // CANCEL is a deliberate "не сейчас": the file is not corrupt, there is just nothing to do.
+        if (conflictStrategy == ImportConflictStrategy.CANCEL) {
+            return new ImportApplyResponse(null, 0, 0, 0, 0, false, true);
         }
 
         XlsxImportRun run = runs.save(XlsxImportRun.builder()
@@ -110,9 +128,34 @@ public class XlsxSchedulePreviewService {
 
         int created = 0;
         int skippedOccupied = 0;
+        int overwritten = 0;
         int unknown = 0;
+        boolean overwrite = conflictStrategy == ImportConflictStrategy.OVERWRITE_ALL;
         for (ScheduleCell cell : parsed.cells()) {
-            if (entries.findByUserIdAndStartAt(user.getId(), cell.startAt()).isPresent()) {
+            Optional<TimeEntry> existingEntry = entries.findByUserIdAndStartAt(user.getId(), cell.startAt());
+            if (existingEntry.isPresent()) {
+                if (overwrite) {
+                    TimeEntry e = existingEntry.get();
+                    ActivityMapping mapping = mappings.findByUserAndActivityText(user, cell.activity()).orElse(null);
+                    e.setDelo(mapping == null ? null : mapping.getDelo());
+                    e.setStartAt(cell.startAt());
+                    e.setEndAt(cell.endAt());
+                    e.setStatus(mapping == null ? TimeEntry.Status.UNKNOWN : TimeEntry.Status.DONE);
+                    entries.save(e);
+                    overwritten++;
+                    if (mapping == null) {
+                        unknown++;
+                        questions.save(XlsxImportQuestion.builder()
+                                .importRun(run)
+                                .activityText(cell.activity())
+                                .sheetName(cell.sheetName())
+                                .startAt(cell.startAt())
+                                .resolved(false)
+                                .build());
+                    }
+                    continue;
+                }
+                // Default / SKIP_ALL: leave the existing fact untouched.
                 skippedOccupied++;
                 continue;
             }
@@ -138,22 +181,26 @@ public class XlsxSchedulePreviewService {
         }
 
         run.setTotalCells(parsed.cellCount());
-        run.setMapped(created - unknown);
+        run.setMapped(created + overwritten - unknown);
         run.setUnknown(unknown);
         int pending = questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(run.getId()).size();
         run.setPendingQuestions(pending);
         run.setStatus(pending > 0 ? XlsxImportRun.Status.PAUSED : XlsxImportRun.Status.DONE);
         runs.save(run);
 
-        return new ImportApplyResponse(run.getId(), created, skippedOccupied, pending, false);
+        return new ImportApplyResponse(run.getId(), created, skippedOccupied, overwritten, pending, false, false);
     }
 
     /** Builds the preview summary from parsed cells; every number is counted, never estimated. */
     private ImportPreviewResponse summarise(User user, ParsedSchedule parsed,
                                             Optional<XlsxImportRun> existingRun) {
         Map<String, Integer> counts = new LinkedHashMap<>();
+        int conflictingCells = 0;
         for (ScheduleCell cell : parsed.cells()) {
             counts.merge(cell.activity(), 1, Integer::sum);
+            if (entries.findByUserIdAndStartAt(user.getId(), cell.startAt()).isPresent()) {
+                conflictingCells++;
+            }
         }
 
         List<ActivityPreview> activities = new ArrayList<>();
@@ -181,6 +228,7 @@ public class XlsxSchedulePreviewService {
                 known,
                 activities.size() - known,
                 parsed.cellCount(),
+                conflictingCells,
                 existingRun.isPresent(),
                 List.copyOf(activities));
     }

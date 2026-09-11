@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -299,14 +300,93 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
                 .user(admin).delo(existing).startAt(occupied).endAt(occupied.plusMinutes(15))
                 .status(TimeEntry.Status.DONE).build());
 
+        // SKIP_ALL is the default strategy, matching the pre-03 safe behaviour.
         ImportApplyResponse applied = apply(authed, twoWeekSchedule());
 
         assertThat(applied.skippedOccupied()).isEqualTo(1);
+        assertThat(applied.overwritten()).isZero();
         assertThat(applied.created()).isEqualTo(3);
-        // The pre-existing fact is not overwritten — conflict strategies are ticket 03's scope.
+        // The pre-existing fact is not overwritten — conflict strategies are ticket 03's scope, and
+        // the default keeps existing facts untouched.
         var kept = timeEntryRepository.findByUserIdAndStartAt(admin.getId(), occupied).orElseThrow();
         assertThat(kept.getDelo().getTitle()).isEqualTo("Уже было");
         assertThat(timeEntryRepository.count()).isEqualTo(4);
+    }
+
+    @Test
+    void preview_counts_conflicting_cells_without_writing() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+
+        // Seed two facts that the file would also produce (Mon 07:00 and Tue 07:00).
+        Delo existing = deloRepository.save(Delo.builder().user(admin).title("Уже было").build());
+        for (LocalDateTime start : List.of(
+                LocalDateTime.of(2026, 6, 1, 7, 0),
+                LocalDateTime.of(2026, 6, 2, 7, 0))) {
+            timeEntryRepository.save(TimeEntry.builder()
+                    .user(admin).delo(existing).startAt(start).endAt(start.plusMinutes(15))
+                    .status(TimeEntry.Status.DONE).build());
+        }
+
+        ImportPreviewResponse preview = preview(authed, twoWeekSchedule());
+
+        // The preview must surface the conflict count before the user presses «Применить».
+        assertThat(preview.conflictingCells()).isEqualTo(2);
+        // Looking must still not write.
+        assertThat(timeEntryRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void overwrite_all_replaces_existing_entries_with_file_data() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+
+        // A pre-existing fact in the Monday 07:00 slot, linked to the wrong Дело.
+        Delo oldDelo = deloRepository.save(Delo.builder().user(admin).title("Устаревшее").build());
+        LocalDateTime occupied = LocalDateTime.of(2026, 6, 1, 7, 0);
+        timeEntryRepository.save(TimeEntry.builder()
+                .user(admin).delo(oldDelo).startAt(occupied).endAt(occupied.plusMinutes(15))
+                .status(TimeEntry.Status.DONE).build());
+
+        // «Java» is mapped, so the overwrite should re-link the slot to the correct Дело.
+        Delo coding = deloRepository.save(Delo.builder().user(admin).title("Программирование").build());
+        mappingRepository.save(ActivityMapping.builder()
+                .user(admin).activityText("Java").delo(coding).build());
+
+        ImportApplyResponse applied = applyWithStrategy(authed, twoWeekSchedule(), "OVERWRITE_ALL");
+
+        assertThat(applied.overwritten()).isEqualTo(1);
+        assertThat(applied.skippedOccupied()).isZero();
+        assertThat(applied.created()).isEqualTo(3);
+        assertThat(timeEntryRepository.count()).isEqualTo(4); // replaced in place, no duplicate
+
+        // The conflicting slot now carries the file's activity and Дело.
+        var replaced = timeEntryRepository.findByUserIdAndStartAt(admin.getId(), occupied).orElseThrow();
+        assertThat(replaced.getDelo().getTitle()).isEqualTo("Программирование");
+        assertThat(replaced.getStatus()).isEqualTo(TimeEntry.Status.DONE);
+    }
+
+    @Test
+    void cancel_writes_nothing_and_leaves_existing_facts_intact() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+
+        Delo existing = deloRepository.save(Delo.builder().user(admin).title("Уже было").build());
+        LocalDateTime occupied = LocalDateTime.of(2026, 6, 1, 7, 0);
+        timeEntryRepository.save(TimeEntry.builder()
+                .user(admin).delo(existing).startAt(occupied).endAt(occupied.plusMinutes(15))
+                .status(TimeEntry.Status.DONE).build());
+        long before = timeEntryRepository.count();
+
+        ImportApplyResponse applied = applyWithStrategy(authed, twoWeekSchedule(), "CANCEL");
+
+        assertThat(applied.cancelled()).isTrue();
+        assertThat(applied.created()).isZero();
+        assertThat(applied.skippedOccupied()).isZero();
+        assertThat(applied.overwritten()).isZero();
+        assertThat(applied.importRunId()).isNull();
+        assertThat(timeEntryRepository.count()).isEqualTo(before);
+        assertThat(runRepository.count()).isZero();
     }
 
     @Test
@@ -341,5 +421,25 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
                 .body(multipart(twoWeekSchedule()))
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    /** Apply variant that passes an explicit conflict strategy as a form field. */
+    private ImportApplyResponse applyWithStrategy(WebTestClient client, byte[] bytes, String strategy) {
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("file", new ByteArrayResource(bytes) {
+            @Override
+            public String getFilename() {
+                return "Расписание.xlsx";
+            }
+        }).contentType(MediaType.parseMediaType(XLSX_MIME));
+        builder.part("conflictStrategy", strategy);
+        return client.post()
+                .uri("/api/v1/import/xlsx/apply")
+                .body(BodyInserters.fromMultipartData(builder.build()))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(ImportApplyResponse.class)
+                .returnResult()
+                .getResponseBody();
     }
 }

@@ -53,9 +53,11 @@ public class XlsxImportController {
 
     /** The explicit second step: materialise the previewed cells as Записи времени. */
     @PostMapping(value = "/xlsx/apply", consumes = "multipart/form-data")
-    public ResponseEntity<ImportApplyResponse> apply(Authentication auth, @RequestPart("file") MultipartFile file)
+    public ResponseEntity<ImportApplyResponse> apply(Authentication auth, @RequestPart("file") MultipartFile file,
+                                                      @RequestParam(value = "conflictStrategy",
+                                                              defaultValue = "SKIP_ALL") ImportConflictStrategy conflictStrategy)
             throws Exception {
-        return ResponseEntity.ok(previewService.apply(auth.getName(), file.getBytes(), file.getOriginalFilename()));
+        return ResponseEntity.ok(previewService.apply(auth.getName(), file.getBytes(), file.getOriginalFilename(), conflictStrategy));
     }
 
     @GetMapping("/xlsx/{id}")
