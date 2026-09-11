@@ -27,6 +27,7 @@ const loading = ref(false)
 const applying = ref(false)
 const error = ref('')
 const resolved = ref('')
+const conflictChoice = ref('')
 
 function headers(json = false) {
   return authHeaders(json)
@@ -38,6 +39,7 @@ function selectFile(event) {
   applied.value = null
   questions.value = []
   resolved.value = ''
+  conflictChoice.value = ''
   error.value = ''
 }
 function payload() {
@@ -60,9 +62,28 @@ async function analyse() {
 /** Step 2 — the explicit apply. This is the only call that writes Записи времени. */
 async function apply() {
   if (!file.value) return
+  // When the preview shows conflicts, we ask ONCE for the whole import (decision И-G/H):
+  // skip all / overwrite all / cancel. No per-cell questions.
+  if (preview.value?.conflictingCells > 0 && !conflictChoice.value) {
+    const ok = window.confirm(
+      `Импорт пересекается с ${preview.value.conflictingCells} уже заполненными ячейками.\n` +
+      '«Пропустить все» — оставить существующие записи, «Перезаписать все» — заменить их данными файла, «Отмена» — ничего не делать.'
+    )
+    if (!ok) { conflictChoice.value = 'CANCEL' }
+    else {
+      const overwrite = window.confirm('Заменить существующие записи данными файла? «ОК» — перезаписать, «Отмена» — пропустить.')
+      conflictChoice.value = overwrite ? 'OVERWRITE_ALL' : 'SKIP_ALL'
+    }
+  }
+  if (conflictChoice.value === 'CANCEL') {
+    error.value = 'Импорт отменён: существующие записи не тронуты.'
+    return
+  }
   applying.value = true; error.value = ''
   try {
-    const res = await fetch(`${apiBase()}/import/xlsx/apply`, { method: 'POST', headers: headers(), body: payload() })
+    const form = payload()
+    if (conflictChoice.value) form.append('conflictStrategy', conflictChoice.value)
+    const res = await fetch(`${apiBase()}/import/xlsx/apply`, { method: 'POST', headers: headers(), body: form })
     if (!res.ok) throw new Error(`Применение: HTTP ${res.status}`)
     applied.value = await res.json()
     await loadQuestions()
@@ -108,6 +129,7 @@ async function resolve(question, deloId = null) {
         <span v-if="preview.from"><strong>{{ preview.from }}</strong> — <strong>{{ preview.to }}</strong></span>
         <span><strong>{{ preview.knownActivities }}</strong> известных активностей</span>
         <span><strong>{{ preview.newActivities }}</strong> новых</span>
+        <span v-if="preview.conflictingCells"><strong>{{ preview.conflictingCells }}</strong> ячеек уже заняты — нужен выбор при «Применить»</span>
       </div>
       <details v-if="preview.activities?.length" class="activities">
         <summary>Активности ({{ preview.activities.length }})</summary>
@@ -128,8 +150,10 @@ async function resolve(question, deloId = null) {
     <section v-if="applied" class="card">
       <h2>Импорт завершён</h2>
       <p v-if="applied.alreadyImported" class="banner warn">Файл уже был импортирован — ничего не создано.</p>
+      <p v-if="applied.cancelled" class="banner warn">Импорт отменён — существующие записи не тронуты.</p>
       <div class="summary">
         <span><strong>{{ applied.created }}</strong> Записей создано</span>
+        <span v-if="applied.overwritten"><strong>{{ applied.overwritten }}</strong> перезаписано поверх существующих</span>
         <span><strong>{{ applied.skippedOccupied }}</strong> занятых слотов пропущено</span>
         <span><strong>{{ applied.pendingQuestions }}</strong> вопросов по неизвестным</span>
       </div>
