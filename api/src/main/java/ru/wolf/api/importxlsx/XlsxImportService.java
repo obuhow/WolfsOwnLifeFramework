@@ -70,8 +70,33 @@ public class XlsxImportService {
         User user = current(username);
         XlsxImportRun run = runs.findByUserAndId(user, id).orElseThrow();
         Delo delo;
-        if (request.deloId() != null) delo = delos.findByUserAndId(user, request.deloId()).orElseThrow();
-        else { delo = delos.save(Delo.builder().user(user).title(request.createDelo().title()).build()); }
+        if (request.deloId() != null) {
+            delo = delos.findByUserAndId(user, request.deloId()).orElseThrow();
+        } else {
+            String title = request.createDelo().title();
+            if (SupportingActivities.isSleep(title)) {
+                // Т-1: «Сон» (any case) reuses the existing Дело of the «Ночные часы» mechanism
+                // instead of creating a duplicate — even when the UI asked to "create new".
+                Delo sleep = delos.findFirstByUserAndTitleIgnoreCaseOrderByIdAsc(user, SupportingActivities.SLEEP_DELO_TITLE)
+                        .orElseGet(() -> delos.save(Delo.builder()
+                                .user(user)
+                                .title(SupportingActivities.SLEEP_DELO_TITLE)
+                                .supporting(true)
+                                .build()));
+                // The «Ночные часы» Дело may predate this flag; mark it supporting on first use.
+                if (!sleep.isSupporting()) {
+                    sleep.setSupporting(true);
+                    sleep = delos.save(sleep);
+                }
+                delo = sleep;
+            } else {
+                Boolean requested = request.createDelo().supporting();
+                // Default class-1 activities (Сон, Еда, В дороге, …) to the supporting flag unless
+                // the user explicitly overrode it; the flag is exposed in the Дело API responses.
+                boolean supporting = requested != null ? requested : SupportingActivities.isSupporting(title);
+                delo = delos.save(Delo.builder().user(user).title(title).supporting(supporting).build());
+            }
+        }
         ActivityMapping mapping = mappings.findByUserAndActivityText(user, request.activityText()).orElseGet(() -> mappings.save(ActivityMapping.builder().user(user).activityText(request.activityText()).delo(delo).build()));
         for (XlsxImportQuestion q : questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id)) if (q.getActivityText().equals(request.activityText())) { entries.findByUserIdAndStartAt(user.getId(), q.getStartAt()).ifPresent(e -> { e.setDelo(mapping.getDelo()); e.setStatus(TimeEntry.Status.DONE); entries.save(e); }); q.setResolved(true); questions.save(q); }
         run.setPendingQuestions(questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id).size()); run.setStatus(run.getPendingQuestions() == 0 ? XlsxImportRun.Status.DONE : XlsxImportRun.Status.PAUSED); runs.save(run);
@@ -82,5 +107,5 @@ public class XlsxImportService {
     private ImportResponse toResponse(XlsxImportRun r) { return new ImportResponse(r.getId(), r.getStatus().name(), r.getTotalCells(), r.getMapped(), r.getUnknown(), r.getPendingQuestions()); }
     public record ImportResponse(Long id, String status, int totalCells, int mapped, int unknown, int pendingQuestions) {}
     public record ResolveRequest(String activityText, Long deloId, CreateDelo createDelo) {}
-    public record CreateDelo(String title, Long projectId) {}
+    public record CreateDelo(String title, Long projectId, Boolean supporting) {}
 }
