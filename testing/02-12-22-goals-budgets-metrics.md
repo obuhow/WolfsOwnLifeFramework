@@ -2,9 +2,9 @@
 
 Источники для дополнительных секций:
 
-- `.scratch/release-0.2/issues/02-goals-budgets-metrics.md`
-- `.scratch/release-0.2/issues/12-wave-stats.md`
-- `.scratch/release-0.2/issues/22-metric-quick-increment.md`
+- `.scratch/release-0.2-methodology/issues/02-goals-budgets-metrics.md`
+- `.scratch/release-0.2-methodology/issues/12-wave-stats.md`
+- `.scratch/release-0.2-methodology/issues/22-metric-quick-increment.md`
 
 ## TC-0.2-02-01 — CRUD Целей
 **Приоритет:** Critical · **Тип:** UI

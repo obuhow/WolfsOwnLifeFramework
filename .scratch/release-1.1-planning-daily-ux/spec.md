@@ -4,7 +4,7 @@ Status: `resolved` (релиз закрыт 2026-08-31: тикеты 01–09 res
 Feature slug: `release-1.1-planning-daily-ux`
 Tracker: local markdown (this file + `bugs/`, `issues/`)
 Glossary: `CONTEXT.md`
-Grill-with-docs: `.scratch/release-1.1-planning-daily-ux/grill.md`
+Grill-with-docs: `.scratch/release-1.1-planning-daily-ux/spike/grill.md`
 Depends on: `release-1.0-final-tech-debt` (закрыт), `release-0.8-load-charts`
 (вкладки Бюджет/Кривые/Лестница/Очередь), `release-0.3-ui-design` (визуальный контракт).
 

@@ -4,8 +4,8 @@
 
 ## Область проверки
 
-- Источник требований: [`../.scratch/release-0.2/spec.md`](../.scratch/release-0.2/spec.md).
-- Тикеты: `01–22` из [`../.scratch/release-0.2/issues/`](../.scratch/release-0.2/issues/).
+- Источник требований: [`../.scratch/release-0.2-methodology/spec.md`](../.scratch/release-0.2-methodology/spec.md).
+- Тикеты: `01–22` из [`../.scratch/release-0.2-methodology/issues/`](../.scratch/release-0.2-methodology/issues/).
 - Формат: тематические Markdown-файлы; тест-кейсы имеют идентификаторы `TC-0.2-<ticket>-NN`.
 - Тесты рассчитаны на ручной прогон через UI. Если для сценария нужен административный или отсутствующий в UI endpoint, это отмечено как **API-only**.
 
@@ -69,4 +69,4 @@
 
 ## Замечание по scope
 
-Тесты составлены по текущему набору тикетов `.scratch/release-0.2/issues/01–22`. Тикеты `02`, `03` и `04` уже имеют статус `resolved`, но включены в регрессионный прогон наравне с остальными.
+Тесты составлены по текущему набору тикетов `.scratch/release-0.2-methodology/issues/01–22`. Тикеты `02`, `03` и `04` уже имеют статус `resolved`, но включены в регрессионный прогон наравне с остальными.

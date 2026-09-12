@@ -1,6 +1,6 @@
 # Тикет 13 — Режим фиксации времени
 
-Источник: `.scratch/release-0.2/issues/13-time-capture-mode.md`.
+Источник: `.scratch/release-0.2-methodology/issues/13-time-capture-mode.md`.
 
 ## TC-0.2-13-01 — Переключение режима
 **Приоритет:** Critical · **Тип:** UI
@@ -90,7 +90,7 @@
 
 # Тикет 19 — Разбор переключений
 
-Источник: `.scratch/release-0.2/issues/19-switch-review-hours.md`.
+Источник: `.scratch/release-0.2-methodology/issues/19-switch-review-hours.md`.
 
 ## TC-0.2-19-01 — Preview не меняет Записи
 **Приоритет:** Critical · **Тип:** UI

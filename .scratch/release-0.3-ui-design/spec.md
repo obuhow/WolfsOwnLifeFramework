@@ -5,7 +5,7 @@ Feature slug: `release-0.3-ui-design`
 Tracker: local markdown (this file)
 Glossary: `CONTEXT.md`
 Visual reference: `Minimal Web Application UI Mockups/WOLF - экран "Сегодня".dc.html`, interpretation **1a**
-Depends on: `release-0.1` (existing calendar OS); defines the UI contract consumed by `release-0.2` (Methodology Layer)
+Depends on: `release-0.1-calendar-os` (existing calendar OS); defines the UI contract consumed by `release-0.2-methodology` (Methodology Layer)
 
 ---
 

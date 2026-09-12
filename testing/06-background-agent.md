@@ -1,6 +1,6 @@
 # Тикет 06 — Фоновый агент
 
-Источник: `.scratch/release-0.2/issues/06-background-agent.md`.
+Источник: `.scratch/release-0.2-methodology/issues/06-background-agent.md`.
 
 ## TC-0.2-06-01 — Ручной запуск создаёт подложку
 **Приоритет:** Critical · **Тип:** UI/API-only setup

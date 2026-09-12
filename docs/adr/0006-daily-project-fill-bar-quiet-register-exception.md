@@ -2,7 +2,7 @@
 
 - Статус: **Принят** (2026-08-31, релиз 1.1) — финальная приёмка владельца получена
 - Контекст: WOLF 1.1, доработка Ежедневника (бэклог справа). Решение владельца из
-  grill-with-docs зафиксировано в `.scratch/release-1.1-planning-daily-ux/grill.md` (реш. A).
+  grill-with-docs зафиксировано в `.scratch/release-1.1-planning-daily-ux/spike/grill.md` (реш. A).
 - Связано: `.scratch/release-0.3-ui-design/spec.md` (визуальный контракт «тихого реестра»),
   `.scratch/release-0.3-ui-design/issues/01`, `.../03`, `.../05`, `.../09`;
   тикет `.scratch/release-1.1-planning-daily-ux/issues/06-daily-project-fill-bar.md`.

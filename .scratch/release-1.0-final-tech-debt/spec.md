@@ -4,7 +4,7 @@ Status: `resolved`
 Feature slug: `release-1.0-final-tech-debt`
 Tracker: local markdown (this file + `bugs/`, `issues/`)
 Glossary: `CONTEXT.md`
-Grill-with-docs: `.scratch/release-1.0-final-tech-debt/grill.md` (результаты доменной прожарки)
+Grill-with-docs: `.scratch/release-1.0-final-tech-debt/spike/grill.md` (результаты доменной прожарки)
 Depends on: `release-0.9-layered-arch` (слой Controller→Service→Repository сложился),
 `release-0.8-load-charts`, `release-0.7-ai-import` (боты Telegram/Max),
 `release-0.6-demo-onboarding` (демо-профили, онбординг), `release-0.4-multiuser-demo`

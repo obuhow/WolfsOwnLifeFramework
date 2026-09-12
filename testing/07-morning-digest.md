@@ -1,6 +1,6 @@
 # Тикет 07 — Утренний обход
 
-Источник: `.scratch/release-0.2/issues/07-morning-digest.md`.
+Источник: `.scratch/release-0.2-methodology/issues/07-morning-digest.md`.
 
 ## TC-0.2-07-01 — Состав страницы «Утро»
 **Приоритет:** Critical · **Тип:** UI

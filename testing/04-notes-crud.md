@@ -1,6 +1,6 @@
 # Тикет 04 — Заметки
 
-Источник: `.scratch/release-0.2/issues/04-notes-crud.md`.
+Источник: `.scratch/release-0.2-methodology/issues/04-notes-crud.md`.
 
 ## TC-0.2-04-01 — Заметка к Проекту
 **Приоритет:** Critical · **Тип:** UI

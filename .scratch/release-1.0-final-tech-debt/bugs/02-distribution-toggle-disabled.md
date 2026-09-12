@@ -3,7 +3,7 @@
 Type: bug
 Status: resolved
 Найдено при: релиз 1.0 (живой сайт, экран создания/редактирования проекта)
-Регрессия в: `release-0.2` (модель `planDistribution`), Status: resolved
+Регрессия в: `release-0.2-methodology` (модель `planDistribution`), Status: resolved
 
 ## Доказательство расхождения
 

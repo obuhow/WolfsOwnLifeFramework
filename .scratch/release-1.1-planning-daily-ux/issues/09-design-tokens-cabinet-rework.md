@@ -55,7 +55,7 @@ destructive-действий, шкала отступов `4,8,12,16,24,28,40px`
 ## Что сделать
 
 Фронт (`web/src`), патч уже готов (файл `wolftokensstep1.patch` в приложении к тикету,
-скопирован в `.scratch/release-1.1-planning-daily-ux/assets/wolftokensstep1.patch`):
+скопирован в `.scratch/release-1.1-planning-daily-ux/spike/assets/wolftokensstep1.patch`):
 
 1. Создать `web/src/tokens.css` содержимым из патча (копирайт-шапка WOLF/AGPL уже внутри).
 2. Применить правки `web/src/style.css`: `@import './tokens.css';` первой строкой,

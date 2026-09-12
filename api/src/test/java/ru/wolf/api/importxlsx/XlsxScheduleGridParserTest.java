@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * Release 1.4 ticket 01 — DB-free tests for the weekly-grid parser.
  *
  * <p>The owner's real {@code Расписание.xlsx} is deliberately NOT in the repository (personal data;
- * see {@code .scratch/xlsx-schedule-import/.gitignore}), so these tests build a synthetic workbook
+ * see {@code .scratch/release-1.4-schedule-import/spike/.gitignore}), so these tests build a synthetic workbook
  * in the SAME format — date serials in row 1 columns D–J, day captions in row 2, time fractions in
  * column C, activities in D–J, and a «Факт» aggregate block at the bottom. The real file was used
  * once, out of band, to verify the parser reproduces the spike's cell/activity totals.
@@ -118,7 +118,7 @@ class XlsxScheduleGridParserTest {
      * The decisive check on the Excel-1900 conversion: serial 46174 is the Monday the file's own
      * row-2 caption calls «Понедельник». An off-by-one in the leap-year compensation shows up here
      * as Sunday 2026-05-31 — which is exactly the error the spike made
-     * (`.scratch/xlsx-schedule-import/bugs/01`), and which would have shifted every imported record
+     * (`.scratch/release-1.4-schedule-import/bugs/01`), and which would have shifted every imported record
      * by one day.
      */
     @Test

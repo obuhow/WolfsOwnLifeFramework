@@ -1,6 +1,6 @@
 # Тикет 10 — Каскад ресурсов
 
-Источник: `.scratch/release-0.2/issues/10-resource-cascade.md`.
+Источник: `.scratch/release-0.2-methodology/issues/10-resource-cascade.md`.
 
 ## TC-0.2-10-01 — Preview сдвига
 **Приоритет:** Critical · **Тип:** UI

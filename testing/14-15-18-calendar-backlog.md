@@ -1,6 +1,6 @@
 # Тикет 14 — Календарь и месячный вид
 
-Источник: `.scratch/release-0.2/issues/14-calendar-month-view.md`.
+Источник: `.scratch/release-0.2-methodology/issues/14-calendar-month-view.md`.
 
 ## TC-0.2-14-01 — Новый маршрут и редирект
 **Приоритет:** Critical · **Тип:** UI
@@ -36,7 +36,7 @@
 
 # Тикет 15 — Бэклог периода
 
-Источник: `.scratch/release-0.2/issues/15-backlog-panel.md`.
+Источник: `.scratch/release-0.2-methodology/issues/15-backlog-panel.md`.
 
 ## TC-0.2-15-01 — Секции недели и месяца
 **Приоритет:** Critical · **Тип:** UI
@@ -77,7 +77,7 @@ Legacy/XLSX импорт с опцией добавления в бэклог п
 
 # Тикет 18 — Планирование и суммарная нагрузка
 
-Источник: `.scratch/release-0.2/issues/18-planning-page-capacity.md`.
+Источник: `.scratch/release-0.2-methodology/issues/18-planning-page-capacity.md`.
 
 ## TC-0.2-18-01 — Маршрут и плановые часы
 **Приоритет:** Critical · **Тип:** UI

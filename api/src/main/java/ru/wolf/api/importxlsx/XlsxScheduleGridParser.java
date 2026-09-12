@@ -43,7 +43,7 @@ import org.springframework.stereotype.Component;
  * {@link ScheduleCell}{@code (date, time, activity)} — ready to be materialised into Записи времени
  * by a later ticket. Nothing here touches the database.
  *
- * <p>The format was established by the spike (`.scratch/xlsx-schedule-import/spike/RESULT.md`,
+ * <p>The format was established by the spike (`.scratch/release-1.4-schedule-import/spike/RESULT.md`,
  * `sample/ANALYSIS.md`) and differs from every assumption the old inline parser in
  * {@link XlsxImportService} made:
  *

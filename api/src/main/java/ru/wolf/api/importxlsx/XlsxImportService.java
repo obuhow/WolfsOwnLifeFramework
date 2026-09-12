@@ -35,7 +35,7 @@ import ru.wolf.api.user.UserRepository;
  * The previous {@code upload} method — which parsed with its own sheet-name/A–G/00:00 assumptions
  * and wrote Записи времени the moment a file arrived — was removed with it, because none of those
  * assumptions hold for the owner's real {@code Расписание.xlsx} and it silently invented a default
- * week when the sheet name carried no date. See {@code .scratch/xlsx-schedule-import/spec.md}
+ * week when the sheet name carried no date. See {@code .scratch/release-1.4-schedule-import/spec.md}
  * («Совместимость с существующим XLSX-импортом»): no other XLSX format is known in this repository,
  * so the parser was replaced rather than duplicated.
  */

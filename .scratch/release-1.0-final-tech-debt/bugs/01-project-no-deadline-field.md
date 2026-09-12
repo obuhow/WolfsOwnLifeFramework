@@ -3,7 +3,7 @@
 Type: bug
 Status: resolved
 Найдено при: релиз 1.0 (живой сайт, экран создания проекта)
-Регрессия в: `release-0.2` (модель `Project` + `CreateProjectRequest`), Status: resolved
+Регрессия в: `release-0.2-methodology` (модель `Project` + `CreateProjectRequest`), Status: resolved
 
 ## Доказательство расхождения
 

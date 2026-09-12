@@ -1,6 +1,6 @@
 # Тикет 03 — Банк Идей
 
-Источник: `.scratch/release-0.2/issues/03-ideas-bank.md`.
+Источник: `.scratch/release-0.2-methodology/issues/03-ideas-bank.md`.
 
 ## TC-0.2-03-01 — CRUD и категории
 **Приоритет:** Critical · **Тип:** UI

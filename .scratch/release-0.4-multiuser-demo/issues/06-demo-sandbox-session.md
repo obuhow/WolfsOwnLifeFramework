@@ -8,7 +8,7 @@
 
 > `UserPurgeService` из тикета 03 **сохраняется** — он нужен админскому удалению пользователя (тикет 04), но по расписанию больше не вызывается.
 
-> Код (`DemoController`, `DemoGcService`) удалён. `DemoFixtureGenerator` сохранён как основа профилей 0.6. Копия сохранена в `.scratch/release-cancelled/issues/`.
+> Код (`DemoController`, `DemoGcService`) удалён. `DemoFixtureGenerator` сохранён как основа профилей 0.6. Копия сохранена в `.scratch/release-0.4-cancelled-demo-sandbox/issues/`.
 
 **What to build:** Публичный вход в демо. `POST /api/v1/demo/session` создаёт **нового временного пользователя** с полным набором фикстур и сроком жизни 24 часа и возвращает готовый JWT. Кнопка «Попробовать демо» на экране входа. Часовой GC удаляет истёкшие аккаунты со всеми данными.
 

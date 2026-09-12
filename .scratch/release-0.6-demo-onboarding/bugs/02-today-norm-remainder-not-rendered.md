@@ -8,7 +8,7 @@ Blocked by:
 
 ## Что не так
 
-Тикет `.scratch/release-0.4-multiuser-demo/issues/07-today-norm.md` помечен
+Тикет `.scratch/release-0.4-multiuser-demo/issues/07-today-daily-norm-remainder.md` помечен
 `resolved`, но поставлена только серверная половина — тот же разрыв, что в баге 09.
 
 Коммит `622ecf7` («feat(release-0.4): ticket 07 today daily norm remainder») изменил

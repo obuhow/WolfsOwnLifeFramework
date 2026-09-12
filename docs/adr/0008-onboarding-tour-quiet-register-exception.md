@@ -7,7 +7,7 @@
 > изменения существа решения; ссылки в тикетах релиза 1.2 обновлены.
 - Контекст: WOLF 1.2, переработка Приветственного тура в сквозной 15-шаговый сценарий.
   Решение владельца из grill-with-docs зафиксировано в
-  `.scratch/release-1.2-onboarding-tour/grill.md` (реш. A).
+  `.scratch/release-1.2-onboarding-tour/spike/grill.md` (реш. A).
 - Связано: `.scratch/release-0.3-ui-design/spec.md` (визуальный контракт «тихого реестра»),
   `.scratch/release-0.3-ui-design/issues/01`, `.../09`;
   `.scratch/release-0.6-demo-onboarding/issues/03-onboarding-tour.md` (Status: `resolved`);

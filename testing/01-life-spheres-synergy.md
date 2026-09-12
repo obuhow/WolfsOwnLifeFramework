@@ -1,6 +1,6 @@
 # Тикет 01 — Сферы жизни и Синергия
 
-Источник: `.scratch/release-0.2/issues/01-life-spheres-synergy.md`.
+Источник: `.scratch/release-0.2-methodology/issues/01-life-spheres-synergy.md`.
 
 ## TC-0.2-01-01 — Seed-справочник Сфер жизни
 **Приоритет:** High · **Тип:** UI

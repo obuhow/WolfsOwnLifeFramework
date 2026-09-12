@@ -1,6 +1,6 @@
 # Тикет 09 — Честный прогноз Gantt
 
-Источник: `.scratch/release-0.2/issues/09-gantt-forecast.md`.
+Источник: `.scratch/release-0.2-methodology/issues/09-gantt-forecast.md`.
 
 ## TC-0.2-09-01 — Прогноз по среднему
 **Приоритет:** Critical · **Тип:** UI/API-only setup
@@ -31,7 +31,7 @@
 
 # Тикет 11 — Импорт и экспорт `wolf-data` v0.2
 
-Источник: `.scratch/release-0.2/issues/11-xlsx-import.md`.
+Источник: `.scratch/release-0.2-methodology/issues/11-xlsx-import.md`.
 
 ## TC-0.2-11-01 — Формат и шаблоны
 **Приоритет:** High · **Тип:** UI/API-only fallback

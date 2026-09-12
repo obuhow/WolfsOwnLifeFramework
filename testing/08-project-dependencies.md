@@ -1,6 +1,6 @@
 # Тикет 08 — Зависимости между Проектами
 
-Источник: `.scratch/release-0.2/issues/08-project-dependencies.md`.
+Источник: `.scratch/release-0.2-methodology/issues/08-project-dependencies.md`.
 
 ## TC-0.2-08-01 — A блокирует B
 **Приоритет:** Critical · **Тип:** UI

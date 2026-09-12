@@ -4,7 +4,7 @@ Status: `ready-for-agent` (прожарка проведена, решения �
 Feature slug: `release-1.2-onboarding-tour`
 Tracker: local markdown (this file + `issues/`)
 Glossary: `CONTEXT.md`
-Grill-with-docs: `.scratch/release-1.2-onboarding-tour/grill.md`
+Grill-with-docs: `.scratch/release-1.2-onboarding-tour/spike/grill.md`
 ADR: `docs/adr/0008-onboarding-tour-quiet-register-exception.md` (черновик, блокирует тикет 01)
 Depends on: `release-0.6-demo-onboarding` (существующий тур, тикеты 02/03/04),
 `release-1.1-planning-daily-ux` (тикет 06 — полоса заполнения проекта; тикет 07 — «Карандаш+»),

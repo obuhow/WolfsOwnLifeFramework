@@ -1,6 +1,6 @@
 # Тикет 16 — Сегодня: Бэклог недели и Чек-лист дня
 
-Источник: `.scratch/release-0.2/issues/16-today-backlog-checklist.md`.
+Источник: `.scratch/release-0.2-methodology/issues/16-today-backlog-checklist.md`.
 
 ## TC-0.2-16-01 — x/y по Бэклогу недели
 **Приоритет:** Critical · **Тип:** UI
@@ -36,7 +36,7 @@
 
 # Тикет 17 — Отчёт «Чек-лист»
 
-Источник: `.scratch/release-0.2/issues/17-checklist-report.md`.
+Источник: `.scratch/release-0.2-methodology/issues/17-checklist-report.md`.
 
 ## TC-0.2-17-01 — История и агрегаты
 **Приоритет:** Critical · **Тип:** UI
@@ -72,7 +72,7 @@
 
 # Тикет 20 — Рутины
 
-Источник: `.scratch/release-0.2/issues/20-routines.md`.
+Источник: `.scratch/release-0.2-methodology/issues/20-routines.md`.
 
 ## TC-0.2-20-01 — CRUD Рутин
 **Приоритет:** Critical · **Тип:** UI
@@ -103,7 +103,7 @@
 
 # Тикет 21 — Кривая нагрузки
 
-Источник: `.scratch/release-0.2/issues/21-load-curve.md`.
+Источник: `.scratch/release-0.2-methodology/issues/21-load-curve.md`.
 
 ## TC-0.2-21-01 — Кривая Проекта
 **Приоритет:** Critical · **Тип:** UI

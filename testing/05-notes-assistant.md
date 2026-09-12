@@ -1,6 +1,6 @@
 # Тикет 05 — NotesAssistant: аудио, транскрипт и resume
 
-Источник: `.scratch/release-0.2/issues/05-notes-assistant-port.md`.
+Источник: `.scratch/release-0.2-methodology/issues/05-notes-assistant-port.md`.
 
 ## TC-0.2-05-01 — Аудио превращается в Заметку с транскриптом
 **Приоритет:** Critical · **Тип:** UI/API-only setup
