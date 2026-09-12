@@ -24,7 +24,7 @@ package ru.wolf.api.importxlsx.dto;
  * carries the run id so the existing questions/resolve screens keep working unchanged.
  *
  * @param importRunId      id of the {@code xlsx_import_run} written by this apply
- * @param created          Записи времени actually inserted
+ * @param created          grouped Записи времени actually inserted
  * @param skippedOccupied  slots left untouched because a Запись already occupied them (SKIP_ALL)
  * @param overwritten      existing Записи времени replaced by the file's data (OVERWRITE_ALL)
  * @param pendingQuestions unresolved import questions after the run (drives the resolve flow)

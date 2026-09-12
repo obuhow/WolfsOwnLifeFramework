@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -199,7 +200,7 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
     }
 
     @Test
-    void apply_creates_one_done_entry_per_cell_and_links_known_activities() throws Exception {
+    void apply_creates_entries_and_links_known_activities() throws Exception {
         WebTestClient authed = authedAdminClient();
         User admin = admin();
 
@@ -224,7 +225,7 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
 
         assertThat(timeEntryRepository.count()).isEqualTo(4);
 
-        // One cell = one 15-minute Запись времени, and time is the user's LOCAL time: 07:00 in the
+        // Non-contiguous cells remain separate entries, and time is the user's LOCAL time: 07:00 in
         // file is 07:00 in startAt, with no UTC conversion anywhere.
         var mondayJava = timeEntryRepository.findByUserIdAndStartAt(
                 admin.getId(), LocalDateTime.of(2026, 6, 1, 7, 0)).orElseThrow();
@@ -239,6 +240,121 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
         assertThat(gym.getStatus()).isEqualTo(TimeEntry.Status.UNKNOWN);
         assertThat(questionRepository.count()).isEqualTo(1);
         assertThat(questionRepository.findAll().get(0).getActivityText()).isEqualTo("Спортзал");
+    }
+
+    @Test
+    void preview_and_apply_materialize_three_contiguous_cells_as_one_long_entry() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+        Delo coding = deloRepository.save(Delo.builder().user(admin).title("Программирование").build());
+        mappingRepository.save(ActivityMapping.builder()
+                .user(admin).activityText("Java").delo(coding).build());
+
+        ImportPreviewResponse preview = preview(authed, contiguousSchedule("Java"));
+
+        assertThat(preview.totalCells()).isEqualTo(3);
+        assertThat(preview.timeEntriesToCreate()).isEqualTo(1);
+
+        ImportApplyResponse applied = apply(authed, contiguousSchedule("Java"));
+
+        assertThat(applied.created()).isEqualTo(1);
+        Map<?, ?> run = authed.get()
+                .uri("/api/v1/import/xlsx/{id}", applied.importRunId())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(Map.class)
+                .returnResult()
+                .getResponseBody();
+        assertThat(run.get("totalCells")).isEqualTo(3);
+        assertThat(run.get("mapped")).isEqualTo(3);
+        assertThat(run.get("unknown")).isEqualTo(0);
+        assertThat(timeEntryRepository.findAll()).singleElement().satisfies(entry -> {
+            assertThat(entry.getStartAt()).isEqualTo(LocalDateTime.of(2026, 6, 1, 9, 0));
+            assertThat(entry.getEndAt()).isEqualTo(LocalDateTime.of(2026, 6, 1, 9, 45));
+            assertThat(entry.getStatus()).isEqualTo(TimeEntry.Status.DONE);
+            assertThat(entry.getDelo().getId()).isEqualTo(coding.getId());
+        });
+    }
+
+    @Test
+    void skip_all_splits_a_long_import_interval_around_an_occupied_middle_slot() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+        Delo coding = deloRepository.save(Delo.builder().user(admin).title("Программирование").build());
+        Delo existing = deloRepository.save(Delo.builder().user(admin).title("Уже было").build());
+        mappingRepository.save(ActivityMapping.builder()
+                .user(admin).activityText("Java").delo(coding).build());
+        LocalDateTime middle = LocalDateTime.of(2026, 6, 1, 9, 15);
+        timeEntryRepository.save(TimeEntry.builder()
+                .user(admin).delo(existing).startAt(middle).endAt(middle.plusMinutes(15))
+                .status(TimeEntry.Status.DONE).build());
+
+        ImportApplyResponse applied = apply(authed, contiguousSchedule("Java"));
+
+        assertThat(applied.created()).isEqualTo(2);
+        assertThat(applied.skippedOccupied()).isEqualTo(1);
+        assertThat(timeEntryRepository.findAll()).hasSize(3);
+        assertThat(timeEntryRepository.findByUserIdAndStartAt(admin.getId(), LocalDateTime.of(2026, 6, 1, 9, 0)))
+                .get().satisfies(entry -> assertThat(entry.getEndAt())
+                        .isEqualTo(LocalDateTime.of(2026, 6, 1, 9, 15)));
+        assertThat(timeEntryRepository.findByUserIdAndStartAt(admin.getId(), LocalDateTime.of(2026, 6, 1, 9, 30)))
+                .get().satisfies(entry -> assertThat(entry.getEndAt())
+                        .isEqualTo(LocalDateTime.of(2026, 6, 1, 9, 45)));
+    }
+
+    @Test
+    void overwrite_all_merges_a_replaced_middle_slot_into_one_long_import_interval() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+        Delo coding = deloRepository.save(Delo.builder().user(admin).title("Программирование").build());
+        Delo existing = deloRepository.save(Delo.builder().user(admin).title("Уже было").build());
+        mappingRepository.save(ActivityMapping.builder()
+                .user(admin).activityText("Java").delo(coding).build());
+        LocalDateTime middle = LocalDateTime.of(2026, 6, 1, 9, 15);
+        timeEntryRepository.save(TimeEntry.builder()
+                .user(admin).delo(existing).startAt(middle).endAt(middle.plusMinutes(15))
+                .status(TimeEntry.Status.DONE).build());
+
+        ImportApplyResponse applied = applyWithStrategy(authed, contiguousSchedule("Java"), "OVERWRITE_ALL");
+
+        assertThat(applied.created()).isEqualTo(1);
+        assertThat(applied.overwritten()).isEqualTo(1);
+        assertThat(timeEntryRepository.findAll()).singleElement().satisfies(entry -> {
+            assertThat(entry.getStartAt()).isEqualTo(LocalDateTime.of(2026, 6, 1, 9, 0));
+            assertThat(entry.getEndAt()).isEqualTo(LocalDateTime.of(2026, 6, 1, 9, 45));
+            assertThat(entry.getDelo().getId()).isEqualTo(coding.getId());
+        });
+    }
+
+    @Test
+    void overwrite_all_preserves_unimported_fragments_of_an_existing_long_entry() throws Exception {
+        WebTestClient authed = authedAdminClient();
+        User admin = admin();
+        Delo coding = deloRepository.save(Delo.builder().user(admin).title("Программирование").build());
+        Delo existing = deloRepository.save(Delo.builder().user(admin).title("Уже было").build());
+        mappingRepository.save(ActivityMapping.builder()
+                .user(admin).activityText("Java").delo(coding).build());
+        LocalDateTime existingStart = LocalDateTime.of(2026, 6, 1, 9, 0);
+        timeEntryRepository.save(TimeEntry.builder()
+                .user(admin).delo(existing).startAt(existingStart).endAt(existingStart.plusHours(1))
+                .status(TimeEntry.Status.DONE).build());
+
+        ImportApplyResponse applied = applyWithStrategy(authed, singleCellSchedule("Java", 9, 15), "OVERWRITE_ALL");
+
+        assertThat(applied.created()).isEqualTo(1);
+        assertThat(applied.overwritten()).isEqualTo(1);
+        assertThat(timeEntryRepository.findAll()).hasSize(3);
+        assertThat(timeEntryRepository.findByUserIdAndStartAt(admin.getId(), LocalDateTime.of(2026, 6, 1, 9, 0)))
+                .get().satisfies(entry -> assertThat(entry.getEndAt())
+                        .isEqualTo(LocalDateTime.of(2026, 6, 1, 9, 15)));
+        assertThat(timeEntryRepository.findByUserIdAndStartAt(admin.getId(), LocalDateTime.of(2026, 6, 1, 9, 15)))
+                .get().satisfies(entry -> {
+                    assertThat(entry.getEndAt()).isEqualTo(LocalDateTime.of(2026, 6, 1, 9, 30));
+                    assertThat(entry.getDelo().getId()).isEqualTo(coding.getId());
+                });
+        assertThat(timeEntryRepository.findByUserIdAndStartAt(admin.getId(), LocalDateTime.of(2026, 6, 1, 9, 30)))
+                .get().satisfies(entry -> assertThat(entry.getEndAt())
+                        .isEqualTo(LocalDateTime.of(2026, 6, 1, 10, 0)));
     }
 
     @Test
@@ -586,6 +702,40 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
         assertThat(eda.isSupporting()).isTrue();
         Delo java = deloRepository.findByUserAndTitleInIgnoreCase(admin(), List.of("java")).get(0);
         assertThat(java.isSupporting()).isFalse();
+    }
+
+    /** Builds one Monday with a single 15-minute cell. */
+    private byte[] singleCellSchedule(String activity, int hour, int minute) throws Exception {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("1-7 июня");
+            Row dates = sheet.createRow(0);
+            for (int day = 0; day < 7; day++) {
+                dates.createCell(3 + day).setCellValue(SERIAL_2026_06_01 + day);
+            }
+            Row row = sheet.createRow(2);
+            row.createCell(2).setCellValue(timeFraction(hour, minute));
+            row.createCell(3).setCellValue(activity);
+            wb.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    /** Builds one Monday with three consecutive 15-minute cells for one activity. */
+    private byte[] contiguousSchedule(String activity) throws Exception {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("1-7 июня");
+            Row dates = sheet.createRow(0);
+            for (int day = 0; day < 7; day++) {
+                dates.createCell(3 + day).setCellValue(SERIAL_2026_06_01 + day);
+            }
+            for (int slot = 0; slot < 3; slot++) {
+                Row row = sheet.createRow(2 + slot);
+                row.createCell(2).setCellValue(timeFraction(9, slot * 15));
+                row.createCell(3).setCellValue(activity);
+            }
+            wb.write(out);
+            return out.toByteArray();
+        }
     }
 
     /** Builds a one-week schedule with one row containing the supplied activity variants. */

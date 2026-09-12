@@ -30,7 +30,7 @@ import java.util.List;
  * estimated.
  *
  * @param weeks               sheets that yielded a dated week
- * @param totalCells          filled activity cells found (each becomes one 15-minute Запись времени)
+ * @param totalCells          filled activity cells found; these remain the source grid units
  * @param from                earliest date in the file
  * @param to                  latest date in the file
  * @param knownActivities     distinct activities already mapped to a Дело (`activity_mapping`)

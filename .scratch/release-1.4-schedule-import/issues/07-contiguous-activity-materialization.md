@@ -7,7 +7,7 @@
 
 **Blocked by:** 02, 03, 05
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 ## Контракт группировки
 
