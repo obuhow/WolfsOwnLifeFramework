@@ -420,21 +420,21 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
         User admin = admin();
         Delo coding = deloRepository.save(Delo.builder().user(admin).title("Программирование").build());
         mappingRepository.save(ActivityMapping.builder()
-                .user(admin).activityText("Java").delo(coding).build());
+                .user(admin).activityText("Java   Script").delo(coding).build());
 
         ImportPreviewResponse preview = preview(authed,
-                scheduleWithActivities(" Java ", "JAVA", "java"));
+                scheduleWithActivities(" Java Script ", "JAVA SCRIPT", "java script"));
 
         assertThat(preview.knownActivities()).isEqualTo(1);
         assertThat(preview.newActivities()).isZero();
         assertThat(preview.activities()).singleElement().satisfies(activity -> {
-            assertThat(activity.activityText()).isEqualTo("Java");
+            assertThat(activity.activityText()).isEqualTo("Java Script");
             assertThat(activity.cells()).isEqualTo(3);
             assertThat(activity.known()).isTrue();
             assertThat(activity.deloTitle()).isEqualTo("Программирование");
         });
 
-        ImportApplyResponse applied = apply(authed, scheduleWithActivities(" Java ", "JAVA", "java"));
+        ImportApplyResponse applied = apply(authed, scheduleWithActivities(" Java Script ", "JAVA SCRIPT", "java script"));
         assertThat(applied.pendingQuestions()).isZero();
         assertThat(questionRepository.count()).isZero();
         assertThat(timeEntryRepository.findAll()).hasSize(3).allSatisfy(entry -> {

@@ -23,18 +23,28 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.wolf.api.user.User;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ActivityMappingRepository extends JpaRepository<ActivityMapping, Long> {
-    /** Finds a mapping across the automatic (trim/case) normalization boundary. */
+    /** Loads mappings in deterministic order for the shared Java-side normalization key. */
+    List<ActivityMapping> findByUserOrderByIdAsc(User user);
+
+    /** Fast path for the common trim/case-only variant. */
     @Query("""
             select m from ActivityMapping m
             where m.user = :user
               and lower(trim(m.activityText)) = lower(trim(:activityText))
             order by m.id asc
             """)
-    Optional<ActivityMapping> findByUserAndNormalizedActivityText(@Param("user") User user,
-                                                                   @Param("activityText") String activityText);
+    Optional<ActivityMapping> findByUserAndTrimmedActivityText(@Param("user") User user,
+                                                                 @Param("activityText") String activityText);
+
+    /** Finds a mapping using exactly the same key as preview/apply normalization. */
+    default Optional<ActivityMapping> findByUserAndNormalizedActivityText(User user, String activityText) {
+        return findByUserAndTrimmedActivityText(user, activityText)
+                .or(() -> ActivityMappingMatcher.firstMatch(findByUserOrderByIdAsc(user), activityText));
+    }
 
     /** Kept for callers that need the exact legacy lookup semantics. */
     Optional<ActivityMapping> findByUserAndActivityText(User user, String activityText);
