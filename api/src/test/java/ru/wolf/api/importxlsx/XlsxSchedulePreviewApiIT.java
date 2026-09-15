@@ -473,7 +473,9 @@ class XlsxSchedulePreviewApiIT extends ApiIntegrationTest {
 
         assertThat(applied.overwritten()).isEqualTo(1);
         assertThat(applied.skippedOccupied()).isZero();
-        assertThat(applied.created()).isEqualTo(3);
+        // Ticket 07 changed created to count inserted aggregated intervals. All four source
+        // cells are separate groups here, including the overwritten one.
+        assertThat(applied.created()).isEqualTo(4);
         assertThat(timeEntryRepository.count()).isEqualTo(4); // replaced in place, no duplicate
 
         // The conflicting slot now carries the file's activity and Дело.
