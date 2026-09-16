@@ -196,17 +196,17 @@
         <div class="fact">
           <div class="fact-k">Стенд</div>
           <div class="fact-v">Поднят</div>
-          <div class="fact-n"><code>api</code> UP · <code>web</code> 200 · <code>db</code> healthy · <code>docs</code> 8090</div>
+          <div class="fact-n"><code>api</code> UP (<code>/api/v1/health</code> = 200) · <code>web</code> 200 · <code>db</code> healthy · <code>docs</code> отдаётся через <code>/docs/</code> контейнера <code>web</code> (свой порт не публикуется)</div>
         </div>
         <div class="fact">
           <div class="fact-k">Прод</div>
           <div class="fact-v">Отвечает</div>
-          <div class="fact-n">wolfs.smallmba.space → 144.124.251.167 · HTTP 200</div>
+          <div class="fact-n">144.124.251.167 · HTTP 200. Имя <code>wolfs.smallmba.space</code> из среды разработки не резолвится, поэтому проверка по имени здесь не выполнялась</div>
         </div>
         <div class="fact">
           <div class="fact-k">Отданные ассеты</div>
           <div class="fact-v">Отстают от develop</div>
-          <div class="fact-n">стенд отдаёт <code>index-B7M2ItiI.js</code> — сборку <code>1.3.0</code> из <code>develop</code> @ <code>7c5aab8</code> (на тот момент — релиз 1.3 + тикеты 01–02 релиза 1.4). С тех пор <code>develop</code> закрыл 1.4 и поднял версию до <code>1.4.0</code>; передеплой стенда не выполнялся</div>
+          <div class="fact-n">стенд отдаёт <code>index-D2ul8YIw.js</code> + <code>index-rJklEFhd.css</code> — сборку <code>1.3.0</code> из deploy-дерева @ <code>660dd35</code> (тикет 04 релиза 1.4; образ <code>api</code> собран 2026-09-11, <code>web</code> — 2026-09-12). В <code>develop</code> с тех пор вошли тикеты 05–07 и версии <code>1.4.0</code>; передеплой не выполнялся</div>
         </div>
         <div class="fact">
           <div class="fact-k">Закрытый релиз</div>
@@ -216,7 +216,7 @@
         <div class="fact">
           <div class="fact-k">Данные стенда</div>
           <div class="fact-v">Целы</div>
-          <div class="fact-n">8 пользователей · 2673 Записи времени · миграции Flyway до <code>V42</code> · том пережил передеплой</div>
+          <div class="fact-n">8 пользователей · 2685 Записей времени · миграции Flyway до <code>V43</code> (применена 2026-09-11, вместе с тикетом 04) · том пережил передеплой</div>
         </div>
       </div>
 
@@ -713,8 +713,8 @@
         </thead>
         <tbody>
           <tr>
-            <td><b>Стенд отстаёт от <code>develop</code> на весь релиз 1.4</b></td>
-            <td>Последний передеплой стенда — из <code>develop</code> @ <code>7c5aab8</code>: образы <code>wolf-web</code>/<code>wolf-api</code> отдают сборку <code>1.3.0</code> (<code>index-B7M2ItiI.js</code>, <code>index-L_8EGIz6.css</code>), <code>/actuator/health</code> = UP, <code>/api/v1/health</code> через nginx = 200, данные целы (8 пользователей, миграция V42). После этого <code>develop</code> получил тикеты 03–07 релиза 1.4 (включая миграцию <b>V43</b>) и версии <code>1.4.0</code>, но новые образы не собирались.</td>
+            <td><b>Стенд отстаёт от <code>develop</code> на тикеты 05–07 релиза 1.4</b></td>
+            <td>Последний передеплой — deploy-дерево @ <code>660dd35</code>: в нём тикеты 01–04 релиза 1.4, миграция <b>V43</b> применена на стенде 2026-09-11 07:33, <code>/api/v1/health</code> = 200, данные целы (8 пользователей, 2685 Записей времени). Проверка по работающему jar: <code>ImportConflictStrategy</code> (тикет 03) внутри есть, <code>ActivityTextNormalizer</code> (05) и <code>ScheduleEntryGrouper</code> (07) — нет. Образ <code>api</code> собран 2026-09-11, <code>web</code> — 2026-09-12, версия в сборке всё ещё <code>1.3.0</code>. Нормализация с её фиксом (05), склейка в WeekView (06) и агрегация интервалов (07) живут только в <code>develop</code>: агрегированных Записей на стенде нет, каждая ячейка по-прежнему пишется отдельно.</td>
             <td><span class="chip">нужен передеплой</span></td>
           </tr>
           <tr>
@@ -786,7 +786,7 @@
       <h2>Ещё не решено<span class="h2-sub">Явно зафиксированные пробелы — чтобы они не всплыли посреди реализации</span></h2>
       <ul>
         <li><b>Статус бага Б-2 релиза 1.3</b> — исправление смёржено, но баг оставлен <code>open</code>: непонятно, что делать с <code>resolved</code> у тикета 06 релиза 1.1, который поставил лишь половину вертикального среза. Решение — за владельцем.</li>
-        <li><b>Стенд на сборке 1.3.0</b> — релиз 1.4 закрыт в <code>develop</code>, но образы <code>wolf-web</code>/<code>wolf-api</code> не пересобирались: миграция <b>V43</b> и вся логика импорта на стенде пока не работают. Нужен передеплой.</li>
+        <li><b>Стенд на сборке 1.3.0 (код тикета 04)</b> — релиз 1.4 закрыт в <code>develop</code>, но образы <code>wolf-web</code>/<code>wolf-api</code> не пересобирались: в работающем jar нет нормализации (05), склейки в WeekView (06) и агрегации интервалов (07). Нужен передеплой.</li>
         <li><b>Числа спайка против прод-парсера</b> — реальный файл даёт 2117 ячеек и 78 активностей, эталон разведки (1943/67) отменён как приёмочный критерий и разобран в <code>bugs/01–03</code> релиза 1.4.</li>
         <li><b>Личные данные вне репозитория</b> — реальный <code>Расписание.xlsx</code> намеренно gitignored, поэтому автотесты 1.4 идут на синтетическом файле того же формата, а сверка с настоящим делается одноразовым харнессом вручную. Это осознанный размен: воспроизводимость тестов против приватности полугода жизни владельца.</li>
         <li><b>Хвост релиза 0.4</b> — тикет <code>09</code> (сквозная приёмка трёх путей в живом браузере) остаётся <code>open</code>; остальной код 0.4 смёржен.</li>
