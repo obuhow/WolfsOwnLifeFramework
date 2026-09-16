@@ -439,19 +439,13 @@ async function removeFromBacklog(deloId) {
   }
 }
 
-/** Identity of a slot content for merge: same delo OR same ad-hoc text + same status. */
-function entryMergeKey(entry) {
-  if (!entry) return null
-  if (entry.deloId != null) return `d:${entry.deloId}:${entry.status}`
-  if (entry.adHocText) return `a:${entry.adHocText}:${entry.status}`
-  return null
-}
-
 /**
  * Per day column: for each visible row either a block-start cell (with rowspan)
- * or a continuation (own real slot kept for quick-edit sub-slot clicks — ticket 07)
+ * or a continuation (own real slot kept for quick-edit sub-slot clicks — ticket 06/07)
  * or an empty single cell.
  * Contiguous same-name entries render as one block: "Сон 00:00–07:00".
+ * The merge contract itself lives in weekViewBlocks.js (entryMergeKey) so the
+ * legacy 15-min visual merge is not re-implemented here.
  */
 const dayBlocks = computed(() => {
   const rows = visibleTimeRows.value

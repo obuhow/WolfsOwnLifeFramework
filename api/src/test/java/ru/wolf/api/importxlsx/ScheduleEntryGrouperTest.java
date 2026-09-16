@@ -58,6 +58,22 @@ class ScheduleEntryGrouperTest {
     }
 
     @Test
+    void status_change_starts_a_new_group() {
+        LocalDate day = LocalDate.of(2026, 6, 1);
+        List<ScheduleEntryGrouper.Candidate> cells = List.of(
+                candidate("09:00", "Java", 7L, day, TimeEntry.Status.DONE),
+                candidate("09:15", "Java", 7L, day, TimeEntry.Status.PLANNED),
+                candidate("09:30", "Java", 7L, day, TimeEntry.Status.PLANNED),
+                candidate("09:45", "Java", 7L, day, TimeEntry.Status.DONE));
+
+        List<ScheduleEntryGrouper.Group> groups = ScheduleEntryGrouper.group(cells);
+
+        assertThat(groups).extracting(ScheduleEntryGrouper.Group::startAt)
+                .containsExactly(day.atTime(9, 0), day.atTime(9, 15), day.atTime(9, 45));
+        assertThat(groups.get(1).endAt()).isEqualTo(day.atTime(9, 45));
+    }
+
+    @Test
     void duplicate_source_slots_are_rejected_before_grouping() {
         List<ScheduleEntryGrouper.Candidate> cells = List.of(
                 candidate("09:00", "Java", 7L),
@@ -74,10 +90,16 @@ class ScheduleEntryGrouperTest {
 
     private static ScheduleEntryGrouper.Candidate candidate(String time, String activity, Long deloId,
                                                               LocalDate date) {
+        return candidate(time, activity, deloId, date,
+                deloId == null ? TimeEntry.Status.UNKNOWN : TimeEntry.Status.DONE);
+    }
+
+    private static ScheduleEntryGrouper.Candidate candidate(String time, String activity, Long deloId,
+                                                             LocalDate date, TimeEntry.Status status) {
         return new ScheduleEntryGrouper.Candidate(
                 new XlsxScheduleGridParser.ScheduleCell(date, LocalTime.parse(time), activity, "week"),
                 ActivityTextNormalizer.key(activity),
                 deloId,
-                deloId == null ? TimeEntry.Status.UNKNOWN : TimeEntry.Status.DONE);
+                status);
     }
 }

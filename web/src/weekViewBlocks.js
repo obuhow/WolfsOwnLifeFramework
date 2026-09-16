@@ -45,6 +45,18 @@ function parseSlotLabel(startAt) {
 }
 
 /**
+ * Identity of a slot content for merge (ticket 06): same Delo OR same ad-hoc
+ * text, plus same status. Adjacent legacy 15-min rows with one merge key
+ * render as ONE block without touching the DB.
+ */
+export function entryMergeKey(entry) {
+  if (!entry) return null
+  if (entry.deloId != null) return `d:${entry.deloId}:${entry.status}`
+  if (entry.adHocText) return `a:${entry.adHocText}:${entry.status}`
+  return null
+}
+
+/**
  * Absolute startAt of a given visible row, mapped onto a specific day's timeline.
  * `firstDay` is days[0], used when rows carry absolute day-start offsets.
  */
@@ -104,16 +116,26 @@ export function buildDayBlocks(day, rows, entryCovering, firstDay) {
       i += 1
       continue
     }
+    const mergeKey = entryMergeKey(entry)
+    const covered = [entry]
     let j = i + 1
     while (j < rows.length) {
       const s2 = rowSlotStart(day, rows[j], firstDay)
       const e2 = entryCovering(s2)
-      if (!e2 || e2.id !== entry.id) break
+      if (!e2) break
+      const sameRecord = e2.id != null && e2.id === entry.id
+      const sameKey = mergeKey !== null && entryMergeKey(e2) === mergeKey
+      if (!sameRecord && !sameKey) break
+      covered.push(e2)
       j += 1
     }
     const span = j - i
+    // The block spans the FIRST covered startAt to the LAST covered endAt, so a
+    // visual merge of legacy 15-min rows reads as one real interval, not 15 min.
     const startLabel = parseSlotLabel(entry.startAt)
-    const endLabel = parseSlotLabel(entry.endAt)
+    const lastEntry = covered[covered.length - 1]
+    const endAt = lastEntry.endAt || addMinutes(entry.startAt, span * 15)
+    const endLabel = parseSlotLabel(endAt)
     const name = entry.deloTitle || entry.adHocText || ''
     const displayLabel = span > 1 ? `${name} ${startLabel}–${endLabel}` : name
     cells.push({
@@ -134,11 +156,14 @@ export function buildDayBlocks(day, rows, entryCovering, firstDay) {
     })
     for (let k = i + 1; k < j; k++) {
       const kSlotStart = rowSlotStart(day, rows[k], firstDay)
+      // Each continuation keeps ITS OWN covering record: quick-edit of a sub-slot
+      // must never target a neighbouring legacy row's entry.
+      const kEntry = entryCovering(kSlotStart) || entry
       cells.push({
         kind: 'cont',
         rowIndex: k,
         span: 0,
-        slot: { startAt: kSlotStart, label: rows[k].label, entry, date: day.date, isNight: rows[k].isNight, minute: rows[k].minute, hour: rows[k].hour },
+        slot: { startAt: kSlotStart, label: rows[k].label, entry: kEntry, date: day.date, isNight: rows[k].isNight, minute: rows[k].minute, hour: rows[k].hour },
         displayLabel: '',
         rangeLabel: ''
       })
