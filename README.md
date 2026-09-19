@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/dist/logo.svg" alt="WOLF" width="120" />
+  <img src="web/public/logo.svg" alt="WOLF" width="120" />
 </p>
 
 <h1 align="center">WOLF — Wolf's Own Life Framework</h1>
