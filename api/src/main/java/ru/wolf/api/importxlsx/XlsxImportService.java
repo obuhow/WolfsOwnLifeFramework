@@ -25,6 +25,10 @@ import ru.wolf.api.timeentry.TimeEntry;
 import ru.wolf.api.timeentry.TimeEntryRepository;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
+import ru.wolf.api.importxlsx.dto.NormalizeRequest;
+import ru.wolf.api.importxlsx.dto.NormalizeResponse;
+
+import java.util.Optional;
 
 /**
  * Run-level operations on an XLSX import: reading a run's summary and resolving the questions it
@@ -47,11 +51,12 @@ public class XlsxImportService {
     private final ActivityMappingRepository mappings;
     private final XlsxImportRunRepository runs;
     private final XlsxImportQuestionRepository questions;
+    private final ActivityNormalizer normalizer;
 
     public XlsxImportService(UserRepository users, DeloRepository delos, TimeEntryRepository entries,
                                 ActivityMappingRepository mappings, XlsxImportRunRepository runs,
-                                XlsxImportQuestionRepository questions) {
-        this.users = users; this.delos = delos; this.entries = entries; this.mappings = mappings; this.runs = runs; this.questions = questions;
+                                XlsxImportQuestionRepository questions, ActivityNormalizer normalizer) {
+        this.users = users; this.delos = delos; this.entries = entries; this.mappings = mappings; this.runs = runs; this.questions = questions; this.normalizer = normalizer;
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +106,24 @@ public class XlsxImportService {
         for (XlsxImportQuestion q : questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id)) if (q.getActivityText().equals(request.activityText())) { entries.findByUserIdAndStartAt(user.getId(), q.getStartAt()).ifPresent(e -> { e.setDelo(mapping.getDelo()); e.setStatus(TimeEntry.Status.DONE); entries.save(e); }); q.setResolved(true); questions.save(q); }
         run.setPendingQuestions(questions.findByImportRunIdAndResolvedFalseOrderByStartAtAsc(id).size()); run.setStatus(run.getPendingQuestions() == 0 ? XlsxImportRun.Status.DONE : XlsxImportRun.Status.PAUSED); runs.save(run);
         return toResponse(run);
+    }
+
+    /**
+     * Release 1.4 ticket 05, stage 2 (И-E): records a confirmed semantic merge of an activity text
+     * onto an existing Дело, so the importer no longer treats it as UNKNOWN. The merge is persisted
+     * only when {@code acknowledged} is explicitly true — the system never decides a synonym on its
+     * own. Returns the resulting mapping, or {@code null} when not acknowledged (caller keeps the
+     * activity UNKNOWN and its import question).
+     */
+    @Transactional
+    public NormalizeResponse normalize(String username, NormalizeRequest request) {
+        User user = current(username);
+        if (request.acknowledged() == null || !request.acknowledged()) {
+            return null;
+        }
+        Delo delo = delos.findByUserAndId(user, request.deloId()).orElseThrow();
+        ActivityMapping mapping = normalizer.normalize(user, request.activityText(), Optional.of(delo), true);
+        return new NormalizeResponse(mapping.getActivityText(), mapping.getDelo().getId(), mapping.getDelo().getTitle());
     }
 
     private User current(String username) { return users.findByUsername(username).orElseThrow(); }

@@ -72,6 +72,7 @@ public class XlsxSchedulePreviewService {
     private final XlsxImportRunRepository runs;
     private final XlsxImportQuestionRepository questions;
     private final XlsxScheduleGridParser parser;
+    private final ActivityNormalizer normalizer;
 
     /** Parses the file and reports what applying it would do. Writes nothing. */
     @Transactional(readOnly = true)
@@ -136,7 +137,8 @@ public class XlsxSchedulePreviewService {
             if (existingEntry.isPresent()) {
                 if (overwrite) {
                     TimeEntry e = existingEntry.get();
-                    ActivityMapping mapping = mappings.findByUserAndActivityText(user, cell.activity()).orElse(null);
+                    // Stage-1 key so «Сон»/«сон» resolve to the same mapping (И-E).
+                    ActivityMapping mapping = mappings.findByUserAndActivityTextIgnoreCase(user, normalizer.canonicalStage1(cell.activity())).orElse(null);
                     e.setDelo(mapping == null ? null : mapping.getDelo());
                     e.setStartAt(cell.startAt());
                     e.setEndAt(cell.endAt());
@@ -159,7 +161,8 @@ public class XlsxSchedulePreviewService {
                 skippedOccupied++;
                 continue;
             }
-            ActivityMapping mapping = mappings.findByUserAndActivityText(user, cell.activity()).orElse(null);
+            // Stage-1 key so «Сон»/«сон» resolve to the same mapping (И-E).
+            ActivityMapping mapping = mappings.findByUserAndActivityTextIgnoreCase(user, normalizer.canonicalStage1(cell.activity())).orElse(null);
             entries.save(TimeEntry.builder()
                     .user(user)
                     .delo(mapping == null ? null : mapping.getDelo())
@@ -194,10 +197,14 @@ public class XlsxSchedulePreviewService {
     /** Builds the preview summary from parsed cells; every number is counted, never estimated. */
     private ImportPreviewResponse summarise(User user, ParsedSchedule parsed,
                                             Optional<XlsxImportRun> existingRun) {
-        Map<String, Integer> counts = new LinkedHashMap<>();
+        // Stage-1 normalisation (И-E): «Сон»/«сон»/« Сон » are one activity. Group by the canonical
+        // (trim+lowercase) key, but keep the first original spelling so the preview still reads
+        // naturally — the collapse is in the count and the mapping, not in the displayed text.
+        Map<String, ActivityGroup> groups = new LinkedHashMap<>();
         int conflictingCells = 0;
         for (ScheduleCell cell : parsed.cells()) {
-            counts.merge(cell.activity(), 1, Integer::sum);
+            String key = normalizer.canonicalStage1(cell.activity());
+            groups.computeIfAbsent(key, k -> new ActivityGroup(cell.activity())).cells += 1;
             if (entries.findByUserIdAndStartAt(user.getId(), cell.startAt()).isPresent()) {
                 conflictingCells++;
             }
@@ -205,13 +212,17 @@ public class XlsxSchedulePreviewService {
 
         List<ActivityPreview> activities = new ArrayList<>();
         int known = 0;
-        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-            ActivityMapping mapping = mappings.findByUserAndActivityText(user, entry.getKey()).orElse(null);
+        for (Map.Entry<String, ActivityGroup> entry : groups.entrySet()) {
+            ActivityMapping mapping = mappings.findByUserAndActivityTextIgnoreCase(user, entry.getKey()).orElse(null);
             Delo delo = mapping == null ? null : mapping.getDelo();
             if (mapping != null) {
                 known++;
             }
-            activities.add(new ActivityPreview(entry.getKey(), entry.getValue(),
+            // When the activity is already taught, show the stored spelling (the user's choice);
+            // otherwise show the first spelling actually seen in the file. Stage-1 only collapses
+            // the count/key, it never rewrites what the user wrote.
+            String display = mapping != null ? mapping.getActivityText() : entry.getValue().display;
+            activities.add(new ActivityPreview(display, entry.getValue().cells,
                     mapping != null, delo == null ? null : delo.getTitle()));
         }
         activities.sort(Comparator.comparingInt(ActivityPreview::cells).reversed()
@@ -247,6 +258,16 @@ public class XlsxSchedulePreviewService {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (Exception e) {
             throw new IllegalStateException("SHA-256 недоступен", e);
+        }
+    }
+
+    /** One preview activity group: collapses stage-1 variants but remembers a display spelling. */
+    private static final class ActivityGroup {
+        final String display;
+        int cells;
+
+        ActivityGroup(String display) {
+            this.display = display;
         }
     }
 }

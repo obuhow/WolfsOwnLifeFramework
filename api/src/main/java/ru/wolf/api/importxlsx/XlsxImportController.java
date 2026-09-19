@@ -25,6 +25,8 @@ import org.springframework.web.multipart.MultipartFile;
 import ru.wolf.api.importxlsx.XlsxImportService.*;
 import ru.wolf.api.importxlsx.dto.ImportApplyResponse;
 import ru.wolf.api.importxlsx.dto.ImportPreviewResponse;
+import ru.wolf.api.importxlsx.dto.NormalizeRequest;
+import ru.wolf.api.importxlsx.dto.NormalizeResponse;
 
 /**
  * Release 1.4 ticket 02: the schedule import is now two explicit steps — preview, then apply.
@@ -63,6 +65,17 @@ public class XlsxImportController {
     @GetMapping("/xlsx/{id}")
     public ResponseEntity<ImportResponse> get(Authentication auth, @PathVariable Long id) {
         return ResponseEntity.ok(service.get(auth.getName(), id));
+    }
+
+    /**
+     * Release 1.4 ticket 05, stage 2 (И-E): the user explicitly confirms that an activity text
+     * means the same as an existing Дело, so the importer may merge them via {@code activity_mapping}
+     * instead of raising a separate UNKNOWN question. Without acknowledgment the call is a no-op
+     * merge (returns null) — the system never guesses a semantic equivalence on its own.
+     */
+    @PostMapping("/xlsx/normalize")
+    public ResponseEntity<NormalizeResponse> normalize(Authentication auth, @RequestBody NormalizeRequest request) {
+        return ResponseEntity.ok(service.normalize(auth.getName(), request));
     }
 
     @PostMapping("/xlsx/{id}/resolve")

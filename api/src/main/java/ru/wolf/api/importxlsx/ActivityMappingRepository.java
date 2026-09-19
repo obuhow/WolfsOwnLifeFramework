@@ -23,10 +23,27 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.wolf.api.user.User;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ActivityMappingRepository extends JpaRepository<ActivityMapping, Long> {
     Optional<ActivityMapping> findByUserAndActivityText(User user, String activityText);
+
+    /**
+     * Lookup ignoring letter case (stage-1 of ticket 05: {@code «Сон»}/{@code «сон»} are one
+     * activity). Done in Java, not with SQL {@code lower()}: the Alpine/PostgreSQL default collation
+     * is {@code C}, whose {@code lower()} does NOT fold Cyrillic, so a SQL {@code lower(a)=lower(b)}
+     * comparison would wrongly miss every Russian spelling. Java's {@code toLowerCase()} folds
+     * Cyrillic correctly, so we fetch the user's mappings and compare the trimmed, lower-cased text.
+     */
+    List<ActivityMapping> findByUser(User user);
+
+    default Optional<ActivityMapping> findByUserAndActivityTextIgnoreCase(User user, String text) {
+        String key = text == null ? "" : text.trim().toLowerCase();
+        return findByUser(user).stream()
+                .filter(m -> (m.getActivityText() == null ? "" : m.getActivityText().trim().toLowerCase()).equals(key))
+                .findFirst();
+    }
 
     /**
      * Соответствия «текст активности → Дело» ссылаются на Дела профиля;
