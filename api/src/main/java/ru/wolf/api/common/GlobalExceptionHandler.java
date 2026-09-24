@@ -22,6 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import ru.wolf.api.agentchat.AgentChatProviderException;
+import ru.wolf.api.agentchat.ChatSessionNotFoundException;
 import ru.wolf.api.demo.DemoDataConflictException;
 import ru.wolf.api.goal.DuplicateGoalPriorityException;
 import ru.wolf.api.idea.IdeaAlreadyPromotedException;
@@ -33,6 +35,20 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ChatSessionNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleChatSessionNotFound(ChatSessionNotFoundException ex) {
+        Map<String, String> body = new HashMap<>();
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(AgentChatProviderException.class)
+    public ResponseEntity<Map<String, String>> handleAgentChatProvider(AgentChatProviderException ex) {
+        Map<String, String> body = new HashMap<>();
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
+    }
 
     @ExceptionHandler(ProjectDependencyCycleException.class)
     public ResponseEntity<Map<String, String>> handleProjectDependencyCycle(ProjectDependencyCycleException ex) {

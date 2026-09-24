@@ -1,6 +1,6 @@
 # Тикет 03 — Порт агента и чат-эндпоинт
 
-Status: needs-triage
+Status: resolved
 Blocked by: 01, 02
 Type: task
 

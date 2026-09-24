@@ -1,6 +1,6 @@
 # Тикет 02 — Контекст агента и динамика расписания
 
-Status: needs-triage
+Status: resolved
 Blocked by:
 Type: task
 

@@ -1,6 +1,6 @@
 # Тикет 01 — Хранение переписки и история API
 
-Status: needs-triage
+Status: claimed
 Blocked by:
 Type: task
 
