@@ -1,6 +1,6 @@
 # Тикет 04 — Предлагаемые действия и подтверждение
 
-Status: needs-triage
+Status: claimed
 Blocked by: 03
 Type: task
 

@@ -115,6 +115,17 @@ public class ChatService {
         return recent;
     }
 
+    ChatSession sessionEntity(User user, Long sessionId) {
+        return findSession(user, sessionId);
+    }
+
+    ChatMessage messageEntity(User user, Long sessionId, Long messageId) {
+        ChatSession session = findSession(user, sessionId);
+        return messageRepository.findById(messageId)
+                .filter(message -> message.getSession().getId().equals(session.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Сообщение чата не найдено"));
+    }
+
     private void validatePage(int page, int limit) {
         if (page < 0) throw new IllegalArgumentException("Номер страницы не может быть отрицательным");
         if (limit < 1 || limit > MAX_PAGE_SIZE) {

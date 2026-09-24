@@ -11,6 +11,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.wolf.api.agentchat.dto.AgentChatResponse;
 import ru.wolf.api.agentchat.dto.ChatMessageResponse;
 import ru.wolf.api.agentchat.dto.ChatSessionResponse;
+import ru.wolf.api.delo.DeloRepository;
 import ru.wolf.api.support.ApiIntegrationTest;
 
 import java.util.List;
@@ -41,6 +42,9 @@ class AgentChatApiIT extends ApiIntegrationTest {
 
     @Autowired
     ChatService chatService;
+
+    @Autowired
+    DeloRepository deloRepository;
 
     @Autowired
     ru.wolf.api.user.UserRepository userRepository;
@@ -120,6 +124,45 @@ class AgentChatApiIT extends ApiIntegrationTest {
                 .isEqualTo("Провайдер временно недоступен");
 
         assertThat(messageRepository.count()).isZero();
+    }
+
+    @Test
+    void proposed_action_changes_data_only_after_confirmation_and_repeat_is_idempotent() {
+        WebTestClient client = authedAdminClient();
+        ChatSessionResponse session = createSession(client);
+        long before = deloRepository.count();
+        fakeAgent.setResponse("Могу создать Дело после подтверждения");
+        fakeAgent.setAction(new AgentAction(AgentAction.Type.CREATE_DELO, null,
+                java.util.Map.of("title", "Подтверждённое Дело")));
+
+        AgentChatResponse response = client.post()
+                .uri("/api/v1/agent-chat/sessions/{id}/chat", session.id())
+                .bodyValue(java.util.Map.of("content", "Создай Дело"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(AgentChatResponse.class)
+                .returnResult().getResponseBody();
+
+        assertThat(deloRepository.count()).isEqualTo(before);
+        assertThat(response.proposedAction().type()).isEqualTo(AgentAction.Type.CREATE_DELO);
+
+        client.post()
+                .uri("/api/v1/agent-chat/sessions/{sessionId}/actions/{actionId}/confirm",
+                        session.id(), response.proposedAction().id())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.status").isEqualTo("APPLIED")
+                .jsonPath("$.applied").isEqualTo(true);
+        assertThat(deloRepository.count()).isEqualTo(before + 1);
+
+        client.post()
+                .uri("/api/v1/agent-chat/sessions/{sessionId}/actions/{actionId}/confirm",
+                        session.id(), response.proposedAction().id())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.status").isEqualTo("APPLIED")
+                .jsonPath("$.applied").isEqualTo(false);
+        assertThat(deloRepository.count()).isEqualTo(before + 1);
     }
 
     @Test

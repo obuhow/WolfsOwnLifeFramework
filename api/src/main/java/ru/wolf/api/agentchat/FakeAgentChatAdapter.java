@@ -1,5 +1,6 @@
 package ru.wolf.api.agentchat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +13,9 @@ public class FakeAgentChatAdapter implements AgentChatPort {
 
     private final AtomicReference<String> response = new AtomicReference<>("Тестовый ответ агента");
     private final AtomicReference<String> failure = new AtomicReference<>();
+    private final AtomicReference<AgentAction> action = new AtomicReference<>();
     private final AtomicReference<Request> lastRequest = new AtomicReference<>();
+    private final AgentActionParser responseParser = new AgentActionParser(new ObjectMapper());
 
     @Override
     public Response complete(Request request) {
@@ -21,7 +24,8 @@ public class FakeAgentChatAdapter implements AgentChatPort {
         if (error != null) {
             throw new AgentChatProviderException(error);
         }
-        return new Response(response.get());
+        AgentAction proposed = action.get();
+        return proposed == null ? responseParser.parse(response.get()) : new Response(response.get(), proposed);
     }
 
     public void setResponse(String value) {
@@ -33,6 +37,10 @@ public class FakeAgentChatAdapter implements AgentChatPort {
         failure.set(message);
     }
 
+    public void setAction(AgentAction value) {
+        action.set(value);
+    }
+
     public Request lastRequest() {
         return lastRequest.get();
     }
@@ -40,6 +48,7 @@ public class FakeAgentChatAdapter implements AgentChatPort {
     public void reset() {
         response.set("Тестовый ответ агента");
         failure.set(null);
+        action.set(null);
         lastRequest.set(null);
     }
 }

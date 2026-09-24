@@ -25,7 +25,11 @@ public interface AgentChatPort {
         }
     }
 
-    record Response(String content) {
+    record Response(String content, AgentAction action) {
+        public Response(String content) {
+            this(content, null);
+        }
+
         public Response {
             if (content == null || content.isBlank()) {
                 throw new IllegalArgumentException("Ответ агента не может быть пустым");

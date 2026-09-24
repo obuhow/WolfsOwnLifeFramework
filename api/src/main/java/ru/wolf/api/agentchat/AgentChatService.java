@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.agentchat.dto.AgentChatResponse;
 import ru.wolf.api.agentchat.dto.ChatMessageResponse;
+import ru.wolf.api.agentchat.dto.ProposedActionResponse;
 import ru.wolf.api.agentcontext.AgentContext;
 import ru.wolf.api.agentcontext.AgentContextService;
 import ru.wolf.api.note.assistant.LlmDisabledException;
@@ -30,12 +31,16 @@ public class AgentChatService {
             + "и историю диалога; не выдумывай отсутствующие числа и факты. Если данных не хватает, "
             + "прямо скажи об этом. Термины WOLF: Проект, Дело, Запись времени, Рутина и Область жизни. "
             + "Никаких действий в системе самостоятельно: только объяснения и предложения; применение "
-            + "действий будет доступно отдельным подтверждением пользователя.";
+            + "действий будет доступно отдельным подтверждением пользователя. Если предлагаешь одно "
+            + "из разрешённых действий, верни JSON-объект с полями text и action. В action укажи type, "
+            + "необязательный targetId и fields; для ответа без действия используй action:null. "
+            + "Не предлагай типы действий вне этого списка.";
 
     private final UserRepository userRepository;
     private final ChatService chatService;
     private final AgentContextService contextService;
     private final AgentChatPort agent;
+    private final AgentActionService actionService;
     private final NotesAssistantProperties properties;
 
     @Transactional
@@ -77,7 +82,13 @@ public class AgentChatService {
                 user, sessionId, ChatMessage.Role.USER, content);
         ChatMessageResponse assistantMessage = chatService.appendMessage(
                 user, sessionId, ChatMessage.Role.ASSISTANT, reply.content());
-        return new AgentChatResponse(userMessage, assistantMessage, properties.getModel());
+        ProposedActionResponse proposedAction = null;
+        if (reply.action() != null) {
+            ChatSession session = chatService.sessionEntity(user, sessionId);
+            ChatMessage assistantEntity = chatService.messageEntity(user, sessionId, assistantMessage.id());
+            proposedAction = actionService.createProposal(user, session, assistantEntity, reply.action());
+        }
+        return new AgentChatResponse(userMessage, assistantMessage, properties.getModel(), proposedAction);
     }
 
     private String providerMessage() {

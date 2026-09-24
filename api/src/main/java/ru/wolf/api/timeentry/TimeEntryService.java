@@ -427,6 +427,28 @@ public class TimeEntryService {
         return ResponseEntity.noContent().build();
     }
 
+    /** Explicit mutation seam for confirmed agent actions; ownership is checked by id. */
+    @Transactional
+    public ResponseEntity<TimeEntryResponse> updateEntry(String username, Long id, PutTimeEntryRequest request) {
+        User user = currentUser(username);
+        TimeEntry existing = timeEntryRepository.findById(id)
+                .filter(entry -> entry.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Запись времени не найдена"));
+        timeEntryRepository.delete(existing);
+        timeEntryRepository.flush();
+        return putEntry(username, request);
+    }
+
+    /** Idempotent delete seam for confirmed agent actions; deleting another user's entry is impossible. */
+    @Transactional
+    public void deleteEntry(String username, Long id) {
+        User user = currentUser(username);
+        timeEntryRepository.findById(id)
+                .filter(entry -> entry.getUser().getId().equals(user.getId()))
+                .ifPresentOrElse(timeEntryRepository::delete,
+                        () -> { throw new IllegalArgumentException("Запись времени не найдена"); });
+    }
+
     /** Confirm by interval id or by startAt of the interval. */
     @Transactional
     public ResponseEntity<TimeEntryResponse> confirmOne(

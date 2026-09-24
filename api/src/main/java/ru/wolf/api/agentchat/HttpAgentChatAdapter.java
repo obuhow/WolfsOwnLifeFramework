@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import ru.wolf.api.note.assistant.NotesAssistantProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Locale;
@@ -18,9 +19,11 @@ public class HttpAgentChatAdapter implements AgentChatPort {
 
     private final RestClient client;
     private final NotesAssistantProperties properties;
+    private final AgentActionParser actionParser;
 
     public HttpAgentChatAdapter(RestClient.Builder builder, NotesAssistantProperties properties) {
         this.properties = properties;
+        this.actionParser = new AgentActionParser(new ObjectMapper());
         this.client = builder.baseUrl(properties.getUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -43,7 +46,7 @@ public class HttpAgentChatAdapter implements AgentChatPort {
                     || response.choices().get(0).message().content().isBlank()) {
                 throw new AgentChatProviderException("LLM-провайдер вернул пустой ответ");
             }
-            return new Response(response.choices().get(0).message().content());
+            return actionParser.parse(response.choices().get(0).message().content());
         } catch (AgentChatProviderException ex) {
             throw ex;
         } catch (RestClientException ex) {

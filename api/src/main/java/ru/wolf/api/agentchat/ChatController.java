@@ -23,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import ru.wolf.api.agentchat.dto.AgentChatRequest;
+import ru.wolf.api.agentchat.dto.AgentActionApplyResponse;
 import ru.wolf.api.agentchat.dto.AgentChatResponse;
 import ru.wolf.api.agentchat.dto.ChatMessageRequest;
 import ru.wolf.api.agentchat.dto.ChatMessageResponse;
@@ -37,6 +38,7 @@ public class ChatController {
 
     private final ChatService chatService;
     private final AgentChatService agentChatService;
+    private final AgentActionService actionService;
 
     @GetMapping("/sessions")
     public ResponseEntity<List<ChatSessionResponse>> listSessions(Authentication authentication) {
@@ -84,5 +86,23 @@ public class ChatController {
     ) {
         return ResponseEntity.ok(agentChatService.complete(
                 authentication.getName(), sessionId, request.content()));
+    }
+
+    @PostMapping("/sessions/{sessionId}/actions/{proposalId}/confirm")
+    public ResponseEntity<AgentActionApplyResponse> confirmAction(
+            Authentication authentication,
+            @PathVariable Long sessionId,
+            @PathVariable Long proposalId
+    ) {
+        return ResponseEntity.ok(actionService.apply(authentication.getName(), sessionId, proposalId));
+    }
+
+    @PostMapping("/sessions/{sessionId}/actions/{proposalId}/reject")
+    public ResponseEntity<AgentActionApplyResponse> rejectAction(
+            Authentication authentication,
+            @PathVariable Long sessionId,
+            @PathVariable Long proposalId
+    ) {
+        return ResponseEntity.ok(actionService.reject(authentication.getName(), sessionId, proposalId));
     }
 }
