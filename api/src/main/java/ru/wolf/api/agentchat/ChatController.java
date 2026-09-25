@@ -28,6 +28,7 @@ import ru.wolf.api.agentchat.dto.AgentChatResponse;
 import ru.wolf.api.agentchat.dto.ChatMessageRequest;
 import ru.wolf.api.agentchat.dto.ChatMessageResponse;
 import ru.wolf.api.agentchat.dto.ChatSessionResponse;
+import ru.wolf.api.agentchat.dto.ProposedActionResponse;
 
 import java.util.List;
 
@@ -65,6 +66,12 @@ public class ChatController {
     ) {
         return ResponseEntity.ok(chatService.listMessages(
                 authentication.getName(), sessionId, page, limit));
+    }
+
+    @GetMapping("/sessions/{sessionId}/actions")
+    public ResponseEntity<List<ProposedActionResponse>> listActions(
+            Authentication authentication, @PathVariable Long sessionId) {
+        return ResponseEntity.ok(actionService.list(authentication.getName(), sessionId));
     }
 
     @PostMapping("/sessions/{sessionId}/messages")

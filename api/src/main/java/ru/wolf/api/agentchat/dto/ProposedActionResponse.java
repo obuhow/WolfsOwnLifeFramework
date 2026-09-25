@@ -10,6 +10,8 @@ public record ProposedActionResponse(
         AgentAction.Type type,
         Long targetId,
         Map<String, Object> fields,
-        AgentActionProposal.Status status
+        AgentActionProposal.Status status,
+        Long assistantMessageId,
+        Map<String, Object> result
 ) {
 }

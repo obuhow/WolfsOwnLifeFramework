@@ -587,16 +587,16 @@ onBeforeUnmount(() => {
         </main>
       </div>
 
-      <!-- Чат-панель импорта записей (релиз 0.7, тикет 02): плавающая кнопка
-           открывает карточку предпросмотра поверх основного контента. -->
+      <!-- Чат-панель управляющего агента (релиз 1.5, тикет 05): кнопка «＋»
+           открывает диалог поверх основного контента. -->
       <button
         v-if="token && !isOnboarding"
         type="button"
         class="import-fab"
         :class="{ active: importOpen }"
         :aria-expanded="importOpen ? 'true' : 'false'"
-        aria-label="Импорт записей"
-        title="Импорт записей"
+        aria-label="Чат с управляющим агентом"
+        title="Чат с управляющим агентом"
         @click="toggleImport"
       >
         <span aria-hidden="true">＋</span>
@@ -606,7 +606,7 @@ onBeforeUnmount(() => {
         <aside
           v-if="token && !isOnboarding && importOpen"
           class="import-dock"
-          aria-label="Карточка импорта записей"
+          aria-label="Чат с управляющим агентом"
         >
           <button type="button" class="import-dock-close" aria-label="Закрыть" @click="closeImport">✕</button>
           <ImportChatPanel />
@@ -625,7 +625,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Чат-панель импорта записей (релиз 0.7, тикет 02) — плавающая кнопка + док.
+/* Чат-панель управляющего агента (релиз 1.5, тикет 05) — плавающая кнопка + док.
    «Тихий» вид: без ярких рамок, цвета из темы интерфейса. */
 .import-fab {
   position: fixed;

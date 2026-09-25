@@ -44,6 +44,7 @@ public class AgentActionService {
 
     private final UserRepository userRepository;
     private final AgentActionProposalRepository proposalRepository;
+    private final ChatSessionRepository sessionRepository;
     private final ObjectMapper objectMapper;
     private final DeloService deloService;
     private final ProjectService projectService;
@@ -64,6 +65,16 @@ public class AgentActionService {
         } catch (Exception ex) {
             throw new IllegalArgumentException("Предлагаемое действие агента имеет некорректные поля", ex);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProposedActionResponse> list(String username, Long sessionId) {
+        User user = currentUser(username);
+        sessionRepository.findByUserAndId(user, sessionId)
+                .orElseThrow(ChatSessionNotFoundException::new);
+        return proposalRepository.findByUserAndSessionIdOrderByIdAsc(user, sessionId).stream()
+                .map(proposal -> toResponse(proposal, readFields(proposal.getFieldsJson())))
+                .toList();
     }
 
     @Transactional
@@ -164,7 +175,8 @@ public class AgentActionService {
 
     private ProposedActionResponse toResponse(AgentActionProposal proposal, Map<String, Object> fields) {
         return new ProposedActionResponse(proposal.getId(), proposal.getActionType(), proposal.getTargetId(),
-                fields, proposal.getStatus());
+                fields, proposal.getStatus(), proposal.getAssistantMessage().getId(),
+                proposal.getResultJson() == null ? null : readResult(proposal.getResultJson()));
     }
 
     private Map<String, Object> readFields(String json) {

@@ -13,282 +13,338 @@
   GNU Affero General Public License for more details.
 
   You should have received a copy of the GNU Affero General Public License
-  along with this program. if not, see <https://www.gnu.org/licenses/>.
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
 -->
 <script setup>
-import { ref, reactive, computed } from 'vue'
-import { apiBase, authHeaders } from '../api'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { apiBase, authHeaders, handleAuthFailure } from '../api'
+import {
+  actionPresentation,
+  actionResultLabel,
+  mergeChatResponse,
+  newestSession,
+} from '../chatPanelModel.js'
 
-// Тихий контракт 0.3: без ярких рамок/иконок предупреждения, поля с нижним
-// правилом как в остальном интерфейсе. CONFIDENT-поля — заполнены сразу;
-// NEEDS_CONFIRMATION — визуально как черновик (приглушённый текст, не красный).
-
-const text = ref('')
+const messages = ref([])
+const session = ref(null)
+const draft = ref('')
 const busy = ref(false)
+const loading = ref(true)
 const error = ref('')
-const result = ref(null)      // ParseResult
-const confirmed = ref(false)  // после успешного confirm
+const proposals = ref(new Map())
+const messageList = ref(null)
 
-const kindLabels = {
-  DELO: 'Дело',
-  PROJECT: 'Проект',
-  ROUTINE: 'Рутина',
-  RECURRENCE: 'Повторение',
+const actionLabels = {
+  CREATE_DELO: 'Создать дело',
+  UPDATE_DELO: 'Изменить дело',
+  DELETE_DELO: 'Удалить дело',
+  CREATE_PROJECT: 'Создать проект',
+  UPDATE_PROJECT: 'Изменить проект',
+  DELETE_PROJECT: 'Удалить проект',
+  CREATE_TIME_ENTRY: 'Создать запись времени',
+  UPDATE_TIME_ENTRY: 'Изменить запись времени',
+  DELETE_TIME_ENTRY: 'Удалить запись времени',
+  APPLY_RECURRENCE: 'Применить повторение',
 }
 
-// Редактируемые копии полей кандидатов (чтобы пользователь правил до подтверждения).
-const edits = reactive({})
+const canSend = computed(() => !busy.value && Boolean(draft.value.trim()) && Boolean(session.value))
 
-function fieldValue(candidate, name) {
-  const key = `${candidate._idx}:${name}`
-  if (key in edits) return edits[key]
-  const f = (candidate.fields || []).find((x) => x.name === name)
-  return f ? f.value : ''
+function proposalFor(messageId) {
+  return proposals.value.get(messageId) || null
 }
 
-function setField(candidate, name, value) {
-  edits[`${candidate._idx}:${name}`] = value
+function formatTime(value) {
+  if (!value) return ''
+  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
-function isConfident(candidate, name) {
-  const f = (candidate.fields || []).find((x) => x.name === name)
-  return f ? f.confidence === 'CONFIDENT' : false
+function formatFieldValue(value) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }
 
-const hasConflicts = computed(() => (result.value?.conflicts || []).length > 0)
+function readableAction(action) {
+  return actionLabels[action?.type] || action?.type || 'Предлагаемое действие'
+}
+
+async function apiRequest(path, options = {}) {
+  const headers = authHeaders(Boolean(options.body))
+  if (!headers) throw new Error('Требуется вход в WOLF')
+  const response = await fetch(`${apiBase()}${path}`, { ...options, headers })
+  if (handleAuthFailure(response)) {
+    throw new Error('Сессия истекла. Войдите снова.')
+  }
+  if (!response.ok) {
+    let message = ''
+    try {
+      const body = await response.json()
+      message = body.message || body.error || ''
+    } catch {
+      // The status text below is more useful than hiding a non-JSON response.
+    }
+    throw new Error(message || `Запрос не выполнен: HTTP ${response.status}`)
+  }
+  return response.status === 204 ? null : response.json()
+}
+
+async function loadMessages(sessionId) {
+  messages.value = await apiRequest(`/agent-chat/sessions/${sessionId}/messages?page=0&limit=200`)
+}
+
+async function loadActions(sessionId) {
+  const actions = await apiRequest(`/agent-chat/sessions/${sessionId}/actions`)
+  proposals.value = new Map(actions.map((action) => [action.assistantMessageId, action]))
+}
+
+async function ensureSession() {
+  if (session.value) return session.value
+  const sessions = await apiRequest('/agent-chat/sessions')
+  session.value = newestSession(sessions)
+  if (!session.value) session.value = await apiRequest('/agent-chat/sessions', { method: 'POST' })
+  return session.value
+}
+
+async function loadChat() {
+  loading.value = true
+  error.value = ''
+  try {
+    const current = await ensureSession()
+    await loadMessages(current.id)
+    await loadActions(current.id)
+  } catch (cause) {
+    error.value = cause.message
+  } finally {
+    loading.value = false
+    await nextTick()
+    scrollToLatest()
+  }
+}
+
+async function startNewSession() {
+  if (busy.value) return
+  busy.value = true
+  error.value = ''
+  try {
+    session.value = await apiRequest('/agent-chat/sessions', { method: 'POST' })
+    messages.value = []
+    proposals.value = new Map()
+  } catch (cause) {
+    error.value = cause.message
+  } finally {
+    busy.value = false
+  }
+}
 
 async function send() {
-  if (!text.value.trim()) { error.value = 'Введите текст'; return }
-  busy.value = true; error.value = ''; confirmed.value = false
-  try {
-    const res = await fetch(`${apiBase()}/import/parse`, {
-      method: 'POST',
-      headers: authHeaders(true),
-      body: JSON.stringify({ text: text.value }),
-    })
-    // Релиз 1.3, тикет 01 п.4: молчаливый выход на 401/403 давал симптом «совсем ничего».
-    if (res.status === 401 || res.status === 403) {
-      throw new Error('Нет доступа к разбору: войдите заново.')
-    }
-    if (!res.ok) throw new Error(`Разбор: HTTP ${res.status}`)
-    const data = await res.json()
-    if (data.unparsed) {
-      result.value = { unparsed: true, clarificationQuestion: data.clarificationQuestion }
-    } else {
-      (data.candidates || []).forEach((c, i) => { c._idx = i })
-      result.value = data
-    }
-  } catch (e) {
-    error.value = e.message
-  } finally {
-    busy.value = false
-  }
-}
-
-async function confirmAll() {
-  if (!result.value || result.value.unparsed) return
-  busy.value = true; error.value = ''
-  try {
-    const candidates = (result.value.candidates || []).map((c) => ({
-      kind: c.kind,
-      fields: (c.fields || []).map((f) => ({
-        name: f.name,
-        value: fieldValue(c, f.name),
-        confidence: f.confidence,
-      })),
-    }))
-    const res = await fetch(`${apiBase()}/import/confirm`, {
-      method: 'POST',
-      headers: authHeaders(true),
-      body: JSON.stringify({ candidates }),
-    })
-    // Релиз 1.3, тикет 01 п.4: любой неуспех подтверждения виден пользователю текстом.
-    if (res.status === 401 || res.status === 403) {
-      throw new Error('Нет доступа к подтверждению: войдите заново.')
-    }
-    if (!res.ok) throw new Error(`Подтверждение: HTTP ${res.status}`)
-    const data = await res.json()
-    confirmed.value = true
-    result.value = { created: data.created || [] }
-  } catch (e) {
-    error.value = e.message
-  } finally {
-    busy.value = false
-  }
-}
-
-/**
- * Релиз 1.3, тикет 01 (баг Б-1): панель показывает, сколько Записей времени реально создано,
- * а не только список сущностей — раньше пустое расписание выглядело как успех.
- */
-function slotsLabel(count) {
-  const n = Number(count) || 0
-  const mod10 = n % 10
-  const mod100 = n % 100
-  let word = 'записей'
-  if (mod10 === 1 && mod100 !== 11) word = 'запись'
-  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = 'записи'
-  return `${n} ${word} времени`
-}
-
-function reset() {
-  text.value = ''
-  result.value = null
-  confirmed.value = false
+  const content = draft.value.trim()
+  if (!content || busy.value) return
+  busy.value = true
   error.value = ''
-  for (const k in edits) delete edits[k]
+  try {
+    const current = await ensureSession()
+    const response = await apiRequest(`/agent-chat/sessions/${current.id}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    })
+    messages.value = mergeChatResponse(messages.value, response)
+    if (response.proposedAction) {
+      proposals.value = new Map(proposals.value).set(
+        response.proposedAction.assistantMessageId,
+        response.proposedAction,
+      )
+    }
+    draft.value = ''
+    await nextTick()
+    scrollToLatest()
+  } catch (cause) {
+    error.value = cause.message
+  } finally {
+    busy.value = false
+  }
 }
+
+async function confirmProposal(action) {
+  if (!action || !actionPresentation(action).canConfirm || busy.value) return
+  await updateProposal(action, 'confirm')
+}
+
+async function rejectProposal(action) {
+  if (!action || !actionPresentation(action).canConfirm || busy.value) return
+  await updateProposal(action, 'reject')
+}
+
+async function updateProposal(action, operation) {
+  busy.value = true
+  error.value = ''
+  try {
+    const current = await ensureSession()
+    const result = await apiRequest(
+      `/agent-chat/sessions/${current.id}/actions/${action.id}/${operation}`,
+      { method: 'POST' },
+    )
+    proposals.value = new Map(proposals.value).set(action.assistantMessageId, {
+      ...action,
+      status: result.status,
+      result: result.result,
+    })
+  } catch (cause) {
+    error.value = cause.message
+  } finally {
+    busy.value = false
+  }
+}
+
+function scrollToLatest() {
+  if (messageList.value) messageList.value.scrollTop = messageList.value.scrollHeight
+}
+
+onMounted(loadChat)
 </script>
 
 <template>
-  <section class="import-panel" aria-label="Импорт записей">
+  <section class="chat-panel" aria-label="Чат с управляющим агентом">
     <header class="panel-head">
-      <h2>Импорт записей</h2>
-      <p class="eyebrow">Свободный текст → Дела, Проекты, Рутины</p>
+      <div>
+        <h2>Управляющий агент</h2>
+        <p class="eyebrow">Планирование, расписание и импорт — в одном диалоге</p>
+      </div>
+      <button
+        type="button"
+        class="btn btn-ghost btn-small"
+        :disabled="busy || loading"
+        @click="startNewSession"
+      >
+        Новый диалог
+      </button>
     </header>
 
-    <!-- Ввод -->
-    <div v-if="!result" class="input-row">
-      <textarea
-        v-model="text"
-        class="chat-input"
-        rows="3"
-        placeholder="Напишите, что нужно сделать — например: «после тренировки, часа полтора, потом душ»"
-        @keydown.ctrl.enter="send"
-      ></textarea>
-      <button class="btn btn-primary" :disabled="busy || !text.trim()" @click="send">
-        {{ busy ? 'Разбор…' : 'Разобрать' }}
-      </button>
-    </div>
+    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="loading" class="status-line">Загрузка истории…</p>
 
-    <p v-if="error" class="banner error">{{ error }}</p>
-
-    <!-- Не разобралось: один уточняющий вопрос текстом, без создания сущностей -->
-    <div v-if="result && result.unparsed" class="clarify">
-      <p class="clarify-text">{{ result.clarificationQuestion }}</p>
-      <button class="btn btn-ghost" @click="reset">Написать снова</button>
-    </div>
-
-    <!-- Карточка предпросмотра: одна общая для всех кандидатов -->
-    <div v-if="result && !result.unparsed && !confirmed" class="preview">
-      <div v-for="c in result.candidates" :key="c._idx" class="candidate-card">
-        <div class="candidate-kind">{{ kindLabels[c.kind] || c.kind }}</div>
-        <div v-for="f in c.fields" :key="f.name" class="field-row" :class="{ draft: !isConfident(c, f.name) }">
-          <label :for="`f-${c._idx}-${f.name}`" class="field-label">{{ f.name }}</label>
-          <input
-            :id="`f-${c._idx}-${f.name}`"
-            class="field-input"
-            :class="{ confident: isConfident(c, f.name) }"
-            :value="fieldValue(c, f.name)"
-            @input="setField(c, f.name, $event.target.value)"
-          />
-        </div>
-      </div>
-
-      <!-- Занятый слот: три варианта прямо в карточке (всегда Создать поверх) -->
-      <p v-if="hasConflicts" class="conflict-note">
-        Слот пересекается с существующей записью — будет создан параллельный интервал (поверх).
+    <div v-else ref="messageList" class="message-list" aria-live="polite">
+      <p v-if="!messages.length" class="empty-state">
+        Напишите, что нужно спланировать или изменить. Агент сначала объяснит решение,
+        а изменение данных предложит отдельно для подтверждения.
       </p>
+      <article
+        v-for="message in messages"
+        :key="message.id"
+        class="message"
+        :class="message.role === 'USER' ? 'message-user' : 'message-assistant'"
+      >
+        <div class="message-meta">
+          {{ message.role === 'USER' ? 'Вы' : 'Агент' }}
+          <time v-if="message.createdAt" :datetime="message.createdAt">{{ formatTime(message.createdAt) }}</time>
+        </div>
+        <p class="message-content">{{ message.content }}</p>
 
-      <div class="preview-actions">
-        <button class="btn btn-primary" :disabled="busy" @click="confirmAll">
-          {{ busy ? 'Запись…' : 'Подтвердить' }}
-        </button>
-        <button class="btn btn-ghost" @click="reset">Отмена</button>
-      </div>
-    </div>
-
-    <!-- Результат подтверждения -->
-    <div v-if="confirmed" class="done">
-      <ul class="created-list">
-        <li v-for="e in result.created" :key="`${e.type}-${e.id}`">
-          <div class="created-row">
-            <span class="created-kind">{{ kindLabels[e.kind] || e.kind }}</span>
-            <a :href="`#${e.link}`" class="created-link">{{ e.title }}</a>
-            <span v-if="e.timeEntriesCreated > 0" class="created-slots">
-              {{ slotsLabel(e.timeEntriesCreated) }}
+        <div v-if="proposalFor(message.id)" class="proposal-card">
+          <div class="proposal-heading">{{ readableAction(proposalFor(message.id)) }}</div>
+          <dl v-if="Object.keys(proposalFor(message.id).fields || {}).length" class="proposal-fields">
+            <template v-for="(value, name) in proposalFor(message.id).fields" :key="name">
+              <dt>{{ name }}</dt>
+              <dd>{{ formatFieldValue(value) }}</dd>
+            </template>
+          </dl>
+          <p v-if="proposalFor(message.id).targetId" class="proposal-target">
+            Цель: #{{ proposalFor(message.id).targetId }}
+          </p>
+          <div class="proposal-actions">
+            <button
+              v-if="actionPresentation(proposalFor(message.id)).canConfirm"
+              type="button"
+              class="btn btn-primary"
+              :disabled="busy"
+              @click="confirmProposal(proposalFor(message.id))"
+            >
+              {{ busy ? 'Обработка…' : actionPresentation(proposalFor(message.id)).label }}
+            </button>
+            <button
+              v-if="actionPresentation(proposalFor(message.id)).canConfirm"
+              type="button"
+              class="btn btn-ghost"
+              :disabled="busy"
+              @click="rejectProposal(proposalFor(message.id))"
+            >
+              Отклонить
+            </button>
+            <span
+              v-else
+              class="proposal-status"
+              :class="{ applied: actionPresentation(proposalFor(message.id)).applied }"
+            >
+              {{ actionPresentation(proposalFor(message.id)).label }}
             </span>
           </div>
-          <p v-if="e.note" class="created-note">{{ e.note }}</p>
-        </li>
-      </ul>
-      <button class="btn btn-ghost" @click="reset">Ещё запись</button>
+          <p v-if="proposalFor(message.id).result" class="proposal-result">
+            Результат: {{ actionResultLabel(proposalFor(message.id).result) }}
+          </p>
+        </div>
+      </article>
     </div>
+
+    <form class="input-row" @submit.prevent="send">
+      <textarea
+        v-model="draft"
+        class="chat-input"
+        rows="3"
+        maxlength="8000"
+        placeholder="Напишите, что нужно сделать…"
+        :disabled="busy || loading"
+        @keydown.ctrl.enter.prevent="send"
+      ></textarea>
+      <button type="submit" class="btn btn-primary" :disabled="!canSend">
+        {{ busy ? 'Ответ формируется…' : 'Отправить' }}
+      </button>
+    </form>
   </section>
 </template>
 
 <style scoped>
-.import-panel {
+.chat-panel {
   display: grid;
-  gap: 1rem;
-  background: var(--card, #fffdf9);
-  border: 1px solid var(--border, #e6dfd4);
-  border-radius: 10px;
-  padding: 1.1rem 1.2rem;
-  max-width: 42rem;
+  gap: var(--wolf-gap-group);
+  width: min(var(--wolf-chat-width), calc(100vw - var(--wolf-chat-gutter)));
+  background: var(--wolf-surface);
+  border: 1px solid var(--wolf-rule);
+  border-radius: var(--wolf-radius-lg);
+  padding: var(--wolf-space-3) var(--wolf-space-4);
 }
-.panel-head h2 { margin: 0; font-size: 1.05rem; font-weight: 600; }
-.eyebrow { margin: 0.15rem 0 0; color: var(--muted-foreground, #756d64); font-size: 0.82rem; }
-
-.input-row { display: grid; gap: 0.6rem; }
-.chat-input {
-  width: 100%;
-  resize: vertical;
-  font: inherit;
-  padding: 0.6rem 0.7rem;
-  border: 1px solid var(--border, #e6dfd4);
-  border-bottom: 2px solid var(--border, #e6dfd4);
-  border-radius: 8px;
-  background: var(--background, #fff);
-  color: var(--foreground, #2b2620);
+.panel-head { display: flex; justify-content: space-between; gap: var(--wolf-gap-inline); align-items: start; }
+.panel-head h2 { margin: 0; font-size: var(--wolf-text-lg); font-weight: 600; }
+.eyebrow { margin: var(--wolf-space-1) 0 0; color: var(--wolf-muted); font-size: var(--wolf-text-sm); }
+.btn { font: inherit; cursor: pointer; border-radius: var(--wolf-radius-lg); padding: var(--wolf-space-2) var(--wolf-space-3); border: 1px solid transparent; }
+.btn-primary { background: var(--wolf-ink); color: var(--wolf-on-ink); }
+.btn-primary:disabled, .btn-ghost:disabled { opacity: 0.55; cursor: default; }
+.btn-ghost { background: transparent; color: var(--wolf-muted); border-color: var(--wolf-rule); }
+.btn-small { padding: var(--wolf-space-1) var(--wolf-space-2); white-space: nowrap; font-size: var(--wolf-text-sm); }
+.banner { margin: 0; padding: var(--wolf-space-2) var(--wolf-space-3); border-radius: var(--wolf-radius-lg); font-size: var(--wolf-text-sm); }
+.banner.error { background: var(--wolf-danger-surface); color: var(--wolf-danger-ink); border: 1px solid var(--wolf-danger-ink); }
+.status-line, .empty-state { margin: 0; color: var(--wolf-muted); font-size: var(--wolf-text-sm); }
+.message-list { display: grid; gap: var(--wolf-gap-inline); max-height: min(52vh, var(--wolf-chat-max-height)); overflow-y: auto; padding: var(--wolf-space-1) var(--wolf-space-2); }
+.message { max-width: var(--wolf-chat-message-width); padding: var(--wolf-space-2) var(--wolf-space-3); border: 1px solid var(--wolf-rule); border-radius: var(--wolf-radius-lg); }
+.message-user { justify-self: end; background: var(--wolf-surface); }
+.message-assistant { justify-self: start; background: var(--wolf-fill); }
+.message-meta { display: flex; gap: var(--wolf-space-2); color: var(--wolf-muted); font-size: var(--wolf-text-xs); }
+.message-meta time { opacity: 0.75; }
+.message-content { margin: var(--wolf-space-1) 0 0; white-space: pre-wrap; line-height: var(--wolf-leading-base); }
+.proposal-card { margin-top: var(--wolf-space-2); padding-top: var(--wolf-space-2); border-top: 1px solid var(--wolf-rule); }
+.proposal-heading { font-size: var(--wolf-text-sm); font-weight: 600; }
+.proposal-fields { display: grid; grid-template-columns: minmax(var(--wolf-chat-label-width), 0.45fr) minmax(0, 1fr); gap: var(--wolf-space-1) var(--wolf-space-2); margin: var(--wolf-space-2) 0; font-size: var(--wolf-text-sm); }
+.proposal-fields dt { color: var(--wolf-muted); }
+.proposal-fields dd { margin: 0; overflow-wrap: anywhere; }
+.proposal-target, .proposal-result { margin: var(--wolf-space-1) 0; color: var(--wolf-muted); font-size: var(--wolf-text-xs); }
+.proposal-actions { display: flex; align-items: center; gap: var(--wolf-space-2); flex-wrap: wrap; }
+.proposal-status { color: var(--wolf-muted); font-size: var(--wolf-text-sm); }
+.proposal-status.applied { color: var(--wolf-done-ink); }
+.input-row { display: grid; gap: var(--wolf-gap-inline); }
+.chat-input { width: 100%; resize: vertical; box-sizing: border-box; font: inherit; padding: var(--wolf-space-2) var(--wolf-space-3); border: 1px solid var(--wolf-rule); border-bottom: 2px solid var(--wolf-rule); border-radius: var(--wolf-radius-lg); background: var(--wolf-surface); color: var(--wolf-ink); }
+.chat-input:focus { outline: none; border-bottom-color: var(--wolf-focus); }
+@media (max-width: 768px) {
+  .chat-panel { width: calc(100vw - var(--wolf-chat-gutter)); padding: var(--wolf-space-3); }
+  .panel-head { display: grid; }
+  .message { max-width: var(--wolf-chat-message-width-mobile); }
 }
-.chat-input:focus { outline: none; border-bottom-color: var(--accent, #9a7b4f); }
-
-.btn { font: inherit; cursor: pointer; border-radius: 8px; padding: 0.45rem 0.9rem; border: 1px solid transparent; }
-.btn-primary { background: var(--accent, #9a7b4f); color: #fff; }
-.btn-primary:disabled { opacity: 0.55; cursor: default; }
-.btn-ghost { background: transparent; color: var(--muted-foreground, #756d64); border-color: var(--border, #e6dfd4); }
-
-.banner { margin: 0; padding: 0.5rem 0.7rem; border-radius: 8px; font-size: 0.88rem; }
-.banner.error { background: #fbeae9; color: #8a3632; border: 1px solid #eccfcc; }
-
-.clarify { display: grid; gap: 0.7rem; }
-.clarify-text { margin: 0; color: var(--foreground, #2b2620); font-size: 0.95rem; }
-
-.preview { display: grid; gap: 0.8rem; }
-.candidate-card {
-  border: 1px solid var(--border, #e6dfd4);
-  border-radius: 8px;
-  padding: 0.7rem 0.8rem;
-  display: grid;
-  gap: 0.5rem;
-}
-.candidate-kind { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-foreground, #756d64); }
-.field-row { display: grid; grid-template-columns: 9rem 1fr; align-items: center; gap: 0.5rem; }
-.field-label { color: var(--muted-foreground, #756d64); font-size: 0.84rem; }
-.field-input {
-  font: inherit;
-  padding: 0.32rem 0.5rem;
-  border: 1px solid var(--border, #e6dfd4);
-  border-bottom: 2px solid var(--border, #e6dfd4);
-  border-radius: 6px;
-  background: var(--background, #fff);
-  color: var(--foreground, #2b2620);
-}
-/* NEEDS_CONFIRMATION — визуально как черновик (приглушённый текст), не красный */
-.field-row.draft .field-input { color: var(--muted-foreground, #756d64); font-style: italic; }
-.field-input:focus { outline: none; border-bottom-color: var(--accent, #9a7b4f); }
-
-.conflict-note { margin: 0; font-size: 0.84rem; color: var(--muted-foreground, #756d64); }
-.preview-actions { display: flex; gap: 0.6rem; }
-
-.done { display: grid; gap: 0.7rem; }
-.created-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
-.created-row { display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap; }
-.created-kind { font-size: 0.74rem; text-transform: uppercase; color: var(--muted-foreground, #756d64); margin-right: 0.4rem; }
-.created-link { color: var(--accent, #9a7b4f); text-decoration: none; }
-.created-link:hover { text-decoration: underline; }
-/* Отклик о расписании — нейтральный регистр контракта 0.3: без красного и без полос. */
-.created-slots { font-size: 0.78rem; color: var(--muted-foreground, #756d64); }
-.created-note { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--muted-foreground, #756d64); }
 </style>

@@ -179,6 +179,32 @@ class AgentChatApiIT extends ApiIntegrationTest {
         assertThat(messageRepository.count()).isZero();
     }
 
+    @Test
+    void proposals_are_listed_for_the_current_session_after_reopening() {
+        WebTestClient client = authedAdminClient();
+        ChatSessionResponse session = createSession(client);
+        fakeAgent.setResponse("Предлагаю создать дело");
+        fakeAgent.setAction(new AgentAction(AgentAction.Type.CREATE_DELO, null,
+                java.util.Map.of("title", "Дело из истории")));
+
+        AgentChatResponse response = client.post()
+                .uri("/api/v1/agent-chat/sessions/{id}/chat", session.id())
+                .bodyValue(java.util.Map.of("content", "Создай дело"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(AgentChatResponse.class)
+                .returnResult().getResponseBody();
+
+        client.get()
+                .uri("/api/v1/agent-chat/sessions/{id}/actions", session.id())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].id").isEqualTo(response.proposedAction().id().intValue())
+                .jsonPath("$[0].assistantMessageId").isEqualTo(response.assistantMessage().id().intValue())
+                .jsonPath("$[0].status").isEqualTo("PENDING");
+    }
+
     private ChatSessionResponse createSession(WebTestClient client) {
         return client.post()
                 .uri("/api/v1/agent-chat/sessions")

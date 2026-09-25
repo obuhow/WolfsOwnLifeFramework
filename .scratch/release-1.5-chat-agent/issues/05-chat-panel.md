@@ -1,6 +1,6 @@
 # Тикет 05 — Чат-панель «＋»
 
-Status: needs-triage
+Status: resolved
 Blocked by: 03, 04
 Type: task
 

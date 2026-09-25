@@ -99,6 +99,14 @@
 
   /* ---------- Движение ---------- */
   --wolf-transition: .12s ease;
+
+  /* ---------- Чат агента ---------- */
+  --wolf-chat-width: 42rem;
+  --wolf-chat-max-height: 34rem;
+  --wolf-chat-gutter: var(--wolf-space-5);
+  --wolf-chat-label-width: var(--wolf-space-7);
+  --wolf-chat-message-width: 88%;
+  --wolf-chat-message-width-mobile: 96%;
 }
 
 @media (max-width: 768px) {

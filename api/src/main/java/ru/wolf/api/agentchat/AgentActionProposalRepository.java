@@ -8,10 +8,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import ru.wolf.api.user.User;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface AgentActionProposalRepository extends JpaRepository<AgentActionProposal, Long> {
+
+    List<AgentActionProposal> findByUserAndSessionIdOrderByIdAsc(User user, Long sessionId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
