@@ -9,15 +9,22 @@ public record ChatMessageResponse(
         Long sessionId,
         ChatMessage.Role role,
         String content,
-        Instant createdAt
+        Instant createdAt,
+        ContextTransparencyResponse contextTransparency
 ) {
     public static ChatMessageResponse from(ChatMessage message) {
+        return from(message, null);
+    }
+
+    public static ChatMessageResponse from(
+            ChatMessage message, ContextTransparencyResponse contextTransparency) {
         return new ChatMessageResponse(
                 message.getId(),
                 message.getSession().getId(),
                 message.getRole(),
                 message.getContent(),
-                message.getCreatedAt()
+                message.getCreatedAt(),
+                contextTransparency
         );
     }
 }

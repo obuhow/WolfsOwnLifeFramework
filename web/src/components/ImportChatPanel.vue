@@ -21,6 +21,8 @@ import { apiBase, authHeaders, handleAuthFailure } from '../api'
 import {
   actionPresentation,
   actionResultLabel,
+  contextPresentation,
+  latestContextTransparency,
   mergeChatResponse,
   newestSession,
 } from '../chatPanelModel.js'
@@ -31,8 +33,13 @@ const draft = ref('')
 const busy = ref(false)
 const loading = ref(true)
 const error = ref('')
+const availability = ref({ available: false, reason: 'Проверка доступности агента…' })
+const availabilityLoaded = ref(false)
+const contextTransparency = ref(null)
 const proposals = ref(new Map())
 const messageList = ref(null)
+
+const contextSummary = computed(() => contextPresentation(contextTransparency.value))
 
 const actionLabels = {
   CREATE_DELO: 'Создать дело',
@@ -47,7 +54,12 @@ const actionLabels = {
   APPLY_RECURRENCE: 'Применить повторение',
 }
 
-const canSend = computed(() => !busy.value && Boolean(draft.value.trim()) && Boolean(session.value))
+const canSend = computed(() => (
+  !busy.value
+  && Boolean(draft.value.trim())
+  && Boolean(session.value)
+  && availability.value.available
+))
 
 function proposalFor(messageId) {
   return proposals.value.get(messageId) || null
@@ -89,8 +101,14 @@ async function apiRequest(path, options = {}) {
   return response.status === 204 ? null : response.json()
 }
 
+async function loadAvailability() {
+  availability.value = await apiRequest('/agent-chat/status')
+  availabilityLoaded.value = true
+}
+
 async function loadMessages(sessionId) {
   messages.value = await apiRequest(`/agent-chat/sessions/${sessionId}/messages?page=0&limit=200`)
+  contextTransparency.value = latestContextTransparency(messages.value)
 }
 
 async function loadActions(sessionId) {
@@ -110,6 +128,7 @@ async function loadChat() {
   loading.value = true
   error.value = ''
   try {
+    await loadAvailability()
     const current = await ensureSession()
     await loadMessages(current.id)
     await loadActions(current.id)
@@ -129,6 +148,7 @@ async function startNewSession() {
   try {
     session.value = await apiRequest('/agent-chat/sessions', { method: 'POST' })
     messages.value = []
+    contextTransparency.value = null
     proposals.value = new Map()
   } catch (cause) {
     error.value = cause.message
@@ -149,6 +169,7 @@ async function send() {
       body: JSON.stringify({ content }),
     })
     messages.value = mergeChatResponse(messages.value, response)
+    contextTransparency.value = response.contextTransparency || null
     if (response.proposedAction) {
       proposals.value = new Map(proposals.value).set(
         response.proposedAction.assistantMessageId,
@@ -223,7 +244,33 @@ onMounted(loadChat)
     <p v-if="error" class="banner error" role="alert">{{ error }}</p>
     <p v-if="loading" class="status-line">Загрузка истории…</p>
 
-    <div v-else ref="messageList" class="message-list" aria-live="polite">
+    <div v-if="!loading && availabilityLoaded" class="agent-availability" :class="{ unavailable: !availability.available }" role="status">
+      <strong>{{ availability.available ? 'Агент доступен' : 'Агент недоступен' }}</strong>
+      <span v-if="!availability.available">{{ availability.reason }}</span>
+    </div>
+
+    <section v-if="contextTransparency" class="context-transparency" aria-labelledby="context-transparency-title">
+      <h3 id="context-transparency-title">Что ушло в модель</h3>
+      <p v-if="contextSummary.unavailable" class="context-unavailable">
+        Контекст не отправлялся: {{ contextSummary.unavailable }}
+      </p>
+      <dl v-else class="context-grid">
+        <dt>Период</dt>
+        <dd>{{ contextSummary.period }}</dd>
+        <dt>Проекты</dt>
+        <dd><ul><li v-for="item in contextSummary.projects" :key="item">{{ item }}</li></ul></dd>
+        <dt>Цели</dt>
+        <dd><ul><li v-for="item in contextSummary.goals" :key="item">{{ item }}</li></ul></dd>
+        <dt>Рутины</dt>
+        <dd><ul><li v-for="item in contextSummary.routines" :key="item">{{ item }}</li></ul></dd>
+        <dt>Динамика</dt>
+        <dd><ul><li v-for="item in contextSummary.dynamics" :key="item">{{ item }}</li></ul></dd>
+        <dt>Объём</dt>
+        <dd>{{ contextSummary.payload }} · {{ contextSummary.history }}</dd>
+      </dl>
+    </section>
+
+    <div v-if="!loading" ref="messageList" class="message-list" aria-live="polite">
       <p v-if="!messages.length" class="empty-state">
         Напишите, что нужно спланировать или изменить. Агент сначала объяснит решение,
         а изменение данных предложит отдельно для подтверждения.
@@ -292,7 +339,7 @@ onMounted(loadChat)
         rows="3"
         maxlength="8000"
         placeholder="Напишите, что нужно сделать…"
-        :disabled="busy || loading"
+        :disabled="busy || loading || !availability.available"
         @keydown.ctrl.enter.prevent="send"
       ></textarea>
       <button type="submit" class="btn btn-primary" :disabled="!canSend">
@@ -323,6 +370,15 @@ onMounted(loadChat)
 .banner { margin: 0; padding: var(--wolf-space-2) var(--wolf-space-3); border-radius: var(--wolf-radius-lg); font-size: var(--wolf-text-sm); }
 .banner.error { background: var(--wolf-danger-surface); color: var(--wolf-danger-ink); border: 1px solid var(--wolf-danger-ink); }
 .status-line, .empty-state { margin: 0; color: var(--wolf-muted); font-size: var(--wolf-text-sm); }
+.agent-availability { display: flex; gap: var(--wolf-gap-inline); align-items: baseline; padding: var(--wolf-space-2) var(--wolf-space-3); background: var(--wolf-done-surface); color: var(--wolf-done-ink); border: 1px solid var(--wolf-rule); border-radius: var(--wolf-radius-lg); font-size: var(--wolf-text-sm); }
+.agent-availability.unavailable { background: var(--wolf-danger-surface); color: var(--wolf-danger-ink); }
+.context-transparency { display: grid; gap: var(--wolf-gap-inline); padding: var(--wolf-space-3); background: var(--wolf-fill); border: 1px solid var(--wolf-rule); border-radius: var(--wolf-radius-lg); }
+.context-transparency h3 { margin: 0; font-size: var(--wolf-text-sm); font-weight: 600; }
+.context-unavailable { margin: 0; color: var(--wolf-danger-ink); font-size: var(--wolf-text-sm); }
+.context-grid { display: grid; grid-template-columns: minmax(var(--wolf-chat-label-width), .35fr) minmax(0, 1fr); gap: var(--wolf-space-1) var(--wolf-space-3); margin: 0; font-size: var(--wolf-text-sm); }
+.context-grid dt { color: var(--wolf-muted); }
+.context-grid dd { margin: 0; overflow-wrap: anywhere; }
+.context-grid ul { display: grid; gap: var(--wolf-space-1); margin: 0; padding-left: var(--wolf-space-3); }
 .message-list { display: grid; gap: var(--wolf-gap-inline); max-height: min(52vh, var(--wolf-chat-max-height)); overflow-y: auto; padding: var(--wolf-space-1) var(--wolf-space-2); }
 .message { max-width: var(--wolf-chat-message-width); padding: var(--wolf-space-2) var(--wolf-space-3); border: 1px solid var(--wolf-rule); border-radius: var(--wolf-radius-lg); }
 .message-user { justify-self: end; background: var(--wolf-surface); }

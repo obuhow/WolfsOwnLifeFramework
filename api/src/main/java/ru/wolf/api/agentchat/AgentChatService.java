@@ -3,8 +3,10 @@ package ru.wolf.api.agentchat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.wolf.api.agentchat.dto.AgentAvailabilityResponse;
 import ru.wolf.api.agentchat.dto.AgentChatResponse;
 import ru.wolf.api.agentchat.dto.ChatMessageResponse;
+import ru.wolf.api.agentchat.dto.ContextTransparencyResponse;
 import ru.wolf.api.agentchat.dto.ProposedActionResponse;
 import ru.wolf.api.agentcontext.AgentContext;
 import ru.wolf.api.agentcontext.AgentContextService;
@@ -43,6 +45,14 @@ public class AgentChatService {
     private final AgentActionService actionService;
     private final NotesAssistantProperties properties;
 
+    public AgentAvailabilityResponse availability() {
+        if (!properties.isEnabled()) {
+            return new AgentAvailabilityResponse(false,
+                    "LLM-функции отключены: установите wolf.llm.enabled=true", null);
+        }
+        return new AgentAvailabilityResponse(true, null, properties.getModel());
+    }
+
     @Transactional
     public AgentChatResponse complete(String username, Long sessionId, String content) {
         if (!properties.isEnabled()) {
@@ -78,17 +88,21 @@ public class AgentChatService {
             throw new AgentChatProviderException("LLM-провайдер вернул слишком большой ответ");
         }
 
+        int payloadCharacters = SYSTEM_PROMPT.length() + 2 + context.prompt().length()
+                + messages.stream().mapToInt(message -> message.content().length()).sum();
+        ContextTransparencyResponse transparency = ContextTransparencyResponse.from(
+                context, history.size(), payloadCharacters);
         ChatMessageResponse userMessage = chatService.appendMessage(
                 user, sessionId, ChatMessage.Role.USER, content);
         ChatMessageResponse assistantMessage = chatService.appendMessage(
-                user, sessionId, ChatMessage.Role.ASSISTANT, reply.content());
+                user, sessionId, ChatMessage.Role.ASSISTANT, reply.content(), transparency);
         ProposedActionResponse proposedAction = null;
         if (reply.action() != null) {
             ChatSession session = chatService.sessionEntity(user, sessionId);
             ChatMessage assistantEntity = chatService.messageEntity(user, sessionId, assistantMessage.id());
             proposedAction = actionService.createProposal(user, session, assistantEntity, reply.action());
         }
-        return new AgentChatResponse(userMessage, assistantMessage, properties.getModel(), proposedAction);
+        return new AgentChatResponse(userMessage, assistantMessage, properties.getModel(), proposedAction, transparency);
     }
 
     private String providerMessage() {

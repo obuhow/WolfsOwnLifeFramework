@@ -17,6 +17,8 @@
  */
 package ru.wolf.api.agentchat;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.wolf.api.agentchat.dto.ChatMessageRequest;
 import ru.wolf.api.agentchat.dto.ChatMessageResponse;
 import ru.wolf.api.agentchat.dto.ChatSessionResponse;
+import ru.wolf.api.agentchat.dto.ContextTransparencyResponse;
 import ru.wolf.api.user.User;
 import ru.wolf.api.user.UserRepository;
 
@@ -42,6 +45,7 @@ public class ChatService {
     private final UserRepository userRepository;
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> listSessions(String username) {
@@ -71,7 +75,7 @@ public class ChatService {
         return messageRepository.findBySessionOrderByCreatedAtAscIdAsc(session, PageRequest.of(page, limit))
                 .getContent()
                 .stream()
-                .map(ru.wolf.api.agentchat.dto.ChatMessageResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -88,6 +92,14 @@ public class ChatService {
     @Transactional
     ChatMessageResponse appendMessage(
             User user, Long sessionId, ChatMessage.Role role, String content) {
+        return appendMessage(user, sessionId, role, content, null);
+    }
+
+    /** Stores the exact safe context summary alongside the assistant message. */
+    @Transactional
+    ChatMessageResponse appendMessage(
+            User user, Long sessionId, ChatMessage.Role role, String content,
+            ContextTransparencyResponse contextTransparency) {
         if (role == null) throw new IllegalArgumentException("Роль сообщения обязательна");
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("Сообщение не может быть пустым");
@@ -97,12 +109,13 @@ public class ChatService {
                 .session(session)
                 .role(role)
                 .content(content.trim())
+                .contextTransparencyJson(writeContextTransparency(contextTransparency))
                 .createdAt(Instant.now())
                 .build();
         ChatMessage saved = messageRepository.save(message);
         session.setUpdatedAt(Instant.now());
         sessionRepository.save(session);
-        return ChatMessageResponse.from(saved);
+        return toResponse(saved);
     }
 
     /** Bounded history for one agent request, oldest message first. */
@@ -141,5 +154,27 @@ public class ChatService {
     private ChatSession findSession(User user, Long sessionId) {
         return sessionRepository.findByUserAndId(user, sessionId)
                 .orElseThrow(ChatSessionNotFoundException::new);
+    }
+
+    private ChatMessageResponse toResponse(ChatMessage message) {
+        return ChatMessageResponse.from(message, readContextTransparency(message.getContextTransparencyJson()));
+    }
+
+    private String writeContextTransparency(ContextTransparencyResponse contextTransparency) {
+        if (contextTransparency == null) return null;
+        try {
+            return objectMapper.writeValueAsString(contextTransparency);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Не удалось сохранить прозрачность контекста", ex);
+        }
+    }
+
+    private ContextTransparencyResponse readContextTransparency(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return objectMapper.readValue(json, ContextTransparencyResponse.class);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Не удалось прочитать прозрачность контекста", ex);
+        }
     }
 }

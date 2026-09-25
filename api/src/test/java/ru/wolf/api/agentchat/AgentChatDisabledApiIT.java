@@ -36,6 +36,21 @@ class AgentChatDisabledApiIT extends ApiIntegrationTest {
     }
 
     @Test
+    void disabled_agent_status_explains_unavailability_without_provider_secrets() {
+        WebTestClient client = authedAdminClient();
+
+        client.get()
+                .uri("/api/v1/agent-chat/status")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.available").isEqualTo(false)
+                .jsonPath("$.reason").isEqualTo("LLM-функции отключены: установите wolf.llm.enabled=true")
+                .jsonPath("$.apiKey").doesNotExist()
+                .jsonPath("$.url").doesNotExist();
+    }
+
+    @Test
     void disabled_agent_returns_unavailable_without_writing_messages() {
         WebTestClient client = authedAdminClient();
         ChatSessionResponse session = client.post()

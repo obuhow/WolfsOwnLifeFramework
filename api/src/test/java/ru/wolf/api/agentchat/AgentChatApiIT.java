@@ -70,6 +70,14 @@ class AgentChatApiIT extends ApiIntegrationTest {
                 .expectBody(AgentChatResponse.class)
                 .returnResult().getResponseBody();
 
+        assertThat(response.contextTransparency()).isNotNull();
+        assertThat(response.contextTransparency().available()).isTrue();
+        assertThat(response.contextTransparency().period().weeks()).isEqualTo(26);
+        assertThat(response.contextTransparency().projects()).isNotNull();
+        assertThat(response.contextTransparency().goals()).isNotNull();
+        assertThat(response.contextTransparency().dynamics()).isNotNull();
+        assertThat(response.contextTransparency().payloadCharacters()).isPositive();
+
         assertThat(response.userMessage().role()).isEqualTo(ChatMessage.Role.USER);
         assertThat(response.userMessage().content()).isEqualTo("Составь план");
         assertThat(response.assistantMessage().role()).isEqualTo(ChatMessage.Role.ASSISTANT);

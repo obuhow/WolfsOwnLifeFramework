@@ -1,6 +1,6 @@
 # Тикет 06 — Прозрачность контекста
 
-Status: needs-triage
+Status: resolved
 Blocked by: 05
 Type: task
 

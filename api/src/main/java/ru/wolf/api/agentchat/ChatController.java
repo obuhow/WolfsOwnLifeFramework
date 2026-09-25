@@ -24,6 +24,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import ru.wolf.api.agentchat.dto.AgentChatRequest;
 import ru.wolf.api.agentchat.dto.AgentActionApplyResponse;
+import ru.wolf.api.agentchat.dto.AgentAvailabilityResponse;
 import ru.wolf.api.agentchat.dto.AgentChatResponse;
 import ru.wolf.api.agentchat.dto.ChatMessageRequest;
 import ru.wolf.api.agentchat.dto.ChatMessageResponse;
@@ -40,6 +41,11 @@ public class ChatController {
     private final ChatService chatService;
     private final AgentChatService agentChatService;
     private final AgentActionService actionService;
+
+    @GetMapping("/status")
+    public ResponseEntity<AgentAvailabilityResponse> status() {
+        return ResponseEntity.ok(agentChatService.availability());
+    }
 
     @GetMapping("/sessions")
     public ResponseEntity<List<ChatSessionResponse>> listSessions(Authentication authentication) {

@@ -5,6 +5,8 @@ import {
   newestSession,
   actionPresentation,
   actionResultLabel,
+  contextPresentation,
+  latestContextTransparency,
 } from './src/chatPanelModel.js'
 
 test('newestSession chooses the most recently updated session', () => {
@@ -61,4 +63,44 @@ test('actionPresentation distinguishes pending, applied and rejected proposals',
 test('actionResultLabel shows created records instead of opaque JSON', () => {
   assert.equal(actionResultLabel({ id: 12, title: 'Новое дело' }), 'Новое дело (#12)')
   assert.equal(actionResultLabel({ deleted: 12 }), 'Удалено: #12')
+})
+
+test('contextPresentation keeps payload facts and labels empty slices explicitly', () => {
+  assert.deepEqual(contextPresentation({
+    available: true,
+    period: { from: '2026-03-01', toExclusive: '2026-09-01', weeks: 26 },
+    projects: [{ title: 'Проект', lifeArea: 'Работа' }],
+    goals: [],
+    routines: [],
+    dynamics: { historyAvailable: false, historyNote: 'История отсутствует', projectHours: [] },
+    payloadCharacters: 420,
+  }), {
+    period: '2026-03-01 — 2026-09-01 (26 недель)',
+    projects: ['Проект · Работа'],
+    goals: ['Нет активных целей'],
+    routines: ['Нет активных рутин'],
+    dynamics: ['История отсутствует'],
+    history: '0 сообщений истории',
+    payload: '420 знаков',
+  })
+})
+
+test('contextPresentation explains unavailable agent state without context facts', () => {
+  assert.deepEqual(contextPresentation({
+    available: false,
+    reason: 'LLM-функции отключены',
+  }), {
+    unavailable: 'LLM-функции отключены',
+  })
+})
+
+test('latestContextTransparency restores the most recent persisted receipt', () => {
+  const older = { available: true, payloadCharacters: 120 }
+  const newer = { available: true, payloadCharacters: 240 }
+  assert.deepEqual(latestContextTransparency([
+    { id: 1, role: 'USER' },
+    { id: 2, role: 'ASSISTANT', contextTransparency: older },
+    { id: 3, role: 'USER' },
+    { id: 4, role: 'ASSISTANT', contextTransparency: newer },
+  ]), newer)
 })

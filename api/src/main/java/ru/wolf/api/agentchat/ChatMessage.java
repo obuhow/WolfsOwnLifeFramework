@@ -46,6 +46,9 @@ public class ChatMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "context_transparency_json", columnDefinition = "TEXT")
+    private String contextTransparencyJson;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
