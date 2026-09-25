@@ -23,6 +23,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.wolf.api.agentchat.AgentChatProviderException;
+import ru.wolf.api.agentchat.AgentChatRateLimitExceededException;
 import ru.wolf.api.agentchat.ChatSessionNotFoundException;
 import ru.wolf.api.demo.DemoDataConflictException;
 import ru.wolf.api.goal.DuplicateGoalPriorityException;
@@ -48,6 +49,13 @@ public class GlobalExceptionHandler {
         Map<String, String> body = new HashMap<>();
         body.put("message", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
+    }
+
+    @ExceptionHandler(AgentChatRateLimitExceededException.class)
+    public ResponseEntity<Map<String, String>> handleAgentChatRateLimit(AgentChatRateLimitExceededException ex) {
+        Map<String, String> body = new HashMap<>();
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(body);
     }
 
     @ExceptionHandler(ProjectDependencyCycleException.class)

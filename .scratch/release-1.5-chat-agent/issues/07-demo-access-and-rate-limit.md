@@ -1,6 +1,6 @@
 # Тикет 07 — Доступ демо-профиля и лимит
 
-Status: needs-triage
+Status: resolved
 Blocked by: 03, 05
 Type: task
 
@@ -20,3 +20,25 @@ Type: task
 - После лимита запрос не уходит провайдеру и пользователю показана причина.
 - REGULAR-пользователь не наследует лимит DEMO.
 - Счётчик лимита устойчив к параллельным запросам.
+
+## Answer
+
+- Демо-запросы к `/agent-chat` используют общий `import_bot_daily_usage` и лимит
+  `wolf.import-bot.daily-limit-per-user`; обычные пользователи этот лимит не
+  расходуют.
+- Списание сделано атомарным PostgreSQL upsert с `ON CONFLICT ... WHERE`, поэтому
+  параллельные запросы не могут превысить бюджет. Списание вынесено в отдельную
+  транзакцию до вызова провайдера.
+- При исчерпании API возвращает HTTP 429 с объяснением; провайдер и сохранение
+  сообщений не вызываются. Доступ к сессии по-прежнему проверяется для текущего
+  пользователя.
+
+### Verification
+
+- `AgentChatRateLimitServiceTest` — passed.
+- `AgentChatDemoRateLimitApiIT` — 3 tests passed: DEMO limit, REGULAR bypass,
+  concurrent requests.
+- Existing agent tests (`AgentChatApiIT`, `AgentChatDisabledApiIT`) — passed.
+- Полный `./gradlew test` в окружении не завершён: после запуска полного набора
+  Testcontainers PostgreSQL стал недоступен, и независимые `AdminApiIT` получили
+  `Connection refused`; целевые тесты прошли на реальном PostgreSQL-контейнере.

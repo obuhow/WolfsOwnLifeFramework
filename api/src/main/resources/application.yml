@@ -54,7 +54,7 @@ wolf:
     secret-token: ${WOLF_MAX_SECRET_TOKEN:}
     api-base: ${WOLF_MAX_API_BASE:https://platform-api2.max.ru}
   import-bot:
-    # Per-user daily cap on LLM parse requests across all import channels (point 6).
+    # Per-user daily cap on LLM import/agent requests; demo chat uses the shared counter.
     daily-limit-per-user: ${WOLF_IMPORT_BOT_DAILY_LIMIT:20}
 
 server:

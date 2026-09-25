@@ -26,8 +26,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * tickets 03 &amp; 04, point 6). {@code dailyLimitPerUser} caps LLM parse
  * requests per WOLF user per UTC day; exceeding it yields a polite text refusal
  * while the normal chat-panel form stays available. The counter is shared across
- * every channel (chat-panel, Telegram, Max) so the limit is one budget per user,
- * not per channel.
+ * every channel (chat-panel, Telegram, Max, and the demo agent chat) so the limit
+ * is one budget per user, not per channel. Regular users are not limited by the
+ * demo-agent guard.
  */
 @Getter
 @Setter

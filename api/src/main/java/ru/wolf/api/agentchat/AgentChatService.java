@@ -43,6 +43,7 @@ public class AgentChatService {
     private final AgentContextService contextService;
     private final AgentChatPort agent;
     private final AgentActionService actionService;
+    private final AgentChatRateLimitService rateLimitService;
     private final NotesAssistantProperties properties;
 
     public AgentAvailabilityResponse availability() {
@@ -65,6 +66,7 @@ public class AgentChatService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalStateException("User not found"));
         List<ChatMessage> history = chatService.agentHistory(user, sessionId);
+        rateLimitService.consume(user);
         AgentContext context = contextService.build(user);
 
         List<AgentChatPort.Message> messages = new ArrayList<>(history.size() + 1);

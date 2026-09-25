@@ -18,6 +18,7 @@
 package ru.wolf.api.importer;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -36,4 +37,21 @@ public interface ImportBotDailyUsageRepository extends JpaRepository<ImportBotDa
 
     @Query("SELECT COALESCE(SUM(u.requestCount), 0) FROM ImportBotDailyUsage u WHERE u.userId = :userId")
     long totalCount(@Param("userId") Long userId);
+
+    /**
+     * Atomically consumes one request from the shared daily budget. PostgreSQL's
+     * upsert closes the check-then-increment race between concurrent requests;
+     * zero rows means the existing counter has already reached the limit.
+     */
+    @Modifying
+    @Query(value = """
+            INSERT INTO import_bot_daily_usage (user_id, usage_date, request_count)
+            VALUES (:userId, :usageDate, 1)
+            ON CONFLICT (user_id, usage_date) DO UPDATE
+            SET request_count = import_bot_daily_usage.request_count + 1
+            WHERE import_bot_daily_usage.request_count < :limit
+            """, nativeQuery = true)
+    int tryConsume(@Param("userId") Long userId,
+                   @Param("usageDate") LocalDate usageDate,
+                   @Param("limit") int limit);
 }
