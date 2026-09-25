@@ -17,8 +17,6 @@
  */
 package ru.wolf.api.max;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,11 +28,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.wolf.api.importer.ImportBotDailyUsage;
-import ru.wolf.api.importer.ImportBotDailyUsageRepository;
-import ru.wolf.api.importer.ImportBotProperties;
 import ru.wolf.api.importer.ImportConfirmService;
 import ru.wolf.api.importer.ImportParserService;
+import ru.wolf.api.importer.ImportBotRateLimitService;
 import ru.wolf.api.importer.dto.ConfirmCandidate;
 import ru.wolf.api.importer.dto.ConfirmImportRequest;
 import ru.wolf.api.importer.dto.EntityKind;
@@ -90,10 +86,9 @@ public class MaxImportService {
     private final ImportParserService parserService;
     private final ImportConfirmService confirmService;
     private final MaxPendingImportRepository pendingRepository;
-    private final ImportBotDailyUsageRepository usageRepository;
+    private final ImportBotRateLimitService rateLimitService;
     private final MaxPort maxPort;
     private final UserRepository userRepository;
-    private final ImportBotProperties importBotProperties;
     private final ObjectMapper objectMapper;
 
     /** Dispatch an inbound Max update: link, message, or callback. */
@@ -212,20 +207,10 @@ public class MaxImportService {
     }
 
     private boolean checkRateLimit(Long userId, String chatId) {
-        int limit = importBotProperties.getDailyLimitPerUser();
-        if (limit <= 0) {
-            return true;
-        }
-        LocalDate today = LocalDate.now(ZoneId.of("UTC"));
-        ImportBotDailyUsage usage = usageRepository.findByUserIdAndUsageDate(userId, today)
-                .orElseGet(() -> ImportBotDailyUsage.builder()
-                        .userId(userId).usageDate(today).requestCount(0).build());
-        if (usage.getRequestCount() >= limit) {
+        if (!rateLimitService.tryConsume(userId)) {
             maxPort.sendMessage(chatId, LIMIT_MESSAGE);
             return false;
         }
-        usage.setRequestCount(usage.getRequestCount() + 1);
-        usageRepository.save(usage);
         return true;
     }
 

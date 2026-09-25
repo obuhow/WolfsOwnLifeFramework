@@ -26,9 +26,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -68,7 +65,7 @@ import ru.wolf.api.user.UserRepository;
  * Release 0.7, ticket 04, point 5: the daily import-bot limit is a SINGLE shared
  * counter per user across all channels (chat-panel, Telegram, Max). This test wires
  * both the Telegram and Max import services to the SAME mocked
- * {@link ImportBotDailyUsageRepository} and asserts that requests from the two
+ * {@link ImportBotRateLimitService} and asserts that requests from the two
  * channels by one user consume the same per-user budget.
  *
  * <p>With {@code daily-limit-per-user = 2}: one Telegram request + one Max request
@@ -79,7 +76,7 @@ import ru.wolf.api.user.UserRepository;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class ImportBotSharedLimitTest {
 
-    @Mock private ImportBotDailyUsageRepository sharedUsage;
+    @Mock private ImportBotRateLimitService sharedRateLimit;
     @Mock private TelegramLinkService telegramLink;
     @Mock private MaxLinkService maxLink;
     @Mock private ImportParserService parserService;
@@ -93,16 +90,14 @@ class ImportBotSharedLimitTest {
     private TelegramImportService telegramService;
     private MaxImportService maxService;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ImportBotProperties props = new ImportBotProperties();
     private User user = User.builder().id(1L).username("alice").timezone("Europe/Moscow").build();
 
     @BeforeEach
     void setUp() {
-        props.setDailyLimitPerUser(2);
         telegramService = new TelegramImportService(telegramLink, parserService, confirmService,
-                telegramPending, sharedUsage, telegramPort, userRepository, props, objectMapper);
+                telegramPending, sharedRateLimit, telegramPort, userRepository, objectMapper);
         maxService = new MaxImportService(maxLink, parserService, confirmService,
-                maxPending, sharedUsage, maxPort, userRepository, props, objectMapper);
+                maxPending, sharedRateLimit, maxPort, userRepository, objectMapper);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(telegramLink.resolveUserId("chatT")).thenReturn(Optional.of(1L));
@@ -116,12 +111,7 @@ class ImportBotSharedLimitTest {
 
     @Test
     void telegramAndMaxShareOneBudget() {
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("UTC"));
-        // The same row is returned on every lookup; its counter is mutated in place.
-        ImportBotDailyUsage row = ImportBotDailyUsage.builder()
-                .userId(1L).usageDate(today).requestCount(0).build();
-        when(sharedUsage.findByUserIdAndUsageDate(eq(1L), any(LocalDate.class)))
-                .thenReturn(Optional.of(row));
+        when(sharedRateLimit.tryConsume(1L)).thenReturn(true, true, false);
 
         // 1st request via Telegram
         telegramService.handleMessage(new TelegramMessage(1L,
@@ -132,8 +122,7 @@ class ImportBotSharedLimitTest {
 
         // Both should have parsed and incremented the shared counter (now 2).
         verify(parserService, times(2)).parse(eq(user), anyString());
-        verify(sharedUsage, times(2)).save(any(ImportBotDailyUsage.class));
-        assertThat(row.getRequestCount()).isEqualTo(2);
+        verify(sharedRateLimit, times(2)).tryConsume(1L);
 
         // 3rd request (back to Telegram) must be refused — shared budget exhausted.
         telegramService.handleMessage(new TelegramMessage(2L,
@@ -149,16 +138,12 @@ class ImportBotSharedLimitTest {
         when(userRepository.findById(2L)).thenReturn(Optional.of(
                 User.builder().id(2L).username("bob").timezone("Europe/Moscow").build()));
 
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("UTC"));
-        ImportBotDailyUsage rowB = ImportBotDailyUsage.builder()
-                .userId(2L).usageDate(today).requestCount(0).build();
-        when(sharedUsage.findByUserIdAndUsageDate(eq(2L), any(LocalDate.class)))
-                .thenReturn(Optional.of(rowB));
+        when(sharedRateLimit.tryConsume(2L)).thenReturn(true);
 
         maxService.handleMessage(new MaxMessage(new MaxMessageBody("m2", "задача B"),
                 new MaxRecipient("chatM2")));
 
-        assertThat(rowB.getRequestCount()).isEqualTo(1);
+        verify(sharedRateLimit).tryConsume(2L);
         verify(parserService, never()).parse(eq(user), anyString()); // user 1 never parsed
         verify(parserService).parse(any(User.class), anyString());
     }

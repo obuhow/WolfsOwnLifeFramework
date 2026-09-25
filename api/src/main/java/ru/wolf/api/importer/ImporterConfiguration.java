@@ -23,7 +23,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Channel-independent import configuration (release 0.7, ticket 04). Holds the
  * shared {@link ImportBotProperties} rate-limit settings, consumed by every
- * import channel (chat-panel, Telegram, Max).
+ * import channel (chat-panel, Telegram, Max) and the demo agent chat.
  */
 @Configuration
 @EnableConfigurationProperties(ImportBotProperties.class)

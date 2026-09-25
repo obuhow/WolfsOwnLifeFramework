@@ -27,9 +27,9 @@ import java.time.LocalDate;
  * the counter resets naturally on the next day's row.
  *
  * <p>Introduced by release 0.7 ticket 04 as a shared counter: every import
- * channel (chat-panel, Telegram, Max) increments the same per-user row so a
- * single {@code daily-limit-per-user} budget applies across all channels, not a
- * separate budget per channel. It replaces the Telegram-only
+ * channel (chat-panel, Telegram, Max) and the demo agent chat increment the same
+ * per-user row so a single {@code daily-limit-per-user} budget applies across all
+ * channels, not a separate budget per channel. It replaces the Telegram-only
  * {@code telegram_daily_usage} table (renamed by migration V40).
  */
 @Entity

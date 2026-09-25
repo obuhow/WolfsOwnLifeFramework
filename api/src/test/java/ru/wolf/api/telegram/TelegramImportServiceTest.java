@@ -42,10 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ru.wolf.api.importer.ImportConfirmService;
-import ru.wolf.api.importer.ImportBotDailyUsage;
-import ru.wolf.api.importer.ImportBotDailyUsageRepository;
-import ru.wolf.api.importer.ImportBotProperties;
 import ru.wolf.api.importer.ImportParserService;
+import ru.wolf.api.importer.ImportBotRateLimitService;
 import ru.wolf.api.importer.dto.ConfirmImportRequest;
 import ru.wolf.api.importer.dto.EntityKind;
 import ru.wolf.api.importer.dto.ParseResult;
@@ -71,22 +69,21 @@ class TelegramImportServiceTest {
     @Mock private ImportParserService parserService;
     @Mock private ImportConfirmService confirmService;
     @Mock private TelegramPendingImportRepository pendingRepository;
-    @Mock private ImportBotDailyUsageRepository usageRepository;
+    @Mock private ImportBotRateLimitService rateLimitService;
     @Mock private TelegramPort telegramPort;
     @Mock private UserRepository userRepository;
 
     private TelegramImportService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ImportBotProperties props = new ImportBotProperties();
+
 
     private User userA;
     private User userB;
 
     @BeforeEach
     void setUp() {
-        props.setDailyLimitPerUser(2);
         service = new TelegramImportService(linkService, parserService, confirmService,
-                pendingRepository, usageRepository, telegramPort, userRepository, props, objectMapper);
+                pendingRepository, rateLimitService, telegramPort, userRepository, objectMapper);
         userA = User.builder().id(1L).username("alice").timezone("Europe/Moscow").build();
         userB = User.builder().id(2L).username("bob").timezone("Europe/Moscow").build();
     }
@@ -120,8 +117,7 @@ class TelegramImportServiceTest {
     void chatA_textOnlyResolvesUserA_neverTouchesUserB() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(userA));
         when(linkService.resolveUserId("chatA")).thenReturn(Optional.of(1L));
-        when(usageRepository.findByUserIdAndUsageDate(eq(1L), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
+        when(rateLimitService.tryConsume(1L)).thenReturn(true);
         TelegramPendingImport pending = TelegramPendingImport.builder()
                 .id(java.util.UUID.randomUUID()).chatId("chatA").userId(1L)
                 .payload("[]").build();
@@ -164,10 +160,7 @@ class TelegramImportServiceTest {
     @Test
     void dailyLimitExceeded_politeRefusal_noParse() {
         when(linkService.resolveUserId("chatA")).thenReturn(Optional.of(1L));
-        ImportBotDailyUsage usage = ImportBotDailyUsage.builder()
-                .userId(1L).usageDate(LocalDate.now(java.time.ZoneId.of("UTC"))).requestCount(2).build();
-        when(usageRepository.findByUserIdAndUsageDate(eq(1L), any(LocalDate.class)))
-                .thenReturn(Optional.of(usage));
+        when(rateLimitService.tryConsume(1L)).thenReturn(false);
 
         service.handleMessage(msg("chatA", "ещё одна задача"));
 
@@ -180,10 +173,7 @@ class TelegramImportServiceTest {
     void withinLimit_incrementsCounter_andParses() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(userA));
         when(linkService.resolveUserId("chatA")).thenReturn(Optional.of(1L));
-        ImportBotDailyUsage usage = ImportBotDailyUsage.builder()
-                .userId(1L).usageDate(LocalDate.now(java.time.ZoneId.of("UTC"))).requestCount(1).build();
-        when(usageRepository.findByUserIdAndUsageDate(eq(1L), any(LocalDate.class)))
-                .thenReturn(Optional.of(usage));
+        when(rateLimitService.tryConsume(1L)).thenReturn(true);
         TelegramPendingImport pending = TelegramPendingImport.builder()
                 .id(java.util.UUID.randomUUID()).chatId("chatA").userId(1L).payload("[]").build();
         when(pendingRepository.save(any())).thenReturn(pending);
@@ -191,7 +181,7 @@ class TelegramImportServiceTest {
 
         service.handleMessage(msg("chatA", "задача в 9:00"));
 
-        verify(usageRepository).save(any(ImportBotDailyUsage.class));
+        verify(rateLimitService).tryConsume(1L);
         verify(parserService).parse(eq(userA), anyString());
         verify(telegramPort).sendCard(eq("chatA"), anyString(), anyString(), anyString());
     }

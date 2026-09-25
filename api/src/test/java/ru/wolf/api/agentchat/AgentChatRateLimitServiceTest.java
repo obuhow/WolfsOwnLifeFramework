@@ -5,16 +5,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.wolf.api.importer.ImportBotDailyUsageRepository;
-import ru.wolf.api.importer.ImportBotProperties;
+import ru.wolf.api.importer.ImportBotRateLimitService;
 import ru.wolf.api.user.User;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -24,15 +19,13 @@ import static org.mockito.Mockito.when;
 class AgentChatRateLimitServiceTest {
 
     @Mock
-    ImportBotDailyUsageRepository usageRepository;
+    ImportBotRateLimitService rateLimitService;
 
-    private final ImportBotProperties properties = new ImportBotProperties();
     private AgentChatRateLimitService service;
 
     @BeforeEach
     void setUp() {
-        properties.setDailyLimitPerUser(2);
-        service = new AgentChatRateLimitService(usageRepository, properties);
+        service = new AgentChatRateLimitService(rateLimitService);
     }
 
     @Test
@@ -41,15 +34,13 @@ class AgentChatRateLimitServiceTest {
 
         assertThatCode(() -> service.consume(regular)).doesNotThrowAnyException();
 
-        verifyNoInteractions(usageRepository);
+        verifyNoInteractions(rateLimitService);
     }
 
     @Test
     void demo_user_is_refused_after_atomic_counter_reaches_limit() {
         User demo = User.builder().id(2L).accountType("DEMO").build();
-        LocalDate today = LocalDate.now(ZoneId.of("UTC"));
-        when(usageRepository.tryConsume(eq(2L), eq(today), eq(2)))
-                .thenReturn(1, 1, 0);
+        when(rateLimitService.tryConsume(eq(2L))).thenReturn(true, true, false);
 
         service.consume(demo);
         service.consume(demo);
@@ -58,17 +49,16 @@ class AgentChatRateLimitServiceTest {
                 .isInstanceOf(AgentChatRateLimitExceededException.class)
                 .hasMessage("Дневной лимит запросов агента для демо-профиля исчерпан. Попробуйте завтра.");
 
-        verify(usageRepository, org.mockito.Mockito.times(3))
-                .tryConsume(eq(2L), eq(today), eq(2));
+        verify(rateLimitService, org.mockito.Mockito.times(3)).tryConsume(eq(2L));
     }
 
     @Test
-    void non_positive_limit_keeps_existing_unlimited_configuration() {
-        properties.setDailyLimitPerUser(0);
+    void unlimited_configuration_is_delegated_to_shared_budget() {
         User demo = User.builder().id(2L).accountType("DEMO").build();
+        when(rateLimitService.tryConsume(eq(2L))).thenReturn(true);
 
         assertThatCode(() -> service.consume(demo)).doesNotThrowAnyException();
 
-        verifyNoInteractions(usageRepository);
+        verify(rateLimitService).tryConsume(eq(2L));
     }
 }
